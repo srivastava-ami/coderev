@@ -29,6 +29,7 @@ func (w *fileWalker) checkPatterns() {
 		w.checkGoPanicInLib(line, lineNum)
 		w.checkGoSQLStringConcat(line, lineNum)
 		w.checkGoContextTODO(line, lineNum)
+		w.checkFloatingPromise(line, lineNum)
 	}
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)

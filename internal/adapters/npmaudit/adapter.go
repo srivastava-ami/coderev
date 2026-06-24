@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 
@@ -107,6 +108,6 @@ func mapSeverity(s string) analysis.Severity {
 }
 
 func fileExists(path string) bool {
-	_, err := exec.LookPath(path)
+	_, err := os.Stat(path)
 	return err == nil
 }

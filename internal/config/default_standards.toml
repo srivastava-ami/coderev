@@ -75,7 +75,7 @@ max_depth   = 3
 remediation = "Invert conditions (early return) or extract inner blocks to helpers."
 
 [complexity.duplication]
-rule             = "complexity.cross_file_duplication"
+rule             = "file_structure.duplication"
 threshold_tokens = 25
 
 [file_structure]

@@ -188,10 +188,38 @@ func matchesException(f Finding, exceptions []config.Exception) bool {
 		if ex.Rule != f.Rule {
 			continue
 		}
-		if strings.Contains(f.File, ex.FileOrModule) {
+		if matchExceptionPath(f.File, ex.FileOrModule) {
 			return true
 		}
 	}
+	return false
+}
+
+// matchExceptionPath checks whether the finding's file path matches the exception
+// pattern. The pattern can be an exact suffix (directory/file.go), a glob pattern
+// containing * or ?, or a full path. Matching is anchored at directory boundaries
+// to prevent substring false positives.
+func matchExceptionPath(file, pattern string) bool {
+	// glob match — pattern contains * or ?
+	if strings.ContainsAny(pattern, "*?") {
+		matched, _ := filepath.Match(pattern, file)
+		if matched {
+			return true
+		}
+		// also try matching against just the filename
+		_, base := filepath.Split(file)
+		matched, _ = filepath.Match(pattern, base)
+		return matched
+	}
+
+	// exact suffix match anchored at a separator boundary
+	if strings.HasSuffix(file, pattern) {
+		suffixStart := len(file) - len(pattern)
+		if suffixStart == 0 || file[suffixStart-1] == '/' || file[suffixStart-1] == '\\' {
+			return true
+		}
+	}
+
 	return false
 }
 
