@@ -8,8 +8,65 @@ permissions:
   contents: write
 
 jobs:
+  # Build each platform on its native runner — go-tree-sitter requires CGO
+  # and CGO cannot cross-compile without a C cross-toolchain.
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+          - goos: darwin
+            goarch: amd64
+            runner: macos-13
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-latest
+            cc: aarch64-linux-gnu-gcc
+
+    runs-on: ${{ matrix.runner }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Install arm64 cross-compiler (linux/arm64 only)
+        if: matrix.cc != ''
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+          CGO_ENABLED: 1
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          mkdir -p bin/dist
+          go build -ldflags "-X main.version=${VERSION} -s -w" \
+            -o "bin/dist/coderev-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}" \
+            ./cmd/coderev
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coderev-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: bin/dist/coderev-*
+          retention-days: 1
+
   release:
-    name: Build, publish, update formula
+    name: Publish release and update formula
+    needs: build
     runs-on: ubuntu-latest
 
     steps:
@@ -18,13 +75,10 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-go@v5
+      - uses: actions/download-artifact@v4
         with:
-          go-version: "1.22"
-          cache: true
-
-      - name: Build release binaries
-        run: make dist
+          path: bin/dist
+          merge-multiple: true
 
       - name: Compute SHA256 sums
         id: sha
@@ -59,10 +113,10 @@ jobs:
         run: |
           sed -i \
             -e "s/version \"[^\"]*\"/version \"${VERSION}\"/" \
-            -e "s/SHA256_DARWIN_ARM64/${DARWIN_ARM64}/" \
-            -e "s/SHA256_DARWIN_AMD64/${DARWIN_AMD64}/" \
-            -e "s/SHA256_LINUX_ARM64/${LINUX_ARM64}/"  \
-            -e "s/SHA256_LINUX_AMD64/${LINUX_AMD64}/"  \
+            -e "s/SHA256_DARWIN_ARM64/${DARWIN_ARM64}/g" \
+            -e "s/SHA256_DARWIN_AMD64/${DARWIN_AMD64}/g" \
+            -e "s/SHA256_LINUX_ARM64/${LINUX_ARM64}/g"  \
+            -e "s/SHA256_LINUX_AMD64/${LINUX_AMD64}/g"  \
             Formula/coderev.rb
 
       - name: Commit formula update
@@ -70,5 +124,5 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/coderev.rb
-          git commit -m "chore: bump formula to ${GITHUB_REF_NAME}"
+          git diff --staged --quiet || git commit -m "bump formula to ${GITHUB_REF_NAME}"
           git push origin HEAD:main
