@@ -34,6 +34,10 @@ func (w *fileWalker) checkPatterns() {
 		w.checkPythonPrint(line, lineNum)
 		w.checkPythonBareExcept(line, lineNum)
 		w.checkPythonEvalExec(line, lineNum)
+		// Rust-specific checks
+		w.checkRustUnwrap(line, lineNum)
+		w.checkRustPanic(line, lineNum)
+		w.checkRustExpect(line, lineNum)
 	}
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)
@@ -121,7 +125,7 @@ func (w *fileWalker) checkEmptyCatch(line string, lineNum int) {
 
 func isTestFile(path string) bool {
 	base := filepath.Base(path)
-	return strings.HasSuffix(base, "_test.go") ||
+	return strings.HasSuffix(base, "_test.go") || strings.HasSuffix(base, "_test.rs") ||
 		strings.HasSuffix(base, ".spec.ts") || strings.HasSuffix(base, ".test.ts") ||
 		strings.HasSuffix(base, ".spec.js") || strings.HasSuffix(base, ".test.js")
 }

@@ -8,6 +8,18 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// rustGuard returns (trimmed, skip=true) when the line is not Rust or is a comment.
+func (w *fileWalker) rustGuard(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
+		return "", true
+	}
+	if w.lang != analysis.LangRust {
+		return "", true
+	}
+	return trimmed, false
+}
+
 // emitFinding appends a finding, auto-filling File/Source/Snippet and
 // enriching Tags/Standards from the rule registry if not already set.
 // jsTSGuard returns (trimmed, skip=true) when the line should not be checked.

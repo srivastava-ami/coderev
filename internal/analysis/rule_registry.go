@@ -65,6 +65,11 @@ var RuleRegistry = map[string]RuleMeta{
 	"nx_conventions.no_deep_import": {},
 	"nx_conventions.boundaries":     {},
 
+	// rust_conventions
+	"rust.no_unwrap": {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_panic":  {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_expect": {},
+
 	// go_conventions
 	"go.fmt_print":         {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},
 	"go.panic_in_lib":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
