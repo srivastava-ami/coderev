@@ -47,7 +47,7 @@ jobs:
           mkdir -p .tmp
           docker run --rm -v "$GITHUB_WORKSPACE:/src" \
             ${{ env.IMAGE }}:ci-latest /src > .tmp/scan.log 2>&1 || true
-          grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
+          grep -E "status:|blocker|findings|warning:|posted" .tmp/scan.log | tail -5
 
       - name: Publish to step summary
         if: always()
@@ -56,7 +56,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: coderev-report-${{ github.ref_name }}-${{ github.sha }}
+          name: coderev-report-${{ github.sha }}
           path: coderev-report.md
           if-no-files-found: ignore
           retention-days: 14
@@ -112,7 +112,7 @@ jobs:
               --repo "${PR_REPO}" \
               --pr "${PR_NUMBER}" \
               /src > .tmp/scan.log 2>&1 || true
-          grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
+          grep -E "status:|blocker|findings|warning:|posted" .tmp/scan.log | tail -5
 
       - name: Post report as PR comment
         if: always()
@@ -168,7 +168,7 @@ jobs:
           mkdir -p .tmp
           docker run --rm -v "$GITHUB_WORKSPACE:/src" \
             ${{ env.IMAGE }}:latest /src > .tmp/scan.log 2>&1 || true
-          grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
+          grep -E "status:|blocker|findings|warning:|posted" .tmp/scan.log | tail -5
 
       - name: Commit report to main
         if: always()
