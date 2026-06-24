@@ -70,7 +70,10 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 
 	findings, err := collectAnalyseResults(results)
 	dupFindings := DetectDuplication(req.Files)
-	return append(findings, dupFindings...), err
+	magicFindings := checkMagicNumbers(req.Files)
+	findings = append(findings, dupFindings...)
+	findings = append(findings, magicFindings...)
+	return findings, err
 }
 
 func (a *Adapter) runFile(ctx context.Context, fi analysis.FileInfo, out chan<- analyseResult) {
