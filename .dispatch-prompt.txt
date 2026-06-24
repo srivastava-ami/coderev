@@ -9,124 +9,71 @@ You are implementing a specific task. Follow these instructions exactly.
 5. Then run `go test ./...` — all tests must pass.
 6. Do not commit. Leave changes unstaged.
 
-## Task: v110_semgrep_infra
+## Task: v110_rule_yaml
 
 ## What to build
 
-Replace the semgrep adapter's runtime cloud-pack fetch with embedded YAML
-rules. The adapter embeds internal/adapters/semgrep/rules/*.yaml at build
-time via //go:embed, extracts them to a temp directory at scan time, and
-runs semgrep --config <tmpdir>. No network call is made during a scan.
-A placeholder YAML file is added so the embed directive compiles before
-Task D (rule-yaml) adds the real rule files.
+Add the first real coderev-owned semgrep YAML rule: security.secret_fallback_literal.
+This covers the destructuring default form and multi-line assignments that the Go
+line scanner cannot detect. Delete the placeholder.yaml added by Task B.
 
 ## Why
 
-The current adapter fetches p/owasp-top-ten and p/secrets from semgrep's
-cloud registry at scan time. This breaks offline use, pins quality to
-third-party rule maintenance, and violates the zero-network-at-scan-time
-guarantee. Embedding coderev-owned YAML files restores all three properties.
+The Go treesitter scanner covers dot-notation and bracket-notation forms.
+Semgrep's AST-aware matching covers:
+  const { SIGNING_KEY = 'dev-key' } = process.env
+  const { JWT_SECRET = 'x', PORT = '3000' } = process.env
+These require understanding destructuring assignment structure, not line patterns.
 
 ## Exact implementation spec — follow this precisely
 
 The spec below contains the EXACT code to write. Copy it verbatim.
 Do not invent alternative implementations.
 
-### placeholder_yaml
+### security_yaml
 
-Write this exact content to internal/adapters/semgrep/rules/placeholder.yaml.
-It is a valid semgrep file that matches nothing. Task D (rule-yaml) will
-replace it with real rules and delete this file.
+Write this exact content to internal/adapters/semgrep/rules/security.yaml.
+Note: $VAL uses '.+' which requires a non-empty match — empty fallback does not fire.
 
-  # coderev built-in semgrep rules
-  # Real rules are added per category. This file satisfies the embed directive.
-  rules: []
-
-### adapter_change
-
-Replace internal/adapters/semgrep/adapter.go entirely with the following.
-The parseSemgrepOutput and mapSeverity functions are unchanged from the current
-file — copy them verbatim. Only execSemgrep and the top of the file change.
-
-  package semgrep
-
-  import (
-      "context"
-      "embed"
-      "encoding/json"
-      "fmt"
-      "io/fs"
-      "os"
-      "path/filepath"
-      "strings"
-
-      "github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
-      "github.com/srivastava-ami/coderev/internal/analysis"
-  )
-
-  //go:embed rules/*.yaml
-  var embeddedRules embed.FS
-
-  type Adapter struct{ binary string }
-
-  func New(binary string) *Adapter {
-      if binary == "" { binary = "semgrep" }
-      return &Adapter{binary: binary}
-  }
-
-  func (a *Adapter) Name() string      { return "semgrep" }
-  func (a *Adapter) IsAvailable() bool { return cmdutil.BinaryAvailable(a.binary) }
-  func (a *Adapter) Capabilities() []string {
-      return []string{"security.pattern.*"}
-  }
-
-  func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.Finding, error) {
-      data, err := a.execSemgrep(ctx, req)
-      if err != nil { return nil, err }
-      return parseSemgrepOutput(data)
-  }
-
-  func (a *Adapter) execSemgrep(ctx context.Context, req analysis.RunRequest) ([]byte, error) {
-      rulesDir, err := extractRulesToTemp(embeddedRules)
-      if err != nil {
-          return nil, fmt.Errorf("semgrep: extracting embedded rules: %w", err)
-      }
-      defer os.RemoveAll(rulesDir)
-      args := []string{"--config", rulesDir, "--json", "--quiet", req.Target}
-      args = append(args, req.ExtraArgs...)
-      return cmdutil.RunTool(ctx, a.binary, "semgrep", args)
-  }
-
-  func extractRulesToTemp(rules embed.FS) (string, error) {
-      dir, err := os.MkdirTemp("", "coderev-semgrep-*")
-      if err != nil { return "", err }
-      entries, err := fs.ReadDir(rules, "rules")
-      if err != nil {
-          os.RemoveAll(dir)
-          return "", err
-      }
-      for _, e := range entries {
-          if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") { continue }
-          data, err := fs.ReadFile(rules, "rules/"+e.Name())
-          if err != nil {
-              os.RemoveAll(dir)
-              return "", err
-          }
-          if err := os.WriteFile(filepath.Join(dir, e.Name()), data, 0o644); err != nil {
-              os.RemoveAll(dir)
-              return "", err
-          }
-      }
-      return dir, nil
-  }
-
-  // parseSemgrepOutput, semgrepOutput, semgrepResult, mapSeverity — copy unchanged
-  // from the existing adapter.go. Do not modify them.
+  rules:
+    - id: security.secret_fallback_literal
+      languages: [typescript, javascript]
+      severity: ERROR
+      message: >
+        Env var '$KEY' has a hardcoded literal fallback. If the variable is unset
+        in a deployed environment this uses a known, source-visible value.
+        Fail closed (throw) instead of defaulting.
+      metadata:
+        cwe: "CWE-798"
+        owasp: "A07:2021"
+        source: coderev
+      pattern-either:
+        - pattern: process.env.$KEY ?? "$VAL"
+        - pattern: process.env.$KEY || "$VAL"
+        - pattern: process.env[$KEY] ?? "$VAL"
+        - pattern: process.env[$KEY] || "$VAL"
+        - pattern: |
+            const {..., $KEY = "$VAL", ...} = process.env
+      metavariable-regex:
+        $KEY: '(?i)(secret|password|passwd|token|api[_-]?key|private[_-]?key|client[_-]?secret|credential|jwt|signing[_-]?key|encryption[_-]?key)'
+        $VAL: '.+'
+      paths:
+        exclude:
+          - "**/*.test.ts"
+          - "**/*.spec.ts"
+          - "**/*.test.tsx"
+          - "**/*.spec.tsx"
+          - "**/*.test.js"
+          - "**/*.spec.js"
+          - "**/__tests__/**"
+          - "**/e2e/**"
 
 ## Acceptance criteria (verify each one)
 
-1. go build ./... passes.
-2. When semgrep is not installed: coderev . completes cleanly (adapter skips).
-3. When semgrep is installed: coderev . does not make any network calls
-   (verify with: SEMGREP_SEND_METRICS=off and no --config URL in semgrep args).
-4. The rules/ directory contains placeholder.yaml and the embed compiles.
+1. go build ./... passes (embed picks up security.yaml, placeholder gone).
+2. When semgrep is installed:
+   - A file containing 'const { SIGNING_KEY = "dev-key" } = process.env'
+     produces a security.secret_fallback_literal finding from the semgrep adapter.
+   - PORT and LOG_LEVEL keys produce no findings.
+   - The same pattern in a *.test.ts file produces no findings.
+3. When semgrep is not installed: adapter skips cleanly.

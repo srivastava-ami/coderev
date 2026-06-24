@@ -1,0 +1,32 @@
+  rules:
+    - id: security.secret_fallback_literal
+      languages: [typescript, javascript]
+      severity: ERROR
+      message: >
+        Env var '$KEY' has a hardcoded literal fallback. If the variable is unset
+        in a deployed environment this uses a known, source-visible value.
+        Fail closed (throw) instead of defaulting.
+      metadata:
+        cwe: "CWE-798"
+        owasp: "A07:2021"
+        source: coderev
+      pattern-either:
+        - pattern: process.env.$KEY ?? "$VAL"
+        - pattern: process.env.$KEY || "$VAL"
+        - pattern: process.env[$KEY] ?? "$VAL"
+        - pattern: process.env[$KEY] || "$VAL"
+        - pattern: |
+            const {..., $KEY = "$VAL", ...} = process.env
+      metavariable-regex:
+        $KEY: '(?i)(secret|password|passwd|token|api[_-]?key|private[_-]?key|client[_-]?secret|credential|jwt|signing[_-]?key|encryption[_-]?key)'
+        $VAL: '.+'
+      paths:
+        exclude:
+          - "**/*.test.ts"
+          - "**/*.spec.ts"
+          - "**/*.test.tsx"
+          - "**/*.spec.tsx"
+          - "**/*.test.js"
+          - "**/*.spec.js"
+          - "**/__tests__/**"
+          - "**/e2e/**"
