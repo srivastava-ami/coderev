@@ -26,6 +26,7 @@ All findings are produced by deterministic static analysis — zero LLM calls, z
 ```bash
 # Homebrew (macOS / Linux) — recommended
 brew tap srivastava-ami/tools
+brew trust srivastava-ami/tools   # one-time: Homebrew 4.x requires trusting third-party taps
 brew install coderev
 
 # curl installer — also installs gitleaks, semgrep, madge
