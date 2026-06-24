@@ -50,7 +50,7 @@ coderev [target]
     │      in --diff mode: DiffService.ChangedFiles() filters to changed files
     │
     ├─ 5. Run adapters in parallel
-    │       ├─ treesitter  →  AST-based: 53 rules across TS/JS/Go/Python/Rust
+    │       ├─ treesitter  →  AST-based: 55 rules across TS/JS/Go/Python/Rust
     │       ├─ semgrep     →  OWASP injection / auth / crypto          (if installed)
     │       ├─ gitleaks    →  secret scanning                          (if installed)
     │       ├─ madge       →  circular deps, NX boundaries             (if installed)
@@ -143,7 +143,7 @@ For tools that emit NDJSON output, no Go is needed at all — the `script` adapt
 
 ### Tree-sitter as the primary engine
 
-The majority of rules are satisfied by tree-sitter running in-process (pure Go / CGO). It parses source files from text alone — no running build, no language server, no network. Supported: TypeScript, TSX, JavaScript, Go, **Python**, **Rust** (5 languages, 53 built-in rules).
+The majority of rules are satisfied by tree-sitter running in-process (pure Go / CGO). It parses source files from text alone — no running build, no language server, no network. Supported: TypeScript, TSX, JavaScript, Go, **Python**, **Rust** (5 languages, 55 built-in rules).
 
 **Cross-cutting rules (all languages):** cyclomatic complexity, cognitive complexity, function length, parameter count, nesting depth, hardcoded URLs, magic number literals, cross-file duplication.
 

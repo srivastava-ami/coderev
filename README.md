@@ -135,7 +135,7 @@ Full workflow: `.github/workflows/code-quality.yml`
 
 ## Rules catalog
 
-All 53 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
+All 55 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
 → **[docs/rules-reference.md](docs/rules-reference.md)**
 
 ## Standards file
