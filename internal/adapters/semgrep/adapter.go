@@ -46,7 +46,7 @@ func (a *Adapter) execSemgrep(ctx context.Context, req analysis.RunRequest) ([]b
 		return nil, fmt.Errorf("semgrep: extracting embedded rules: %w", err)
 	}
 	defer os.RemoveAll(rulesDir)
-	args := []string{"--config", rulesDir, "--json", "--quiet", req.Target}
+	args := []string{"--config", rulesDir, "--json", "--quiet", "--no-rewrite-rule-ids", req.Target}
 	args = append(args, req.ExtraArgs...)
 	return cmdutil.RunTool(ctx, a.binary, "semgrep", args)
 }
@@ -110,7 +110,7 @@ func parseSemgrepOutput(data []byte) ([]analysis.Finding, error) {
 	findings := make([]analysis.Finding, 0, len(out.Results))
 	for _, r := range out.Results {
 		findings = append(findings, analysis.Finding{
-			Rule:     "security.semgrep." + r.CheckID,
+			Rule:     r.CheckID,
 			Pillar:   "security",
 			Severity: mapSeverity(r.Extra.Severity),
 			File:     r.Path,
