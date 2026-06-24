@@ -120,21 +120,28 @@ func gitleaksURL(ver string) string {
 }
 
 func ensureSemgrep() error {
+	// pipx works everywhere and isolates the install correctly
 	if onPATH("pipx") {
 		return runVisible("pipx", "install", "semgrep")
 	}
+	// macOS system Python is PEP 668 externally managed — pip3 will always fail;
+	// use brew which has semgrep as a formula
+	if runtime.GOOS == "darwin" {
+		if onPATH("brew") {
+			return runVisible("brew", "install", "semgrep")
+		}
+		return fmt.Errorf("install semgrep manually: brew install semgrep  OR  brew install pipx && pipx install semgrep")
+	}
+	// Linux: pip3 --user works, static binary as last resort
 	if onPATH("pip3") {
 		return runVisible("pip3", "install", "--user", "semgrep")
 	}
 	if onPATH("brew") {
 		return runVisible("brew", "install", "semgrep")
 	}
-	if runtime.GOOS == "linux" {
-		ver := "1.69.0"
-		url := fmt.Sprintf(semgrepReleaseURL, ver, ver)
-		return downloadTGZ(url, "semgrep", "semgrep")
-	}
-	return fmt.Errorf("no installer found — install manually: pipx install semgrep")
+	ver := "1.69.0"
+	url := fmt.Sprintf(semgrepReleaseURL, ver, ver)
+	return downloadTGZ(url, "semgrep", "semgrep")
 }
 
 func ensureMadge() error {
