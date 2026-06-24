@@ -8,6 +8,8 @@ graphify-out/
 .claude/
 .mcp.json
 project_manifest.toml
+CLAUDE.md
+AGENTS.md
 
 # temporary logs from Claude tool executions
 .tmp/

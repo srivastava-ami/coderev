@@ -142,7 +142,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
 
     steps:
@@ -178,6 +178,17 @@ jobs:
             -v "$GITHUB_WORKSPACE:/src" \
             ${{ env.IMAGE }}:latest /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
+
+      - name: Commit report back to main
+        if: always()
+        run: |
+          if [ -f coderev-report.md ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add coderev-report.md
+            git diff --staged --quiet || git commit -m "Update coderev scan report [skip ci]"
+            git push
+          fi
 
       - name: Publish to step summary
         if: always()
