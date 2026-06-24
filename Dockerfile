@@ -16,8 +16,9 @@ FROM debian:bookworm-slim
 
 ARG GITLEAKS_VERSION=8.30.0
 
-# Python (semgrep), Node (madge), curl (gitleaks download)
+# git (--diff mode), Python (semgrep), Node (madge), curl (gitleaks download)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
       python3 python3-pip \
       nodejs npm \
       curl ca-certificates \
