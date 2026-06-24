@@ -1057,3 +1057,27 @@ justification         = "testdata/sample-ts intentional violations"
 approved_by           = "coderev-maintainers"
 expires               = ""
 ticket                = ""
+
+[[exceptions]]
+rule                  = "hardcoding.urls_and_paths"
+file_or_module        = "cmd/coderev/setup.go"
+justification         = "installGitleaksFromRelease() must call the GitHub releases API by its canonical URL — there is no configurable alternative for a self-contained install command"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "complexity.function_length"
+file_or_module        = "cmd/coderev/setup.go"
+justification         = "installGitleaksFromRelease() is bootstrap installer code: detect OS/arch, fetch release metadata, download tarball, extract, install — one atomic operation with no reusable sub-units"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "file_structure.file_length"
+file_or_module        = "cmd/coderev/setup.go"
+justification         = "setup.go contains all install subcommands (setup, install-deps, install-hooks) as a single cohesive unit; splitting it would fragment one feature across multiple files"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
