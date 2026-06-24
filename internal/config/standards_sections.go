@@ -211,6 +211,18 @@ type PerformanceAsyncStd struct {
 	Checks   []string `toml:"checks"`
 }
 
+// ── Python Conventions ─────────────────────────────────────────────────────────
+
+type PythonConventionsStd struct {
+	Severity string `toml:"severity"`
+}
+
+// ── Rust Conventions ───────────────────────────────────────────────────────────
+
+type RustConventionsStd struct {
+	Severity string `toml:"severity"`
+}
+
 // ── NX Conventions ────────────────────────────────────────────────────────────
 
 type NxConventionsStd struct {

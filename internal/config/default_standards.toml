@@ -6,7 +6,7 @@
 [meta]
 version      = "built-in"
 last_updated = "2026-06-23"
-applies_to   = ["typescript", "javascript", "go"]
+applies_to   = ["typescript", "javascript", "go", "python", "rust"]
 
 [security]
 severity = "blocker"
@@ -149,3 +149,11 @@ tool        = "madge"
 [nx_conventions.tags]
 rule           = "nx_conventions.tags"
 required_axes  = ["scope", "type"]
+
+# ── Python Conventions ────────────────────────────────────────────────────────
+[python_conventions]
+severity = "advisory"
+
+# ── Rust Conventions ──────────────────────────────────────────────────────────
+[rust_conventions]
+severity = "advisory"
