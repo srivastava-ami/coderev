@@ -1,21 +1,31 @@
 # Rules Reference
 
-All 53 built-in rules, grouped by pillar, with TOML configuration and severity defaults.
+All 55 built-in rules, grouped by pillar, with TOML configuration and severity defaults.
 
 ---
 
-## Quick start
+## Default standards
 
-```bash
-# Scan with zero config — built-in defaults apply automatically
-coderev .
+coderev ships with built-in standards embedded in the binary, organised by pillar.
+No configuration file is needed — just run `coderev .`.
 
-# See what's available (all rules, their IDs, and current thresholds)
-# Read the standards file if one exists:
-cat code_review_standards.toml
-```
+| File | Pillar |
+|---|---|
+| complexity.toml | Cyclomatic, cognitive, nesting, parameters, function length |
+| security.toml | Secrets, dependencies |
+| stability.toml | Error handling, async |
+| hardcoding.toml | Magic numbers, hardcoded URLs |
+| type_safety.toml | TypeScript any, null assertions |
+| observability.toml | Logging |
+| documentation.toml | TODOs, commented-out code |
+| file_structure.toml | File and class length, circular deps |
+| testing.toml | Coverage thresholds |
+| go.toml | Go conventions |
+| python.toml | Python conventions |
+| rust.toml | Rust conventions |
+| nx.toml | NX monorepo boundaries |
 
-To customise: copy the relevant TOML sections below into your own `code_review_standards.toml`, place it in your repo root, and adjust thresholds.
+To override for a specific repo: `coderev --standards /path/to/custom.toml .`
 
 ---
 
@@ -158,6 +168,7 @@ exceptions  = [0, 1, 2, 100, 1000]    # values to always allow
 | `security.no_weak_crypto` | MD5/SHA-1 references | All | blocker | — | treesitter |
 | `security.no_prototype_pollution` | `__proto__` | TS/JS | blocker | — | treesitter |
 | `security.secrets` | Hardcoded credentials, API keys | All | blocker | — | gitleaks |
+| `security.secret_fallback_literal` | Env secret with hardcoded fallback | TS/JS | blocker (advisory in NODE_ENV guard) | — | treesitter + semgrep |
 | `security.dependencies` | Vulnerable npm packages | JS/TS | blocker | — | npm audit |
 
 ### Built-in treesitter checks (zero dependencies):
@@ -410,7 +421,7 @@ A plugin needs a manifest (`coderev-plugin.toml`) and a binary that outputs find
 
 | Adapter | Rules it handles | Requires install? |
 |---|---|---|
-| **treesitter** | All complexity, file_structure, type_safety, hardcoding, observability, stability, documentation, security (4), go (5), python (7), rust (8), nx_conventions.no_deep_import — **47 rules** | Built-in |
+| **treesitter** | All complexity, file_structure, type_safety, hardcoding, observability, stability, documentation, security (4), go (5), python (7), rust (8), nx_conventions.no_deep_import — **48 rules** | Built-in |
 | **semgrep** | `security.injection.*`, `security.auth.*`, `security.cryptography` | `brew install semgrep` |
 | **gitleaks** | `security.secrets` | `brew install gitleaks` |
 | **madge** | `file_structure.circular_deps`, `nx_conventions.boundaries` | `npm i -g madge` |

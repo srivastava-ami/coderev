@@ -87,7 +87,7 @@ coderev [directory] [flags]
   --pr <number>        override PR number (auto-detected from gh pr view)
   --format <fmt>       markdown (default) | html | sarif
   --output <path>      custom output path
-  --standards <path>   path to code_review_standards.toml (auto-discovered if omitted)
+  --standards <path>   path to custom standards TOML (built-in defaults apply if omitted)
   --config <path>      path to tool_config.toml (auto-discovered if omitted)
   --update-baseline    save current findings as baseline; future runs show delta (▲/▼)
   --json               output findings as structured JSON (machine-readable)
@@ -139,27 +139,15 @@ Full workflow: `.github/workflows/code-quality.yml`
 All 55 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
 → **[docs/rules-reference.md](docs/rules-reference.md)**
 
-## Standards file
+## Standards
 
-Rules live in one TOML file committed to the repo root:
+Standards are built in — no config file needed.
 
-```toml
-# code_review_standards.toml
-[complexity.cyclomatic]
-max_value     = 10
-hard_block_at = 15
+Built-in defaults apply automatically — scan any repo with zero setup. To override thresholds for a specific repo, pass a custom TOML file:
 
-[complexity.function_length]
-max_lines = 40
-
-[[exceptions]]
-rule           = "complexity.cyclomatic"
-file_or_module = "src/legacy/parser.ts"
-justification  = "Third-party parser — tracked in JIRA-4421"
-expires        = "2026-12-31"
+```bash
+coderev --standards /path/to/custom.toml .
 ```
-
-No standards file? Built-in defaults apply automatically — scan any repo with zero setup.
 
 ---
 

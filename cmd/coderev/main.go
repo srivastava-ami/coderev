@@ -38,7 +38,7 @@ produces an interactive Markdown report (default) or a self-contained HTML
 report — no LLMs, no cloud, no network.
 
 If [directory] is omitted the current directory is used.
-Tool-config files are auto-discovered (target dir → cwd → ~/.config/coderev/).`,
+Standards are built into the binary. Run coderev . with no configuration needed.`,
 		Version: version,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    run,
