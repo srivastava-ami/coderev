@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/report"
@@ -14,10 +16,10 @@ import (
 
 // AnnotateRequest bundles the parameters for Annotate.
 type AnnotateRequest struct {
-	Report    report.Report
-	RepoSlug  string // "owner/repo"
-	PRNumber  int
-	Target    string // repo root path — used to make file paths relative
+	Report   report.Report
+	RepoSlug string // "owner/repo"
+	PRNumber int
+	Target   string // repo root path — used to make file paths relative
 }
 
 // Annotate posts inline review comments for every blocker/major finding on a
@@ -26,13 +28,19 @@ func Annotate(req AnnotateRequest) error {
 	if err := checkGHAvailable(); err != nil {
 		return err
 	}
-	comments := buildComments(req.Report.Findings, req.Target)
-	if len(comments) == 0 {
-		return nil
-	}
 	sha, err := headSHA(req.Target)
 	if err != nil {
 		return fmt.Errorf("ghpr: resolving HEAD SHA: %w", err)
+	}
+	// Fetch which lines are actually in the PR diff — the GitHub API rejects
+	// comments on lines outside the diff hunk with 422 "could not be resolved".
+	diffed, err := fetchDiffLines(req.RepoSlug, req.PRNumber)
+	if err != nil {
+		return fmt.Errorf("ghpr: fetching PR diff lines: %w", err)
+	}
+	comments := buildComments(req.Report.Findings, req.Target, diffed)
+	if len(comments) == 0 {
+		return nil
 	}
 	poster := &commentPoster{repoSlug: req.RepoSlug, prNumber: req.PRNumber, sha: sha}
 	return poster.postAll(comments)
@@ -46,7 +54,10 @@ type commentPoster struct {
 
 func (p *commentPoster) postAll(comments []prComment) error {
 	var errs []string
-	for _, c := range comments {
+	for i, c := range comments {
+		if i > 0 {
+			time.Sleep(150 * time.Millisecond) // stay under GitHub's inline comment rate limit
+		}
 		if err := postComment(prPost{repoSlug: p.repoSlug, prNumber: p.prNumber, sha: p.sha, comment: c}); err != nil {
 			errs = append(errs, err.Error())
 		}
@@ -64,7 +75,10 @@ type prComment struct {
 	body string
 }
 
-func buildComments(findings []analysis.Finding, target string) []prComment {
+// buildComments returns inline comments for blockers/majors whose line falls
+// within a diff hunk. Findings on lines outside the diff are silently skipped —
+// they appear in the written report but cannot be annotated inline.
+func buildComments(findings []analysis.Finding, target string, diffed map[string]map[int]bool) []prComment {
 	var out []prComment
 	for _, f := range findings {
 		if f.Severity != analysis.SeverityBlocker && f.Severity != analysis.SeverityMajor {
@@ -74,6 +88,10 @@ func buildComments(findings []analysis.Finding, target string) []prComment {
 		if err != nil {
 			rel = f.File
 		}
+		rel = filepath.ToSlash(rel)
+		if fileLines, ok := diffed[rel]; !ok || !fileLines[f.Line] {
+			continue
+		}
 		body := fmt.Sprintf("**coderev [%s]** `%s`\n\n%s", strings.ToUpper(string(f.Severity)), f.Rule, f.Message)
 		if f.Remediation != "" {
 			body += "\n\n> **Fix:** " + f.Remediation
@@ -81,6 +99,67 @@ func buildComments(findings []analysis.Finding, target string) []prComment {
 		out = append(out, prComment{path: rel, line: f.Line, body: body})
 	}
 	return out
+}
+
+// fetchDiffLines returns map[filepath]map[line]bool for every line that appears
+// on the RIGHT (new) side of the PR diff — context lines and added lines both
+// count; removed lines are not in the new file and cannot be annotated.
+func fetchDiffLines(repoSlug string, prNumber int) (map[string]map[int]bool, error) {
+	endpoint := fmt.Sprintf("repos/%s/pulls/%d/files", repoSlug, prNumber)
+	cmd := exec.Command("gh", "api", "--paginate", endpoint)
+	raw, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("gh api %s: %w", endpoint, err)
+	}
+	var files []struct {
+		Filename string `json:"filename"`
+		Patch    string `json:"patch"`
+	}
+	if err := json.Unmarshal(raw, &files); err != nil {
+		return nil, fmt.Errorf("parsing PR files response: %w", err)
+	}
+	result := make(map[string]map[int]bool, len(files))
+	for _, f := range files {
+		if lines := parsePatchLines(f.Patch); len(lines) > 0 {
+			result[f.Filename] = lines
+		}
+	}
+	return result, nil
+}
+
+// parsePatchLines extracts new-file line numbers from a unified diff patch string.
+// Every context line and added line (i.e. lines visible on the RIGHT side) is included.
+func parsePatchLines(patch string) map[int]bool {
+	lines := make(map[int]bool)
+	if patch == "" {
+		return lines
+	}
+	currentLine := 0
+	for _, line := range strings.Split(patch, "\n") {
+		if strings.HasPrefix(line, "@@") {
+			// "@@ -old,count +new,count @@" — extract new-file start line
+			idx := strings.Index(line, "+")
+			if idx < 0 {
+				continue
+			}
+			rest := line[idx+1:]
+			if i := strings.IndexAny(rest, ", @"); i >= 0 {
+				rest = rest[:i]
+			}
+			n, err := strconv.Atoi(rest)
+			if err != nil {
+				continue
+			}
+			currentLine = n - 1
+			continue
+		}
+		if strings.HasPrefix(line, "-") {
+			continue // removed line — not in new file, cannot be annotated
+		}
+		currentLine++
+		lines[currentLine] = true
+	}
+	return lines
 }
 
 type ghCommentPayload struct {
