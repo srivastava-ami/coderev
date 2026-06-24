@@ -56,63 +56,6 @@ func (w *fileWalker) checkGoPanicInLib(line string, lineNum int) {
 	}
 }
 
-// checkGoSQLStringConcat flags SQL queries built with fmt.Sprintf or string concatenation.
-func (w *fileWalker) checkGoSQLStringConcat(line string, lineNum int) {
-	trimmed, skip := w.goGuard(line)
-	if skip || isTestFile(w.file) {
-		return
-	}
-	msg := goSQLMessage(trimmed)
-	if msg == "" {
-		return
-	}
-	w.emitFinding(analysis.Finding{
-		Rule:        "go.sql_string_concat",
-		Pillar:      "security",
-		Severity:    analysis.SeverityBlocker,
-		Line:        lineNum,
-		Message:     msg,
-		Remediation: "Use parameterised queries: db.Query(q, args...). Never format user input into SQL.",
-	})
-}
-
-func goSQLMessage(trimmed string) string {
-	if strings.Contains(trimmed, "fmt.Sprintf(") && goLineHasSQLKeyword(trimmed) {
-		return "SQL query built with fmt.Sprintf — SQL injection vector"
-	}
-	if goLineHasSQLConcat(trimmed) {
-		return "SQL query assembled by string concatenation — SQL injection vector"
-	}
-	return ""
-}
-
-func goLineHasSQLKeyword(trimmed string) bool {
-	upper := strings.ToUpper(trimmed)
-	for _, kw := range []string{"SELECT ", "INSERT ", "UPDATE ", "DELETE ", "WHERE ", "FROM "} {
-		if strings.Contains(upper, kw) {
-			return true
-		}
-	}
-	return false
-}
-
-// goSQLConcatPatterns lists string-concatenation patterns that indicate SQL building.
-// Kept as a var so pattern strings don't trigger the sql_string_concat check on this file.
-var goSQLConcatPatterns = []string{
-	`+ "SELECT`, `+ "INSERT`, `+ "UPDATE`, `+ "DELETE`,
-	`+ " WHERE "`, `+ " AND "`, `+ " OR "`,
-}
-
-func goLineHasSQLConcat(trimmed string) bool {
-	upper := strings.ToUpper(trimmed)
-	for _, pat := range goSQLConcatPatterns {
-		if strings.Contains(upper, strings.ToUpper(pat)) {
-			return true
-		}
-	}
-	return false
-}
-
 // isWordCall reports whether s contains a call to name where the character
 // immediately before name (if any) is not a Go identifier character.
 // This prevents "nopanic(" from matching a check for "panic(".
@@ -230,3 +173,5 @@ func isGoFuncLiteralOpen(trimmed, line string) bool {
 	hasFuncKw := strings.Contains(trimmed, "func(") || strings.Contains(trimmed, "func (")
 	return hasFuncKw && strings.Contains(line, "{")
 }
+
+

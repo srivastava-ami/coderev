@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
@@ -25,13 +23,7 @@ func New(binary string) *Adapter {
 
 func (a *Adapter) Name() string { return "madge" }
 
-func (a *Adapter) IsAvailable() bool {
-	if _, err := os.Stat(a.binary); err == nil {
-		return true
-	}
-	_, err := exec.LookPath(a.binary)
-	return err == nil
-}
+func (a *Adapter) IsAvailable() bool { return cmdutil.BinaryAvailable(a.binary) }
 
 func (a *Adapter) Capabilities() []string {
 	return []string{"file_structure.circular_deps", "nx_conventions.boundaries"}

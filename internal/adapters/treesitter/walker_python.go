@@ -73,10 +73,13 @@ func (w *fileWalker) checkPythonSQLStringConcat(line string, lineNum int) {
 			break
 		}
 	}
-	if !hasSQL && !strings.Contains(trimmed, "sql +") && !strings.Contains(trimmed, "query +") {
+	hasSQLFragment := strings.Contains(upper, " WHERE ") || strings.Contains(upper, " AND ") || strings.Contains(upper, " OR ")
+	hasSQLVar := strings.Contains(trimmed, "sql +") || strings.Contains(trimmed, "query +") ||
+		strings.Contains(trimmed, "+ sql") || strings.Contains(trimmed, "+ query")
+	if !hasSQL && !hasSQLFragment && !hasSQLVar {
 		return
 	}
-	if !strings.Contains(trimmed, "+") && !strings.Contains(trimmed, `f"`) {
+	if !strings.Contains(trimmed, "+") && !strings.Contains(trimmed, `f"`) && !strings.Contains(trimmed, "f'") {
 		return
 	}
 	w.emitFinding(analysis.Finding{

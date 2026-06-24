@@ -15,7 +15,7 @@ func (w *fileWalker) checkPatterns() {
 		w.checkEval, w.checkInnerHTML, w.checkWeakCrypto, w.checkPrototypePollution,
 		w.checkThrowLiteral, w.checkNonNullAssertion, w.checkForceCast, w.checkDeepImport,
 		w.checkGoFmtPrint, w.checkGoPanicInLib, w.checkGoSQLStringConcat,
-		w.checkGoContextTODO, w.checkFloatingPromise,
+		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
@@ -29,6 +29,7 @@ func (w *fileWalker) checkPatterns() {
 	}
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)
+	w.checkGoIOCopyNoLimit(lines)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {

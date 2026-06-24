@@ -1,30 +1,47 @@
 package treesitter
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
-func checkMagicNumbers(files []analysis.FileInfo) []analysis.Finding {
-	re := regexp.MustCompile(`(?:^|[^a-zA-Z0-9_.])([0-9]+(?:\.[0-9]+)?)(?:[^a-zA-Z0-9_.]|$)`)
+type magicChecker struct {
+	re     *regexp.Regexp
+	excSet map[string]bool
+}
 
+func newMagicChecker(exceptions []int) *magicChecker {
+	excSet := make(map[string]bool, len(exceptions))
+	for _, n := range exceptions {
+		excSet[fmt.Sprintf("%d", n)] = true
+	}
+	return &magicChecker{
+		re:     regexp.MustCompile(`(?:^|[^a-zA-Z0-9_.])([0-9]+(?:\.[0-9]+)?)(?:[^a-zA-Z0-9_.]|$)`),
+		excSet: excSet,
+	}
+}
+
+func checkMagicNumbers(files []analysis.FileInfo, exceptions []int) []analysis.Finding {
+	mc := newMagicChecker(exceptions)
 	var findings []analysis.Finding
 	for _, fi := range files {
 		if isTestFile(fi.Path) {
 			continue
 		}
-		if strings.HasSuffix(fi.Path, ".json") || strings.HasSuffix(fi.Path, ".toml") || strings.HasSuffix(fi.Path, ".yaml") || strings.HasSuffix(fi.Path, ".yml") {
+		if strings.HasSuffix(fi.Path, ".json") || strings.HasSuffix(fi.Path, ".toml") ||
+			strings.HasSuffix(fi.Path, ".yaml") || strings.HasSuffix(fi.Path, ".yml") {
 			continue
 		}
 		lines := strings.Split(string(fi.Content), "\n")
-		findings = append(findings, scanLinesForMagicNumbers(lines, fi.Path, re)...)
+		findings = append(findings, mc.scanLines(lines, fi.Path)...)
 	}
 	return findings
 }
 
-func scanLinesForMagicNumbers(lines []string, path string, re *regexp.Regexp) []analysis.Finding {
+func (mc *magicChecker) scanLines(lines []string, path string) []analysis.Finding {
 	var findings []analysis.Finding
 	for i, line := range lines {
 		lineNum := i + 1
@@ -32,23 +49,26 @@ func scanLinesForMagicNumbers(lines []string, path string, re *regexp.Regexp) []
 		if isCommentLine(trimmed, path) || skipLine(trimmed) {
 			continue
 		}
-		findings = append(findings, emitMagicMatches(line, trimmed, path, lineNum, re)...)
+		findings = append(findings, mc.emitMatches(line, trimmed, path, lineNum)...)
 	}
 	return findings
 }
 
-func emitMagicMatches(line, trimmed, path string, lineNum int, re *regexp.Regexp) []analysis.Finding {
+func (mc *magicChecker) emitMatches(line, trimmed, path string, lineNum int) []analysis.Finding {
 	var findings []analysis.Finding
-	for _, m := range re.FindAllStringSubmatch(line, -1) {
+	for _, m := range mc.re.FindAllStringSubmatch(line, -1) {
 		num := m[1]
 		if num == "0" || num == "1" || num == "0.0" || num == "1.0" {
+			continue
+		}
+		if mc.excSet[num] {
 			continue
 		}
 		if isConstantLike(trimmed) {
 			continue
 		}
 		findings = append(findings, analysis.Finding{
-			Rule:        "hardcoding.magic_number",
+			Rule:        "hardcoding.magic_numbers",
 			Pillar:      "hardcoding",
 			Severity:    analysis.SeverityAdvisory,
 			File:        path,

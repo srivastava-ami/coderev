@@ -42,7 +42,7 @@ var RuleRegistry = map[string]RuleMeta{
 
 	// hardcoding
 	"hardcoding.urls_and_paths": {Tags: []string{"owasp:A05:2021", "cwe:259"}, Standards: []string{"OWASP-2021-A05", "CWE-259"}},
-	"hardcoding.magic_number":   {},
+	"hardcoding.magic_numbers":  {Tags: []string{"cwe:1121"}, Standards: []string{"CWE-1121"}},
 
 	// documentation
 	"documentation.no_comment_tombstones": {},
@@ -76,11 +76,13 @@ var RuleRegistry = map[string]RuleMeta{
 	"rust.no_dbg_macro":  {},
 
 	// go_conventions
-	"go.fmt_print":         {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},
-	"go.panic_in_lib":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
-	"go.sql_string_concat": {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
-	"go.context_todo":      {},
-	"go.defer_in_loop":     {Tags: []string{"cwe:772"}, Standards: []string{"CWE-772"}},
+	"go.fmt_print":               {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},
+	"go.panic_in_lib":            {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"go.sql_string_concat":       {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
+	"go.context_todo":            {},
+	"go.defer_in_loop":           {Tags: []string{"cwe:772"}, Standards: []string{"CWE-772"}},
+	"go.fmt_errorf_no_format":    {Tags: []string{"cwe:134"}, Standards: []string{"CWE-134"}},
+	"go.io_copy_no_limit":        {Tags: []string{"cwe:400"}, Standards: []string{"CWE-400"}},
 
 	// python_conventions
 	"python.fmt_print":           {},

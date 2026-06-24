@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
+	"github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
@@ -25,13 +26,7 @@ func New(binary string) *Adapter {
 
 func (a *Adapter) Name() string { return "npmaudit" }
 
-func (a *Adapter) IsAvailable() bool {
-	if _, err := os.Stat(a.binary); err == nil {
-		return true
-	}
-	_, err := exec.LookPath(a.binary)
-	return err == nil
-}
+func (a *Adapter) IsAvailable() bool { return cmdutil.BinaryAvailable(a.binary) }
 
 func (a *Adapter) Capabilities() []string {
 	return []string{"security.dependencies"}

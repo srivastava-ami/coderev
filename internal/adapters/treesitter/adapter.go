@@ -69,7 +69,7 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 
 	findings, err := collectAnalyseResults(results)
 	dupFindings := DetectDuplication(req.Files)
-	magicFindings := checkMagicNumbers(req.Files)
+	magicFindings := checkMagicNumbers(req.Files, a.stds.Hardcoding.MagicNumbers.Exceptions)
 	findings = append(findings, dupFindings...)
 	findings = append(findings, magicFindings...)
 	return findings, err

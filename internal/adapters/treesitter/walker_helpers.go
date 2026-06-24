@@ -10,11 +10,11 @@ import (
 
 // rustGuard returns (trimmed, skip=true) when the line is not Rust or is a comment.
 func (w *fileWalker) rustGuard(line string) (string, bool) {
-	trimmed := strings.TrimSpace(line)
-	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
+	if w.lang != analysis.LangRust {
 		return "", true
 	}
-	if w.lang != analysis.LangRust {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
 		return "", true
 	}
 	return trimmed, false

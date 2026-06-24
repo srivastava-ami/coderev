@@ -22,7 +22,7 @@ func DiscoverPlugins(dir string) ([]DiscoveredPlugin, error) {
 
 func walkPluginFn(plugins *[]DiscoveredPlugin) func(string, os.DirEntry, error) error {
 	return func(path string, d os.DirEntry, err error) error {
-		if err != nil || d.IsDir() && skipPluginDirs[d.Name()] {
+		if err != nil || (d.IsDir() && skipPluginDirs[d.Name()]) {
 			return filepath.SkipDir
 		}
 		if d.IsDir() {

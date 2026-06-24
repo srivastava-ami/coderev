@@ -995,6 +995,20 @@ cwe                 = "CWE-89"
 owasp               = "A03:2021"
 remediation         = "Use parameterised queries (db.Query(q, args...)) or sqlc/squirrel. Never format user input into SQL."
 
+[go_conventions.fmt_errorf_no_format]
+  rule        = "go.fmt_errorf_no_format"
+  severity    = "major"
+  description = "fmt.Errorf called with a non-literal first argument — format string injection"
+  cwe         = "CWE-134"
+  remediation = "Use fmt.Errorf(\"%s\", msg) or errors.New(msg) — never pass a variable directly as the format string."
+
+[go_conventions.io_copy_no_limit]
+  rule        = "go.io_copy_no_limit"
+  severity    = "major"
+  description = "io.Copy from an HTTP response without io.LimitReader — unbounded disk write"
+  cwe         = "CWE-400"
+  remediation = "Wrap with io.LimitReader(r, maxBytes) before io.Copy."
+
 # ── Naming Conventions ─────────────────────────────────────────────────────
 [go_conventions.naming]
 rule                = "go.naming"
@@ -1222,7 +1236,7 @@ ticket                = ""
 
 [[exceptions]]
 rule                  = "go.sql_string_concat"
-file_or_module        = "internal/adapters/treesitter/walker_go.go"
+file_or_module        = "internal/adapters/treesitter/walker_go_security.go"
 justification         = "SQL keyword strings in goSQLConcatPatterns and goLineHasSQLKeyword are detection constants — not user-facing SQL construction"
 approved_by           = "coderev-maintainers"
 expires               = ""
@@ -1240,6 +1254,22 @@ ticket                = ""
 rule                  = "go.defer_in_loop"
 file_or_module        = "internal/adapters/treesitter/walker_go.go"
 justification         = "The string \"defer \" appears inside the state-machine for-loop as a string literal being searched — detection constant, not a deferred call"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.fmt_errorf_no_format"
+file_or_module        = "internal/adapters/treesitter/walker_go_security.go"
+justification         = "Walker source contains fmt.Errorf( inside message strings (e.g. remediation text with escaped format verbs) — self-detection false positive on detection constants"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.io_copy_no_limit"
+file_or_module        = "internal/adapters/treesitter/walker_go_security.go"
+justification         = "Walker source contains the pattern string as a literal — self-detection false positive"
 approved_by           = "coderev-maintainers"
 expires               = ""
 ticket                = ""

@@ -72,7 +72,7 @@ func printGateResult(gateResult quality.GateResult) error {
 		return nil
 	}
 	fmt.Printf("quality gate: FAILED — %s\n", gateResult.Message)
-	return fmt.Errorf(gateResult.Message)
+	return fmt.Errorf("%s", gateResult.Message)
 }
 
 func runAnalysis(target string, stds analysis.Standards, tc analysis.ToolConfig, ads []analysis.ToolAdapter) (analysis.RunResult, error) {

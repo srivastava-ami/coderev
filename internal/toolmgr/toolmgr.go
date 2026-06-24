@@ -212,13 +212,15 @@ func extractFromTGZ(r io.Reader, toolName, binaryName, dir string) error {
 	return fmt.Errorf("%s: binary %q not found in archive", toolName, binaryName)
 }
 
+const maxBinaryBytes = 256 << 20 // 256 MiB — guard against malicious/corrupt archives
+
 func writeBinary(r io.Reader, dest string) error {
 	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY, 0o755)
 	if err != nil {
 		return err
 	}
 	defer out.Close()
-	_, err = io.Copy(out, r)
+	_, err = io.Copy(out, io.LimitReader(r, maxBinaryBytes))
 	return err
 }
 
