@@ -84,9 +84,13 @@ func (w *fileWalker) checkAnyType(line string, lineNum int) {
 	if strings.HasPrefix(trimmed, "//") {
 		return
 	}
+	sev := analysis.SeverityBlocker
+	if isTestFile(w.file) {
+		sev = analysis.SeverityAdvisory
+	}
 	for _, pat := range []string{": any", "as any", "<any>", ": any[", "Array<any"} {
 		if strings.Contains(line, pat) {
-			w.emitFinding(analysis.Finding{Rule: "type_safety.no_any", Pillar: "type_safety", Severity: analysis.SeverityBlocker, Line: lineNum,
+			w.emitFinding(analysis.Finding{Rule: "type_safety.no_any", Pillar: "type_safety", Severity: sev, Line: lineNum,
 				Message:     fmt.Sprintf("'any' type usage: %s", trimmed),
 				Remediation: "Use 'unknown' with type guards, or generate types from schema."})
 			return
@@ -114,9 +118,19 @@ func (w *fileWalker) checkEmptyCatch(line string, lineNum int) {
 
 func isTestFile(path string) bool {
 	base := filepath.Base(path)
-	return strings.HasSuffix(base, "_test.go") || strings.HasSuffix(base, "_test.rs") ||
+	if strings.HasSuffix(base, "_test.go") || strings.HasSuffix(base, "_test.rs") ||
 		strings.HasSuffix(base, ".spec.ts") || strings.HasSuffix(base, ".test.ts") ||
-		strings.HasSuffix(base, ".spec.js") || strings.HasSuffix(base, ".test.js")
+		strings.HasSuffix(base, ".spec.tsx") || strings.HasSuffix(base, ".test.tsx") ||
+		strings.HasSuffix(base, ".spec.js") || strings.HasSuffix(base, ".test.js") {
+		return true
+	}
+	normalized := filepath.ToSlash(path)
+	for _, segment := range []string{"e2e", "__tests__", "test"} {
+		if strings.Contains(normalized, "/"+segment+"/") || strings.HasPrefix(normalized, segment+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *fileWalker) checkHardcodedURL(line string, lineNum int) {

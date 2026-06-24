@@ -30,10 +30,9 @@ func (w *fileWalker) checkThrowLiteral(line string, lineNum int) {
 
 func (w *fileWalker) checkFloatingPromise(line string, lineNum int) {
 	trimmed, skip := w.jsTSGuard(line)
-	if skip {
+	if skip || isTestFile(w.file) {
 		return
 	}
-	// Heuristic: statement-level async call not anchored
 	if !strings.Contains(line, "(") {
 		return
 	}
@@ -42,11 +41,12 @@ func (w *fileWalker) checkFloatingPromise(line string, lineNum int) {
 		strings.Contains(line, "= ") || strings.Contains(line, "void ") {
 		return
 	}
-	// Looks like a bare async function call: ends with ); or )
-	t := strings.TrimSuffix(strings.TrimSuffix(trimmed, ";"), "")
+	// Only flag calls with explicit async signals in the callee name or well-known
+	// async builtins (fetch). Bare zero-arg calls like clearSessionToken() or signOut()
+	// have unknown return types — we cannot infer Promise without a type-checker.
+	t := strings.TrimSuffix(trimmed, ";")
 	if strings.HasSuffix(t, ")") && (strings.Contains(trimmed, "Async(") ||
-		strings.Contains(trimmed, "async(") || strings.HasPrefix(trimmed, "fetch(") ||
-		strings.HasSuffix(strings.TrimSuffix(trimmed, ";"), "()")) {
+		strings.Contains(trimmed, "async(") || strings.HasPrefix(trimmed, "fetch(")) {
 		w.emitFinding(analysis.Finding{
 			Rule:        "stability.no_floating_promise",
 			Pillar:      "stability",
