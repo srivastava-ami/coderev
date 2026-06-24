@@ -54,9 +54,38 @@ func (mc *magicChecker) scanLines(lines []string, path string) []analysis.Findin
 	return findings
 }
 
+// stripStringLiterals replaces the content inside string literals with spaces so
+// the magic-number regex never matches digits that live inside quoted values.
+func stripStringLiterals(line string) string {
+	var b strings.Builder
+	inSingle, inDouble, inTemplate := false, false, false
+	prevBS := false
+	for _, ch := range line {
+		esc := prevBS
+		prevBS = ch == '\\' && !esc
+		switch {
+		case ch == '\'' && !inDouble && !inTemplate && !esc:
+			inSingle = !inSingle
+			b.WriteRune(ch)
+		case ch == '"' && !inSingle && !inTemplate && !esc:
+			inDouble = !inDouble
+			b.WriteRune(ch)
+		case ch == '`' && !inSingle && !inDouble && !esc:
+			inTemplate = !inTemplate
+			b.WriteRune(ch)
+		case inSingle || inDouble || inTemplate:
+			b.WriteRune(' ')
+		default:
+			b.WriteRune(ch)
+		}
+	}
+	return b.String()
+}
+
 func (mc *magicChecker) emitMatches(line, trimmed, path string, lineNum int) []analysis.Finding {
+	scanLine := stripStringLiterals(line)
 	var findings []analysis.Finding
-	for _, m := range mc.re.FindAllStringSubmatch(line, -1) {
+	for _, m := range mc.re.FindAllStringSubmatch(scanLine, -1) {
 		num := m[1]
 		if num == "0" || num == "1" || num == "0.0" || num == "1.0" {
 			continue

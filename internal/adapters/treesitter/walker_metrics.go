@@ -18,6 +18,15 @@ func (w *fileWalker) emitFunctionFindings(s *functionScope, lines int) {
 	w.checkBooleanParamFlag(s, loc)
 }
 
+// testSev returns advisory when the file is a test/spec file, otherwise the given
+// severity. Prevents long describe/it blocks and test-mock complexity from blocking PRs.
+func (w *fileWalker) testSev(sev analysis.Severity) analysis.Severity {
+	if isTestFile(w.file) {
+		return analysis.SeverityAdvisory
+	}
+	return sev
+}
+
 func (w *fileWalker) checkCyclomatic(s *functionScope, loc string) {
 	maxCC := w.stds.Complexity.Cyclomatic.MaxValue
 	if maxCC == 0 {
@@ -34,11 +43,11 @@ func (w *fileWalker) checkCyclomatic(s *functionScope, loc string) {
 
 	switch {
 	case s.cyclomatic >= hardBlock:
-		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: analysis.SeverityBlocker, Line: s.startLine,
+		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
 			Message:     fmt.Sprintf("%s: cyclomatic complexity %d exceeds hard block (%d)", loc, s.cyclomatic, hardBlock),
 			Remediation: w.stds.Complexity.Cyclomatic.Remediation})
 	case s.cyclomatic > maxCC:
-		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: analysis.SeverityBlocker, Line: s.startLine,
+		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
 			Message:     fmt.Sprintf("%s: cyclomatic complexity %d exceeds max (%d)", loc, s.cyclomatic, maxCC),
 			Remediation: w.stds.Complexity.Cyclomatic.Remediation})
 	case s.cyclomatic > advisory:
@@ -56,7 +65,7 @@ func (w *fileWalker) checkCognitive(s *functionScope, loc string) {
 	if s.cognitive <= maxCog {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.cognitive", Pillar: "complexity", Severity: analysis.SeverityBlocker, Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.cognitive", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
 		Message:     fmt.Sprintf("%s: cognitive complexity %d exceeds max (%d)", loc, s.cognitive, maxCog),
 		Remediation: "Flatten nesting with guard clauses; extract inner blocks to named helpers."})
 }
@@ -69,7 +78,7 @@ func (w *fileWalker) checkFunctionLength(s *functionScope, lines int, loc string
 	if lines <= maxLines {
 		return
 	}
-	sev := analysis.SeverityBlocker
+	sev := w.testSev(analysis.SeverityBlocker)
 	if lines <= maxLines+10 {
 		sev = analysis.SeverityAdvisory
 	}
@@ -86,7 +95,7 @@ func (w *fileWalker) checkParams(s *functionScope, loc string) {
 	if s.params <= maxParams {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.parameter_count", Pillar: "complexity", Severity: analysis.SeverityBlocker, Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.parameter_count", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
 		Message:     fmt.Sprintf("%s: %d parameters (max %d) — introduce a parameter object", loc, s.params, maxParams),
 		Remediation: w.stds.Complexity.Parameters.Remediation})
 }
@@ -99,7 +108,7 @@ func (w *fileWalker) checkNesting(s *functionScope, loc string) {
 	if s.maxNesting <= maxNest {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.nesting", Pillar: "complexity", Severity: analysis.SeverityBlocker, Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.nesting", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
 		Message:     fmt.Sprintf("%s: nesting depth %d (max %d)", loc, s.maxNesting, maxNest),
 		Remediation: w.stds.Complexity.Nesting.Remediation})
 }
@@ -115,21 +124,51 @@ func (w *fileWalker) checkMaxReturnCount(s *functionScope, loc string) {
 }
 
 func (w *fileWalker) checkBooleanParamFlag(s *functionScope, loc string) {
-	for _, name := range s.paramNames {
+	for _, raw := range s.paramNames {
+		name, typeHint := splitParamNameType(raw)
+		// If a type annotation is present and is NOT boolean, skip — not a flag param.
+		// "hash: string", "count: number" must not fire.
+		if typeHint != "" && !isBoolType(typeHint) {
+			continue
+		}
 		if isBoolFlagName(name) {
 			w.emitFinding(analysis.Finding{Rule: "complexity.boolean_param_flag", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
-				Message:     fmt.Sprintf("%s: boolean flag parameter '%s' — flag arguments make callers hard to read", loc, name),
+				Message:     fmt.Sprintf("%s: boolean flag parameter '%s' — flag arguments make callers hard to read", loc, raw),
 				Remediation: "Replace flag params with two separate functions or an options object."})
 			return
 		}
 	}
 }
 
+// splitParamNameType splits "name: TypeAnnotation" or "name = default" into
+// (name, typeHint). typeHint is empty when there is no annotation (unknown type).
+func splitParamNameType(raw string) (name, typeHint string) {
+	if idx := strings.Index(raw, ":"); idx >= 0 {
+		return strings.TrimSpace(raw[:idx]), strings.TrimSpace(raw[idx+1:])
+	}
+	if idx := strings.Index(raw, "="); idx >= 0 {
+		return strings.TrimSpace(raw[:idx]), ""
+	}
+	return strings.TrimSpace(raw), ""
+}
+
+// isBoolType returns true when the type annotation resolves to a boolean variant.
+func isBoolType(t string) bool {
+	t = strings.TrimSpace(t)
+	return t == "boolean" || t == "boolean | undefined" || t == "boolean | null" ||
+		strings.HasPrefix(t, "boolean ")
+}
+
+// isBoolFlagName returns true when the identifier follows a bool-flag naming
+// convention with a camelCase boundary — the char after the prefix must be
+// uppercase, which prevents "hash" matching "has" (h is lowercase).
 func isBoolFlagName(name string) bool {
 	lower := strings.ToLower(name)
 	for _, prefix := range []string{"is", "has", "should", "flag", "enable", "disable", "toggle", "show", "hide"} {
-		if strings.HasPrefix(lower, prefix) && len(name) > len(prefix) {
-			return true
+		if len(name) > len(prefix) && strings.HasPrefix(lower, prefix) {
+			if name[len(prefix)] >= 'A' && name[len(prefix)] <= 'Z' {
+				return true
+			}
 		}
 	}
 	return false
