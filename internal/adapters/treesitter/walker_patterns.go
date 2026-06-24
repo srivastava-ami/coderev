@@ -34,6 +34,10 @@ func (w *fileWalker) checkPatterns() {
 		w.checkPythonPrint(line, lineNum)
 		w.checkPythonBareExcept(line, lineNum)
 		w.checkPythonEvalExec(line, lineNum)
+		w.checkPythonSQLStringConcat(line, lineNum)
+		w.checkPythonSubprocess(line, lineNum)
+		w.checkPythonMutableDefault(line, lineNum)
+		w.checkPythonWildcardImport(line, lineNum)
 		// Rust-specific checks
 		w.checkRustUnwrap(line, lineNum)
 		w.checkRustPanic(line, lineNum)
