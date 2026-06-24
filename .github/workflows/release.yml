@@ -107,12 +107,12 @@ jobs:
 
       - name: Push formula to homebrew-tools tap
         env:
-          TAP_TOKEN:    ${{ secrets.TAP_TOKEN }}
-          VERSION:      ${{ steps.sha.outputs.version }}
-          DARWIN_ARM64: ${{ steps.sha.outputs.darwin_arm64 }}
-          DARWIN_AMD64: ${{ steps.sha.outputs.darwin_amd64 }}
-          LINUX_ARM64:  ${{ steps.sha.outputs.linux_arm64 }}
-          LINUX_AMD64:  ${{ steps.sha.outputs.linux_amd64 }}
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+          VERSION:        ${{ steps.sha.outputs.version }}
+          DARWIN_ARM64:   ${{ steps.sha.outputs.darwin_arm64 }}
+          DARWIN_AMD64:   ${{ steps.sha.outputs.darwin_amd64 }}
+          LINUX_ARM64:    ${{ steps.sha.outputs.linux_arm64 }}
+          LINUX_AMD64:    ${{ steps.sha.outputs.linux_amd64 }}
         run: |
           sed -i \
             -e "s/version \"[^\"]*\"/version \"${VERSION}\"/" \
@@ -121,9 +121,12 @@ jobs:
             -e "s/SHA256_LINUX_ARM64/${LINUX_ARM64}/g"  \
             -e "s/SHA256_LINUX_AMD64/${LINUX_AMD64}/g"  \
             Formula/coderev.rb
-          git clone \
-            https://x-access-token:${TAP_TOKEN}@github.com/srivastava-ami/homebrew-tools.git \
-            tap
+          mkdir -p ~/.ssh
+          echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key
+          chmod 600 ~/.ssh/tap_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o StrictHostKeyChecking=yes"
+          git clone git@github.com:srivastava-ami/homebrew-tools.git tap
           cp Formula/coderev.rb tap/Formula/coderev.rb
           cd tap
           git config user.name  "github-actions[bot]"
