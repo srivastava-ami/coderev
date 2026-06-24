@@ -22,6 +22,8 @@ jobs:
 
       - name: Determine next version and tag
         id: calc
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           LATEST=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
           if [[ -z "$LATEST" ]]; then LATEST="v0.0.0"; fi
@@ -30,7 +32,7 @@ jobs:
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
-          MSG="${{ github.event.pull_request.title }}"
+          MSG="$PR_TITLE"
           echo "PR title: $MSG"
           echo "Current tag: $LATEST"
 
