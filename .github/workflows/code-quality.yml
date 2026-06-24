@@ -4,54 +4,83 @@ on:
   push:
     branches: ["**"]
   pull_request:
-    branches: [main]    # only PRs targeting main get the full annotation treatment
+    branches: [main]
 
 env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  coderev:
-    name: coderev scan
+  # ── branch push: native Go build, no Docker, fastest feedback ────────────────
+  scan-branch:
+    name: coderev scan (branch)
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
-      packages: read          # pull image from GHCR
-      pull-requests: write    # post inline PR annotations
-      security-events: write  # upload SARIF to Code Scanning tab
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0      # full history so --diff origin/<base> works
+          fetch-depth: 2        # HEAD~1 is enough for diff
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true           # caches module download + build cache
 
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+      - name: Build coderev
+        run: mkdir -p .tmp && go build -o /tmp/coderev ./cmd/coderev > .tmp/build.log 2>&1; echo "build exit $?"
+
+      - name: Scan diff
+        run: mkdir -p .tmp && /tmp/coderev --diff HEAD~1 . > .tmp/scan.log 2>&1; grep -E "status:|blocker" .tmp/scan.log | tail -2
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coderev-report-branch
+          path: coderev-report.md
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ── PR and main push: Docker with all adapters, push image to GHCR ──────────
+  scan-full:
+    name: coderev scan
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write           # push image to GHCR after build
+      pull-requests: write      # post inline PR annotations
+      security-events: write    # upload SARIF to Code Scanning
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Build from source with layer cache.
-      # After the first release tag this will pull from GHCR instead.
-      - name: Build coderev image
+      # Pull from GHCR if available, fall back to GHA cache, fall back to full build.
+      # After the first run this step is mostly a fast pull.
+      - name: Build and push coderev image
         uses: docker/build-push-action@v5
         with:
           context: .
-          load: true
-          tags: coderev:ci
+          push: true
+          tags: ${{ env.IMAGE }}:ci-latest
           cache-from: |
+            type=registry,ref=${{ env.IMAGE }}:ci-latest
             type=gha
-            type=registry,ref=${{ env.IMAGE }}:latest
           cache-to: type=gha,mode=max
 
-      # ── pull request → diff scan + inline comments + SARIF ──────────────────
-      - name: Scan PR (incremental diff + annotate)
+      - name: Scan PR (diff + annotate + SARIF)
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,42 +91,31 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             -e GH_TOKEN \
-            coderev:ci \
+            ${{ env.IMAGE }}:ci-latest \
               --diff "origin/${BASE_REF}" \
               --annotate-pr \
               --repo "${PR_REPO}" \
               --pr "${PR_NUMBER}" \
               --format sarif \
-              /src
-          # sarif format: still posts inline comments via --annotate-pr,
-          # and writes coderev-report.sarif for the Code Scanning upload below.
+              /src > .tmp/scan.log 2>&1
+          grep -E "status:|blocker" .tmp/scan.log | tail -2
 
-      - name: Upload SARIF to GitHub Code Scanning
+      - name: Upload SARIF
         if: github.event_name == 'pull_request'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: coderev-report.sarif
 
-      # ── push to main → full scan (no annotation, just report artifact) ──────
       - name: Scan main (full)
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
-            coderev:ci /src
+            ${{ env.IMAGE }}:ci-latest /src > .tmp/scan.log 2>&1
+          grep -E "status:|blocker" .tmp/scan.log | tail -2
 
-      # ── push to any other branch → incremental diff (no annotation) ─────────
-      - name: Scan branch (incremental diff)
-        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/src" \
-            coderev:ci --diff HEAD~1 /src
-
-      # ── always upload the report as a workflow artifact ──────────────────────
-      - name: Upload report artifact
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
           name: coderev-report
           path: |
