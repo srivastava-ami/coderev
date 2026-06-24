@@ -9,19 +9,20 @@ import (
 
 // Standards is the typed representation of code_review_standards.toml.
 type Standards struct {
-	Meta          Meta             `toml:"meta"`
-	Security      SecurityStd      `toml:"security"`
-	Stability     StabilityStd     `toml:"stability"`
-	Hardcoding    HardcodingStd    `toml:"hardcoding"`
-	TypeSafety    TypeSafetyStd    `toml:"type_safety"`
-	Complexity    ComplexityStd    `toml:"complexity"`
-	FileStructure FileStructureStd `toml:"file_structure"`
-	Observability ObservabilityStd `toml:"observability"`
-	Documentation DocumentationStd `toml:"documentation"`
-	Testing       TestingStd       `toml:"testing"`
-	Performance   PerformanceStd   `toml:"performance"`
-	NxConventions NxConventionsStd `toml:"nx_conventions"`
-	Exceptions    []Exception      `toml:"exceptions"`
+	Meta           Meta              `toml:"meta"`
+	Security       SecurityStd       `toml:"security"`
+	Stability      StabilityStd      `toml:"stability"`
+	Hardcoding     HardcodingStd     `toml:"hardcoding"`
+	TypeSafety     TypeSafetyStd     `toml:"type_safety"`
+	Complexity     ComplexityStd     `toml:"complexity"`
+	FileStructure  FileStructureStd  `toml:"file_structure"`
+	Observability  ObservabilityStd  `toml:"observability"`
+	Documentation  DocumentationStd  `toml:"documentation"`
+	Testing        TestingStd        `toml:"testing"`
+	Performance    PerformanceStd    `toml:"performance"`
+	NxConventions  NxConventionsStd  `toml:"nx_conventions"`
+	GoConventions  GoConventionsStd  `toml:"go_conventions"`
+	Exceptions     []Exception       `toml:"exceptions"`
 }
 
 type Meta struct {

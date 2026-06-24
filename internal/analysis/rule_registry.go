@@ -64,4 +64,11 @@ var RuleRegistry = map[string]RuleMeta{
 	// nx_conventions
 	"nx_conventions.no_deep_import": {},
 	"nx_conventions.boundaries":     {},
+
+	// go_conventions
+	"go.fmt_print":         {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},
+	"go.panic_in_lib":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"go.sql_string_concat": {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
+	"go.context_todo":      {},
+	"go.defer_in_loop":     {Tags: []string{"cwe:772"}, Standards: []string{"CWE-772"}},
 }

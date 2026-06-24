@@ -1,10 +1,10 @@
-# Code Review Report: src
+# Code Review Report: nx-code-review-standard
 
-> ✅ **PASS** · 40 findings · 0 blocker(s) · 0 major · 40 advisory  
-> Scanned **46 files** · Generated Wed, 24 Jun 2026 03:34:24 UTC  
-> Standards: `/src/code_review_standards.toml` v2.1.0
+> ✅ **PASS** · 104 findings · 0 blocker(s) · 0 major · 104 advisory  
+> Scanned **48 files** · Generated Tue, 23 Jun 2026 22:36:35 PDT  
+> Standards: `/Users/amitsrivastava/Downloads/srivastava-ami/nx-code-review-standard/code_review_standards.toml` v2.2.0
 
-> 📊 **Baseline saved** — future runs will track trends against these 40 findings.
+> 📊 **Baseline saved** — future runs will track trends against these 104 findings.
 
 ---
 
@@ -14,16 +14,17 @@
 |----------|-------|
 | 🔴 Blocker | 0 |
 | 🟡 Major | 0 |
-| 🔵 Advisory | 40 |
-| **Total** | **40** |
+| 🔵 Advisory | 104 |
+| **Total** | **104** |
 
 <details>
 <summary>Findings by pillar</summary>
 
 | Pillar | Count |
 |--------|-------|
-| complexity | 32 |
-| file_structure | 8 |
+| observability | 62 |
+| complexity | 33 |
+| file_structure | 9 |
 
 </details>
 
@@ -214,125 +215,265 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 ## Findings by Pillar
 
 <details>
-<summary>🟡 <b>complexity</b> ![A](https://img.shields.io/badge/reliability-A-brightgreen) — 32 finding(s)</summary>
+<summary>🟡 <b>complexity</b> ![A](https://img.shields.io/badge/reliability-A-brightgreen) — 33 finding(s)</summary>
 
 | File | Line | Rule | Severity | Message |
 |------|------|------|----------|---------|
-| `/src/cmd/coderev/adapters.go` | 15 | `complexity.cyclomatic` | 🔵 advisory | function 'buildAdapters': cyclomatic complexity 8 (advisory at 5) |
+| `…vastava-ami/nx-code-review-standard/cmd/coderev/adapters.go` | 15 | `complexity.cyclomatic` | 🔵 advisory | function 'buildAdapters': cyclomatic complexity 8 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/cmd/coderev/main.go` | 34 | `complexity.function_length` | 🔵 advisory | function 'main': 35 lines (max 30) |
+| `…code-review-standard/internal/adapters/treesitter/walker.go` | 89 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 8 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…i/nx-code-review-standard/internal/config/standards_test.go` | 65 | `complexity.cyclomatic` | 🔵 advisory | function 'TestLoadParsesComplexityThresholds': cyclomatic complexity 7 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…va-ami/nx-code-review-standard/internal/report/generator.go` | 15 | `complexity.max_return_count` | 🔵 advisory | function 'Generate': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…a-ami/nx-code-review-standard/internal/config/toolconfig.go` | 78 | `complexity.function_length` | 🔵 advisory | function 'defaultToolConfig': 34 lines (max 30) |
 | | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/cmd/coderev/main.go` | 70 | `complexity.cyclomatic` | 🔵 advisory | function 'run': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/cmd/coderev/main.go` | 70 | `complexity.max_return_count` | 🔵 advisory | function 'run': 6 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/cmd/coderev/main.go` | 139 | `complexity.cyclomatic` | 🔵 advisory | function 'postAnnotate': cyclomatic complexity 7 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/cmd/coderev/main.go` | 179 | `complexity.max_return_count` | 🔵 advisory | function 'resolveTarget': 5 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/cmd/coderev/main.go` | 221 | `complexity.boolean_param_flag` | 🔵 advisory | function 'resolveOutputPath': boolean flag parameter 'flag, format string' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/cmd/coderev/setup.go` | 77 | `complexity.max_return_count` | 🔵 advisory | function 'runInstallHooks': 5 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/cmd/coderev/setup.go` | 156 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installGitleaks': boolean flag parameter 'hasBrew bool' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/cmd/coderev/setup.go` | 168 | `complexity.max_return_count` | 🔵 advisory | function 'installSemgrep': 5 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/cmd/coderev/setup.go` | 168 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installSemgrep': boolean flag parameter 'hasBrew, hasPipx, hasPip3 bool' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/cmd/coderev/setup.go` | 186 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installMadge': boolean flag parameter 'hasNPM bool' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/cmd/coderev/setup.go` | 198 | `complexity.cyclomatic` | 🔵 advisory | function 'installGitleaksFromRelease': cyclomatic complexity 8 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/cmd/coderev/setup.go` | 198 | `complexity.max_return_count` | 🔵 advisory | function 'installGitleaksFromRelease': 6 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/adapters/treesitter/duplication.go` | 46 | `complexity.boolean_param_flag` | 🔵 advisory | function 'indexFile': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/internal/adapters/treesitter/duplication.go` | 58 | `complexity.boolean_param_flag` | 🔵 advisory | function 'emitDupFindings': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
-| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/internal/analysis/runner.go` | 116 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/analysis/runner.go` | 116 | `complexity.max_return_count` | 🔵 advisory | function '<anonymous>': 6 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/analysis/runner.go` | 108 | `complexity.function_length` | 🔵 advisory | function 'walkFiles': 36 lines (max 30) |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 20 | `complexity.function_length` | 🔵 advisory | function 'writeMarkdown': 33 lines (max 30) |
 | | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/internal/adapters/treesitter/walker_metrics.go` | 21 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 7 (advisory at 5) |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 140 | `complexity.cyclomatic` | 🔵 advisory | function 'writeExceptions': cyclomatic complexity 7 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/adapters/treesitter/walker.go` | 89 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 8 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/config/toolconfig.go` | 78 | `complexity.function_length` | 🔵 advisory | function 'defaultToolConfig': 34 lines (max 30) |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 34 | `complexity.function_length` | 🔵 advisory | function 'main': 35 lines (max 30) |
 | | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/internal/report/generator.go` | 15 | `complexity.max_return_count` | 🔵 advisory | function 'Generate': 5 return statements (max 4) — consider restructuring |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 70 | `complexity.cyclomatic` | 🔵 advisory | function 'run': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 70 | `complexity.max_return_count` | 🔵 advisory | function 'run': 6 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.cyclomatic` | 🔵 advisory | function 'ratingBadge': cyclomatic complexity 6 (advisory at 5) |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 139 | `complexity.cyclomatic` | 🔵 advisory | function 'postAnnotate': cyclomatic complexity 7 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.max_return_count` | 🔵 advisory | function 'ratingBadge': 6 return statements (max 4) — consider restructuring |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 179 | `complexity.max_return_count` | 🔵 advisory | function 'resolveTarget': 5 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/config/standards_test.go` | 65 | `complexity.cyclomatic` | 🔵 advisory | function 'TestLoadParsesComplexityThresholds': cyclomatic complexity 7 (advisory at 5) |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 221 | `complexity.boolean_param_flag` | 🔵 advisory | function 'resolveOutputPath': boolean flag parameter 'flag, format string' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…nx-code-review-standard/internal/report/markdown_helpers.go` | 57 | `complexity.cyclomatic` | 🔵 advisory | function 'ratingBadge': cyclomatic complexity 6 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/adapters/treesitter/walker_patterns.go` | 75 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/adapters/treesitter/walker_patterns.go` | 118 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/report/model.go` | 118 | `complexity.max_return_count` | 🔵 advisory | function 'pillarRating': 5 return statements (max 4) — consider restructuring |
+| `…nx-code-review-standard/internal/report/markdown_helpers.go` | 57 | `complexity.max_return_count` | 🔵 advisory | function 'ratingBadge': 6 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/report/model.go` | 166 | `complexity.cyclomatic` | 🔵 advisory | function 'buildPillar': cyclomatic complexity 6 (advisory at 5) |
+| `…astava-ami/nx-code-review-standard/internal/report/model.go` | 118 | `complexity.max_return_count` | 🔵 advisory | function 'pillarRating': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…astava-ami/nx-code-review-standard/internal/report/model.go` | 166 | `complexity.cyclomatic` | 🔵 advisory | function 'buildPillar': cyclomatic complexity 6 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/report/markdown.go` | 20 | `complexity.function_length` | 🔵 advisory | function 'writeMarkdown': 33 lines (max 30) |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 77 | `complexity.max_return_count` | 🔵 advisory | function 'runInstallHooks': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 156 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installGitleaks': boolean flag parameter 'hasBrew bool' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 168 | `complexity.max_return_count` | 🔵 advisory | function 'installSemgrep': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 168 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installSemgrep': boolean flag parameter 'hasBrew, hasPipx, hasPip3 bool' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 186 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installMadge': boolean flag parameter 'hasNPM bool' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 198 | `complexity.cyclomatic` | 🔵 advisory | function 'installGitleaksFromRelease': cyclomatic complexity 8 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 198 | `complexity.max_return_count` | 🔵 advisory | function 'installGitleaksFromRelease': 6 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…e-review-standard/internal/adapters/treesitter/walker_go.go` | 205 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…ew-standard/internal/adapters/treesitter/walker_patterns.go` | 81 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…ew-standard/internal/adapters/treesitter/walker_patterns.go` | 124 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…ava-ami/nx-code-review-standard/internal/analysis/runner.go` | 116 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `…ava-ami/nx-code-review-standard/internal/analysis/runner.go` | 116 | `complexity.max_return_count` | 🔵 advisory | function '<anonymous>': 6 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `…ava-ami/nx-code-review-standard/internal/analysis/runner.go` | 108 | `complexity.function_length` | 🔵 advisory | function 'walkFiles': 36 lines (max 30) |
 | | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/internal/report/markdown.go` | 140 | `complexity.cyclomatic` | 🔵 advisory | function 'writeExceptions': cyclomatic complexity 7 (advisory at 5) |
+| `…review-standard/internal/adapters/treesitter/duplication.go` | 46 | `complexity.boolean_param_flag` | 🔵 advisory | function 'indexFile': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…review-standard/internal/adapters/treesitter/duplication.go` | 58 | `complexity.boolean_param_flag` | 🔵 advisory | function 'emitDupFindings': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
+| | | | | 💡 *Replace flag params with two separate functions or an options object.* |
+| `…iew-standard/internal/adapters/treesitter/walker_metrics.go` | 21 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 7 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 
 </details>
 
 <details>
-<summary>🟡 <b>file_structure</b> ![A](https://img.shields.io/badge/reliability-A-brightgreen) — 8 finding(s)</summary>
+<summary>🟡 <b>file_structure</b> ![A](https://img.shields.io/badge/reliability-A-brightgreen) — 9 finding(s)</summary>
 
 | File | Line | Rule | Severity | Message |
 |------|------|------|----------|---------|
-| `/src/internal/architecture/detector.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 204 lines (advisory threshold 150) |
+| `…i/nx-code-review-standard/internal/architecture/detector.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 204 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/cmd/coderev/main.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 240 lines (advisory threshold 150) |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 175 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/adapters/treesitter/duplication.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 240 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/analysis/runner.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 226 lines (advisory threshold 150) |
+| `…astava-ami/nx-code-review-standard/internal/report/model.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 217 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/config/standards_sections.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 232 lines (advisory threshold 150) |
+| `…e-review-standard/internal/adapters/treesitter/walker_go.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 233 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/report/sarif.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
+| `…ava-ami/nx-code-review-standard/internal/analysis/runner.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 226 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/report/model.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 217 lines (advisory threshold 150) |
+| `…-code-review-standard/internal/config/standards_sections.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 233 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/report/markdown.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 175 lines (advisory threshold 150) |
+| `…astava-ami/nx-code-review-standard/internal/report/sarif.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
+| `…review-standard/internal/adapters/treesitter/duplication.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
+| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
+
+</details>
+
+<details>
+<summary>🟡 <b>observability</b> ![A](https://img.shields.io/badge/reliability-A-brightgreen) — 62 finding(s)</summary>
+
+| File | Line | Rule | Severity | Message |
+|------|------|------|----------|---------|
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 11 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 12 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 13 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 14 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 18 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 19 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 20 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 21 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 22 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 23 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 26 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 32 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | 33 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…mi/nx-code-review-standard/internal/output/ghpr/annotate.go` | 57 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 26 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 27 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 34 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 36 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 38 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 51 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 57 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 58 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 59 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 60 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 65 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 83 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 85 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 97 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 100 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 112 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 120 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 160 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | 171 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 127 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 129 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | 163 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…mi/nx-code-review-standard/internal/report/markdown_arch.go` | 16 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…mi/nx-code-review-standard/internal/report/markdown_arch.go` | 31 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…mi/nx-code-review-standard/internal/report/markdown_arch.go` | 49 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…mi/nx-code-review-standard/internal/report/markdown_arch.go` | 51 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…nx-code-review-standard/internal/report/markdown_helpers.go` | 81 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…nx-code-review-standard/internal/report/markdown_helpers.go` | 94 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 87 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 94 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 95 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 102 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 103 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 110 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 130 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 137 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 139 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 142 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 144 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 147 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 149 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 152 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 159 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 171 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 189 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 219 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 243 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | 255 | `go.fmt_print` | 🔵 advisory | fmt.Println/Printf in production code — bypasses structured logging |
+| | | | | 💡 *Use slog, zap, or zerolog with structured fields and log-level control.* |
 
 </details>
 
 ## Hot Files
 
 <details>
-<summary>17 file(s) with findings</summary>
+<summary>21 file(s) with findings</summary>
 
 | File | Language | Lines | Findings | Heat |
 |------|----------|-------|----------|------|
-| `/src/cmd/coderev/main.go` | go | 240 | 7 | `█████` |
-| `/src/cmd/coderev/setup.go` | go | 300 | 7 | `█████` |
-| `/src/internal/analysis/runner.go` | go | 226 | 4 | `██░░░` |
-| `/src/internal/adapters/treesitter/duplication.go` | go | 177 | 3 | `██░░░` |
-| `/src/internal/report/model.go` | go | 217 | 3 | `██░░░` |
-| `/src/internal/report/markdown.go` | go | 175 | 3 | `██░░░` |
-| `/src/internal/adapters/treesitter/walker_patterns.go` | go | 142 | 2 | `█░░░░` |
-| `/src/internal/report/markdown_helpers.go` | go | 97 | 2 | `█░░░░` |
-| `/src/internal/config/toolconfig.go` | go | 112 | 1 | `░░░░░` |
-| `/src/internal/config/standards_test.go` | go | 147 | 1 | `░░░░░` |
-| `/src/internal/config/standards_sections.go` | go | 232 | 1 | `░░░░░` |
-| `/src/internal/adapters/treesitter/walker_metrics.go` | go | 137 | 1 | `░░░░░` |
-| `/src/internal/architecture/detector.go` | go | 204 | 1 | `░░░░░` |
-| `/src/internal/adapters/treesitter/walker.go` | go | 118 | 1 | `░░░░░` |
-| `/src/internal/report/generator.go` | go | 45 | 1 | `░░░░░` |
-| `/src/cmd/coderev/adapters.go` | go | 62 | 1 | `░░░░░` |
-| `/src/internal/report/sarif.go` | go | 177 | 1 | `░░░░░` |
+| `…srivastava-ami/nx-code-review-standard/cmd/coderev/setup.go` | go | 300 | 27 | `█████` |
+| `…ava-ami/nx-code-review-standard/internal/report/markdown.go` | go | 175 | 22 | `████░` |
+| `…rivastava-ami/nx-code-review-standard/cmd/coderev/output.go` | go | 35 | 13 | `██░░░` |
+| `…/srivastava-ami/nx-code-review-standard/cmd/coderev/main.go` | go | 240 | 10 | `█░░░░` |
+| `…nx-code-review-standard/internal/report/markdown_helpers.go` | go | 97 | 4 | `░░░░░` |
+| `…mi/nx-code-review-standard/internal/report/markdown_arch.go` | go | 62 | 4 | `░░░░░` |
+| `…ava-ami/nx-code-review-standard/internal/analysis/runner.go` | go | 226 | 4 | `░░░░░` |
+| `…review-standard/internal/adapters/treesitter/duplication.go` | go | 177 | 3 | `░░░░░` |
+| `…astava-ami/nx-code-review-standard/internal/report/model.go` | go | 217 | 3 | `░░░░░` |
+| `…ew-standard/internal/adapters/treesitter/walker_patterns.go` | go | 148 | 2 | `░░░░░` |
+| `…e-review-standard/internal/adapters/treesitter/walker_go.go` | go | 233 | 2 | `░░░░░` |
+| `…mi/nx-code-review-standard/internal/output/ghpr/annotate.go` | go | 139 | 1 | `░░░░░` |
+| `…a-ami/nx-code-review-standard/internal/config/toolconfig.go` | go | 112 | 1 | `░░░░░` |
+| `…code-review-standard/internal/adapters/treesitter/walker.go` | go | 118 | 1 | `░░░░░` |
+| `…i/nx-code-review-standard/internal/config/standards_test.go` | go | 147 | 1 | `░░░░░` |
+| `…-code-review-standard/internal/config/standards_sections.go` | go | 233 | 1 | `░░░░░` |
+| `…vastava-ami/nx-code-review-standard/cmd/coderev/adapters.go` | go | 62 | 1 | `░░░░░` |
+| `…i/nx-code-review-standard/internal/architecture/detector.go` | go | 204 | 1 | `░░░░░` |
+| `…iew-standard/internal/adapters/treesitter/walker_metrics.go` | go | 137 | 1 | `░░░░░` |
+| `…va-ami/nx-code-review-standard/internal/report/generator.go` | go | 45 | 1 | `░░░░░` |
+| `…astava-ami/nx-code-review-standard/internal/report/sarif.go` | go | 177 | 1 | `░░░░░` |
 
 </details>
 
@@ -356,9 +497,29 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 | `cmd/coderev/setup.go` | `hardcoding.urls_and_paths` | installGitleaksFromRelease() must call the GitHub releases API by its canonical URL — there is no configurable alternative for a self-contained install command |
 | `cmd/coderev/setup.go` | `complexity.function_length` | installGitleaksFromRelease() is bootstrap installer code: detect OS/arch, fetch release metadata, download tarball, extract, install — one atomic operation with no reusable sub-units |
 | `cmd/coderev/setup.go` | `file_structure.file_length` | setup.go contains all install subcommands (setup, install-deps, install-hooks) as a single cohesive unit; splitting it would fragment one feature across multiple files |
+| `internal/adapters/treesitter/walker_go.go` | `go.fmt_print` | Pattern strings ("fmt.Println(", etc.) in the detection array trigger the rule on the checker's own source — detection constants, not production print calls |
+| `internal/adapters/treesitter/walker_go.go` | `go.panic_in_lib` | String literal "panic(" in the detection pattern and message text triggers the rule on its own source code |
+| `internal/adapters/treesitter/walker_go.go` | `go.sql_string_concat` | SQL keyword strings in goSQLConcatPatterns and goLineHasSQLKeyword are detection constants — not user-facing SQL construction |
+| `internal/adapters/treesitter/walker_go.go` | `go.context_todo` | The string "context.TODO()" appears in detection logic and message text — detection constants, not production code |
+| `internal/adapters/treesitter/walker_go.go` | `go.defer_in_loop` | The string "defer " appears inside the state-machine for-loop as a string literal being searched — detection constant, not a deferred call |
+
+</details>
+
+<details>
+<summary>⚠️ Adapter warnings</summary>
+
+- **gitleaks**: gitleaks: exit status 1 — stderr: 
+    ○
+    │╲
+    │ ○
+    ○ ░
+    ░    gitleaks
+
+[90m10:36PM[0m [31mFTL[0m [1mReport path is not writable: /dev/stdout[0m [36merror=[0m[31m[1m"open /dev/stdout: permission denied"[0m[0m
+
 
 </details>
 
 ---
 
-*Generated by [coderev](https://github.com/srivastava-ami/coderev) · Wed, 24 Jun 2026 03:34:24 UTC*
+*Generated by [coderev](https://github.com/srivastava-ami/coderev) · Tue, 23 Jun 2026 22:36:35 PDT*
