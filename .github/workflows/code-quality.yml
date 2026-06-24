@@ -4,7 +4,7 @@ on:
   push:
     branches: ["**"]
   pull_request:
-    branches: ["**"]
+    branches: [main]    # only PRs targeting main get the full annotation treatment
 
 env:
   REGISTRY: ghcr.io
@@ -17,14 +17,15 @@ jobs:
 
     permissions:
       contents: read
-      packages: read         # pull image from GHCR
-      pull-requests: write   # post inline PR annotations
+      packages: read          # pull image from GHCR
+      pull-requests: write    # post inline PR annotations
+      security-events: write  # upload SARIF to Code Scanning tab
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0     # full history so --diff origin/<base> works
+          fetch-depth: 0      # full history so --diff origin/<base> works
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -36,27 +37,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # Try to pull the published image; fall back to building it locally.
-      # After the first tag is published this step becomes a fast `docker pull`.
-      - name: Build coderev image (with layer cache)
+      # Build from source with layer cache.
+      # After the first release tag this will pull from GHCR instead.
+      - name: Build coderev image
         uses: docker/build-push-action@v5
         with:
           context: .
-          load: true          # make image available to docker run in this job
+          load: true
           tags: coderev:ci
           cache-from: |
             type=gha
             type=registry,ref=${{ env.IMAGE }}:latest
           cache-to: type=gha,mode=max
 
-      - name: Scan — full (push to main)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/src" \
-            coderev:ci /src
-
-      - name: Scan — incremental diff (pull request)
+      # ── pull request → diff scan + inline comments + SARIF ──────────────────
+      - name: Scan PR (incremental diff + annotate)
         if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -72,25 +67,34 @@ jobs:
               --annotate-pr \
               --repo "${PR_REPO}" \
               --pr "${PR_NUMBER}" \
+              --format sarif \
               /src
-          # --repo and --pr are passed explicitly in CI because git remote
-          # may not be configured in the detached checkout. For local runs
-          # both are auto-detected and can be omitted.
+          # sarif format: still posts inline comments via --annotate-pr,
+          # and writes coderev-report.sarif for the Code Scanning upload below.
 
-      - name: Scan — incremental diff (feature branch push)
+      - name: Upload SARIF to GitHub Code Scanning
+        if: github.event_name == 'pull_request'
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: coderev-report.sarif
+
+      # ── push to main → full scan (no annotation, just report artifact) ──────
+      - name: Scan main (full)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            coderev:ci /src
+
+      # ── push to any other branch → incremental diff (no annotation) ─────────
+      - name: Scan branch (incremental diff)
         if: github.event_name == 'push' && github.ref != 'refs/heads/main'
         run: |
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/src" \
             coderev:ci --diff HEAD~1 /src
 
-      - name: Upload SARIF to GitHub Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: coderev-report.sarif
-        continue-on-error: true
-
+      # ── always upload the report as a workflow artifact ──────────────────────
       - name: Upload report artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -99,4 +103,5 @@ jobs:
           path: |
             coderev-report.md
             coderev-report.sarif
+          if-no-files-found: ignore
           retention-days: 30
