@@ -1,0 +1,11 @@
+[nx_conventions]
+severity = "blocker"
+
+[nx_conventions.boundaries]
+rule        = "nx_conventions.boundaries"
+description = "Libraries must not import from app-level packages"
+tool        = "madge"
+
+[nx_conventions.tags]
+rule           = "nx_conventions.tags"
+required_axes  = ["scope", "type"]

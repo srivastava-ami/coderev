@@ -1,0 +1,8 @@
+[observability]
+severity = "blocker"
+
+[observability.logging]
+rule             = "observability.logging"
+required_fields  = ["correlationId", "level", "message"]
+checks           = ["no_console_log"]
+forbidden_levels = ["console.log", "console.error", "console.warn"]

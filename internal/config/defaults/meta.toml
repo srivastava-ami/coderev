@@ -1,0 +1,4 @@
+[meta]
+version      = "built-in"
+last_updated = "2026-06-23"
+applies_to   = ["typescript", "javascript", "go", "python", "rust"]

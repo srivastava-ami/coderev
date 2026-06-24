@@ -1,0 +1,9 @@
+[testing]
+severity = "blocker"
+
+[testing.coverage]
+lines       = 80
+branches    = 80
+functions   = 80
+statements  = 80
+new_code_minimum = 80

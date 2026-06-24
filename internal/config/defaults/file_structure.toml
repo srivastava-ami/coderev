@@ -1,0 +1,11 @@
+[file_structure]
+severity = "advisory"
+
+[file_structure.file_length]
+max_lines   = 300
+advisory_at = 200
+remediation = "Split the file by responsibility. Each file should have a single concern."
+
+[file_structure.class_length]
+max_lines   = 150
+remediation = "Extract related methods into a helper class or composition."
