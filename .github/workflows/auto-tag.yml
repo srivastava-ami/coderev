@@ -1,4 +1,4 @@
-name: Auto-tag on merge
+name: Auto-tag and release on merge
 
 on:
   push:
@@ -10,6 +10,8 @@ permissions:
 jobs:
   tag:
     runs-on: ubuntu-latest
+    outputs:
+      next_tag: ${{ steps.calc.outputs.next_tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -17,24 +19,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Determine next version and tag
+        id: calc
         run: |
-          # Get latest semver tag (vX.Y.Z). Skip if this push IS already a tag push.
           LATEST=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
-          if [[ -z "$LATEST" ]]; then
-            LATEST="v0.0.0"
-          fi
+          if [[ -z "$LATEST" ]]; then LATEST="v0.0.0"; fi
 
           MAJOR=$(echo "$LATEST" | cut -d. -f1 | tr -d 'v')
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
-          # Read the merge commit message (squash merge uses PR title)
           MSG=$(git log -1 --pretty=%s)
           echo "Commit: $MSG"
           echo "Current tag: $LATEST"
 
-          # Minor bump if commit adds new capabilities; patch otherwise.
-          # Major is always a manual explicit tag — never auto-bumped here.
           if echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
             NEXT="v${MAJOR}.$((MINOR + 1)).0"
           else
@@ -46,3 +43,127 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$NEXT" -m "$NEXT"
           git push origin "$NEXT"
+          echo "next_tag=$NEXT" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: tag
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: arm64
+            runner: macos-latest
+          - goos: darwin
+            goarch: amd64
+            runner: macos-latest
+            cc: "clang -arch x86_64"
+          - goos: linux
+            goarch: amd64
+            runner: ubuntu-latest
+          - goos: linux
+            goarch: arm64
+            runner: ubuntu-latest
+            cc: aarch64-linux-gnu-gcc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.next_tag }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Install linux/arm64 cross-compiler
+        if: matrix.cc == 'aarch64-linux-gnu-gcc'
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CC: ${{ matrix.cc }}
+          CGO_ENABLED: 1
+        run: |
+          VERSION="${{ needs.tag.outputs.next_tag }}"
+          mkdir -p bin/dist
+          go build -ldflags "-X main.version=${VERSION} -s -w" \
+            -o "bin/dist/coderev-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}" \
+            ./cmd/coderev
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: coderev-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: bin/dist/coderev-*
+          retention-days: 1
+
+  release:
+    needs: [tag, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.tag.outputs.next_tag }}
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/download-artifact@v5
+        with:
+          path: bin/dist
+          merge-multiple: true
+
+      - name: Compute SHA256 sums
+        id: sha
+        run: |
+          TAG="${{ needs.tag.outputs.next_tag }}"
+          VERSION="${TAG#v}"
+          cd bin/dist
+          sha256sum coderev-* > SHA256SUMS
+          echo "version=${VERSION}"                                                           >> "$GITHUB_OUTPUT"
+          echo "darwin_arm64=$(sha256sum coderev-${TAG}-darwin-arm64 | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "darwin_amd64=$(sha256sum coderev-${TAG}-darwin-amd64 | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$(sha256sum  coderev-${TAG}-linux-arm64  | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "linux_amd64=$(sha256sum  coderev-${TAG}-linux-amd64  | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ needs.tag.outputs.next_tag }}"
+          gh release create "$TAG" bin/dist/* \
+            --title "coderev $TAG" \
+            --generate-notes
+
+      - name: Push formula to homebrew-tools tap
+        env:
+          TAP_DEPLOY_KEY: ${{ secrets.TAP_DEPLOY_KEY }}
+          VERSION:        ${{ steps.sha.outputs.version }}
+          DARWIN_ARM64:   ${{ steps.sha.outputs.darwin_arm64 }}
+          DARWIN_AMD64:   ${{ steps.sha.outputs.darwin_amd64 }}
+          LINUX_ARM64:    ${{ steps.sha.outputs.linux_arm64 }}
+          LINUX_AMD64:    ${{ steps.sha.outputs.linux_amd64 }}
+        run: |
+          TAG="${{ needs.tag.outputs.next_tag }}"
+          sed -i \
+            -e "s/version \"[^\"]*\"/version \"${VERSION}\"/" \
+            -e "s/SHA256_DARWIN_ARM64/${DARWIN_ARM64}/g" \
+            -e "s/SHA256_DARWIN_AMD64/${DARWIN_AMD64}/g" \
+            -e "s/SHA256_LINUX_ARM64/${LINUX_ARM64}/g"  \
+            -e "s/SHA256_LINUX_AMD64/${LINUX_AMD64}/g"  \
+            Formula/coderev.rb
+          mkdir -p ~/.ssh
+          echo "$TAP_DEPLOY_KEY" > ~/.ssh/tap_key
+          chmod 600 ~/.ssh/tap_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/tap_key -o StrictHostKeyChecking=yes"
+          git clone git@github.com:srivastava-ami/homebrew-tools.git tap
+          cp Formula/coderev.rb tap/Formula/coderev.rb
+          cd tap
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/coderev.rb
+          git diff --staged --quiet && echo "formula unchanged" && exit 0
+          git commit -m "coderev ${TAG}"
+          git push
