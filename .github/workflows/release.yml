@@ -1,0 +1,74 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build, publish, update formula
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Build release binaries
+        run: make dist
+
+      - name: Compute SHA256 sums
+        id: sha
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#v}"
+          cd bin/dist
+
+          sha256sum coderev-* > SHA256SUMS
+
+          echo "version=${VERSION}"                                                           >> "$GITHUB_OUTPUT"
+          echo "darwin_arm64=$(sha256sum coderev-${TAG}-darwin-arm64 | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "darwin_amd64=$(sha256sum coderev-${TAG}-darwin-amd64 | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "linux_arm64=$(sha256sum  coderev-${TAG}-linux-arm64  | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+          echo "linux_amd64=$(sha256sum  coderev-${TAG}-linux-amd64  | awk '{print $1}')"  >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" bin/dist/* \
+            --title "coderev ${GITHUB_REF_NAME}" \
+            --generate-notes
+
+      - name: Update Homebrew formula
+        env:
+          VERSION:      ${{ steps.sha.outputs.version }}
+          DARWIN_ARM64: ${{ steps.sha.outputs.darwin_arm64 }}
+          DARWIN_AMD64: ${{ steps.sha.outputs.darwin_amd64 }}
+          LINUX_ARM64:  ${{ steps.sha.outputs.linux_arm64 }}
+          LINUX_AMD64:  ${{ steps.sha.outputs.linux_amd64 }}
+        run: |
+          sed -i \
+            -e "s/version \"[^\"]*\"/version \"${VERSION}\"/" \
+            -e "s/SHA256_DARWIN_ARM64/${DARWIN_ARM64}/" \
+            -e "s/SHA256_DARWIN_AMD64/${DARWIN_AMD64}/" \
+            -e "s/SHA256_LINUX_ARM64/${LINUX_ARM64}/"  \
+            -e "s/SHA256_LINUX_AMD64/${LINUX_AMD64}/"  \
+            Formula/coderev.rb
+
+      - name: Commit formula update
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/coderev.rb
+          git commit -m "chore: bump formula to ${GITHUB_REF_NAME}"
+          git push origin HEAD:main

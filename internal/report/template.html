@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Review — {{.Meta.RepoName}}</title>
+<style>
+:root{--bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2d3148;--text:#e2e8f0;--muted:#8892a4;--blocker:#ef4444;--major:#f97316;--advisory:#eab308;--info:#60a5fa;--pass:#22c55e;--fail:#ef4444;--warn:#f97316;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--info);text-decoration:none}
+
+/* Layout */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.header-title{font-size:1.1rem;font-weight:600}
+.header-meta{font-size:.8rem;color:var(--muted)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:.75rem;font-weight:700;letter-spacing:.05em}
+.badge-pass{background:rgba(34,197,94,.15);color:var(--pass);border:1px solid rgba(34,197,94,.3)}
+.badge-fail{background:rgba(239,68,68,.15);color:var(--fail);border:1px solid rgba(239,68,68,.3)}
+
+nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 32px;display:flex;gap:0}
+.tab{padding:12px 20px;cursor:pointer;font-size:.85rem;color:var(--muted);border-bottom:2px solid transparent;transition:all .15s}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--info);border-bottom-color:var(--info)}
+
+.container{max-width:1400px;margin:0 auto;padding:24px 32px}
+.panel{display:none}.panel.active{display:block}
+
+/* Cards */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.card-label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.card-value{font-size:2rem;font-weight:700}
+.card-value.blocker{color:var(--blocker)}
+.card-value.major{color:var(--major)}
+.card-value.advisory{color:var(--advisory)}
+.card-value.pass{color:var(--pass)}
+.card-sub{font-size:.75rem;color:var(--muted);margin-top:4px}
+
+/* Charts */
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px}
+.chart-title{font-size:.85rem;font-weight:600;margin-bottom:16px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+svg.chart{display:block;width:100%;overflow:visible}
+
+/* Pillar scoreboard */
+.pillar-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-bottom:24px}
+.pillar-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px}
+.pillar-name{font-size:.85rem;font-weight:600;margin-bottom:8px;text-transform:capitalize}
+.pillar-bar-bg{background:var(--surface2);border-radius:4px;height:6px;overflow:hidden;margin-bottom:6px}
+.pillar-bar{height:100%;border-radius:4px;transition:width .4s}
+.pillar-count{font-size:.75rem;color:var(--muted)}
+.status-FAIL{color:var(--fail)}
+.status-WARN{color:var(--warn)}
+.status-PASS{color:var(--pass)}
+
+/* Table */
+.toolbar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.search{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 14px;color:var(--text);font-size:.85rem;flex:1;min-width:200px;outline:none}
+.search:focus{border-color:var(--info)}
+.filter-btn{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:7px 14px;color:var(--muted);font-size:.8rem;cursor:pointer;transition:all .15s;white-space:nowrap}
+.filter-btn.active{background:var(--surface2);color:var(--text);border-color:var(--info)}
+.filter-btn:hover{border-color:var(--info)}
+
+table{width:100%;border-collapse:collapse;background:var(--surface);border-radius:10px;overflow:hidden;border:1px solid var(--border);font-size:.83rem}
+thead{background:var(--surface2)}
+th{padding:10px 14px;text-align:left;font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;border-bottom:1px solid var(--border)}
+td{padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--surface2)}
+
+.sev{display:inline-flex;align-items:center;padding:2px 8px;border-radius:4px;font-size:.7rem;font-weight:700;letter-spacing:.05em;white-space:nowrap}
+.sev-blocker{background:rgba(239,68,68,.15);color:var(--blocker)}
+.sev-major{background:rgba(249,115,22,.15);color:var(--major)}
+.sev-advisory{background:rgba(234,179,8,.15);color:var(--advisory)}
+.sev-info{background:rgba(96,165,250,.15);color:var(--info)}
+
+.file-link{font-family:'SF Mono',Consolas,monospace;font-size:.78rem;color:var(--info)}
+.rule-id{font-family:'SF Mono',Consolas,monospace;font-size:.75rem;color:var(--muted)}
+.hidden{display:none!important}
+
+/* Snippet */
+.snippet-toggle{background:none;border:none;color:var(--info);cursor:pointer;font-size:.75rem;margin-top:4px;padding:0}
+.snippet{background:var(--surface2);border-radius:4px;padding:8px 12px;font-family:'SF Mono',Consolas,monospace;font-size:.75rem;margin-top:6px;white-space:pre-wrap;word-break:break-all;color:#a8b4cb;border-left:2px solid var(--border);display:none}
+.snippet.open{display:block}
+
+/* File heatmap */
+.file-list{display:flex;flex-direction:column;gap:6px}
+.file-row{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;cursor:pointer;transition:border-color .15s}
+.file-row:hover{border-color:var(--info)}
+.file-row-header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.file-path{font-family:'SF Mono',Consolas,monospace;font-size:.8rem;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-heat{width:60px;height:6px;border-radius:3px;flex-shrink:0}
+.file-count{font-size:.75rem;color:var(--muted);white-space:nowrap}
+.file-findings{display:none;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.file-row.open .file-findings{display:block}
+
+/* Architecture */
+.arch-content{display:grid;grid-template-columns:1fr 420px;gap:24px}
+.arch-text{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;font-size:.88rem;line-height:1.7}
+.arch-text h2,.arch-text h3{margin:16px 0 8px;color:var(--text)}
+.arch-text h2{font-size:1.1rem}
+.arch-text h3{font-size:.9rem;color:var(--muted)}
+.arch-text ul{padding-left:20px;color:var(--muted)}
+.arch-text li{margin:4px 0}
+.arch-text strong{color:var(--text)}
+.arch-text code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-family:'SF Mono',Consolas,monospace;font-size:.8rem}
+.arch-text blockquote{border-left:2px solid var(--border);padding-left:12px;color:var(--muted);margin:12px 0}
+.graph-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.graph-card-title{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+#dep-graph{width:100%;height:400px}
+
+/* Warnings */
+.warnings{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem}
+.warnings strong{color:var(--major)}
+
+/* Responsive */
+@media(max-width:900px){
+  .grid-4{grid-template-columns:repeat(2,1fr)}
+  .chart-row{grid-template-columns:1fr}
+  .arch-content{grid-template-columns:1fr}
+  .graph-card{display:none}
+}
+@media(max-width:600px){
+  .header,.container{padding-left:16px;padding-right:16px}
+  nav{padding:0 16px}
+  .grid-4{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div>
+    <div class="header-title" id="repo-name">Loading…</div>
+    <div class="header-meta" id="report-meta"></div>
+  </div>
+  <span class="badge" id="overall-badge"></span>
+</header>
+
+<nav>
+  <button class="tab active" onclick="showTab('summary',this)">Summary</button>
+  <button class="tab" onclick="showTab('architecture',this)">Architecture</button>
+  <button class="tab" onclick="showTab('violations',this)">Violations</button>
+  <button class="tab" onclick="showTab('files',this)">Files</button>
+  <button class="tab" onclick="showTab('exceptions',this)">Exceptions</button>
+</nav>
+
+<div class="container">
+
+  <!-- ── SUMMARY ─────────────────────────────────────────────────────── -->
+  <div id="panel-summary" class="panel active">
+    <div id="warnings-banner"></div>
+    <div class="grid-4">
+      <div class="card"><div class="card-label">Total Files</div><div class="card-value" id="s-files">—</div></div>
+      <div class="card"><div class="card-label">Blockers</div><div class="card-value blocker" id="s-blockers">—</div></div>
+      <div class="card"><div class="card-label">Major</div><div class="card-value major" id="s-majors">—</div></div>
+      <div class="card"><div class="card-label">Total Findings</div><div class="card-value" id="s-total">—</div></div>
+    </div>
+
+    <div class="chart-row">
+      <div class="chart-card">
+        <div class="chart-title">Severity Distribution</div>
+        <svg class="chart" id="donut-chart" viewBox="0 0 200 160"></svg>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Findings by Pillar</div>
+        <svg class="chart" id="bar-chart" viewBox="0 0 360 160"></svg>
+      </div>
+    </div>
+
+    <div class="chart-title" style="margin-bottom:12px">Pillar Scorecard</div>
+    <div class="pillar-grid" id="pillar-grid"></div>
+  </div>
+
+  <!-- ── ARCHITECTURE ───────────────────────────────────────────────── -->
+  <div id="panel-architecture" class="panel">
+    <div class="arch-content">
+      <div class="arch-text" id="arch-text">Loading…</div>
+      <div class="graph-card">
+        <div class="graph-card-title">Dependency Graph</div>
+        <div id="dep-graph"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── VIOLATIONS ────────────────────────────────────────────────── -->
+  <div id="panel-violations" class="panel">
+    <div class="toolbar">
+      <input class="search" id="v-search" placeholder="Search rule, file, message…" oninput="filterViolations()">
+      <button class="filter-btn active" data-sev="all" onclick="setSevFilter('all',this)">All</button>
+      <button class="filter-btn" data-sev="blocker" onclick="setSevFilter('blocker',this)">Blockers</button>
+      <button class="filter-btn" data-sev="major" onclick="setSevFilter('major',this)">Major</button>
+      <button class="filter-btn" data-sev="advisory" onclick="setSevFilter('advisory',this)">Advisory</button>
+    </div>
+    <div id="violations-count" style="font-size:.8rem;color:var(--muted);margin-bottom:10px"></div>
+    <table>
+      <thead><tr>
+        <th>Severity</th><th>Rule</th><th>File / Line</th><th>Message</th><th>Remediation</th>
+      </tr></thead>
+      <tbody id="violations-body"></tbody>
+    </table>
+  </div>
+
+  <!-- ── FILES ─────────────────────────────────────────────────────── -->
+  <div id="panel-files" class="panel">
+    <div class="toolbar">
+      <input class="search" id="f-search" placeholder="Filter by path…" oninput="filterFiles()">
+    </div>
+    <div class="file-list" id="file-list"></div>
+  </div>
+
+  <!-- ── EXCEPTIONS ────────────────────────────────────────────────── -->
+  <div id="panel-exceptions" class="panel">
+    <div id="exceptions-content"></div>
+  </div>
+
+</div>
+
+<script>
+const R = {{.ReportJSON}};
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  renderHeader();
+  renderWarnings();
+  renderSummary();
+  renderViolations();
+  renderFiles();
+  renderArchitecture();
+  renderExceptions();
+});
+
+// ── Header ───────────────────────────────────────────────────────────────────
+function renderHeader() {
+  document.getElementById('repo-name').textContent = R.Meta.RepoName + ' — Code Review';
+  document.getElementById('report-meta').textContent =
+    'Standards v' + R.Meta.StandardsVersion + ' · ' + R.Meta.Generated;
+  const badge = document.getElementById('overall-badge');
+  badge.textContent = R.Summary.OverallStatus;
+  badge.className = 'badge badge-' + (R.Summary.OverallStatus === 'PASS' ? 'pass' : 'fail');
+}
+
+// ── Warnings ─────────────────────────────────────────────────────────────────
+function renderWarnings() {
+  const el = document.getElementById('warnings-banner');
+  if (!R.Warnings || R.Warnings.length === 0) return;
+  el.innerHTML = '<div class="warnings"><strong>⚠ Adapter warnings:</strong> ' +
+    R.Warnings.map(w => `<code>${w.Adapter}</code>: ${w.Reason}`).join(' | ') + '</div>';
+}
+
+// ── Summary ───────────────────────────────────────────────────────────────────
+function renderSummary() {
+  const s = R.Summary;
+  document.getElementById('s-files').textContent = s.TotalFiles;
+  document.getElementById('s-blockers').textContent = s.BySeverity.blocker || 0;
+  document.getElementById('s-majors').textContent = s.BySeverity.major || 0;
+  document.getElementById('s-total').textContent = s.TotalFindings;
+
+  renderDonut();
+  renderBar();
+  renderPillars();
+}
+
+function renderDonut() {
+  const s = R.Summary.BySeverity;
+  const items = [
+    { label: 'Blocker', value: s.blocker || 0, color: '#ef4444' },
+    { label: 'Major',   value: s.major   || 0, color: '#f97316' },
+    { label: 'Advisory',value: s.advisory|| 0, color: '#eab308' },
+    { label: 'Info',    value: s.info    || 0, color: '#60a5fa' },
+  ].filter(i => i.value > 0);
+
+  const total = items.reduce((a, b) => a + b.value, 0);
+  if (total === 0) { document.getElementById('donut-chart').innerHTML = '<text x="100" y="85" text-anchor="middle" fill="#8892a4" font-size="12">No findings</text>'; return; }
+
+  const svg = document.getElementById('donut-chart');
+  const cx = 80, cy = 80, r = 60, inner = 38;
+  let start = -Math.PI / 2;
+  let paths = '';
+
+  for (const item of items) {
+    const angle = (item.value / total) * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+    const x2 = cx + r * Math.cos(start + angle), y2 = cy + r * Math.sin(start + angle);
+    const ix1 = cx + inner * Math.cos(start + angle), iy1 = cy + inner * Math.sin(start + angle);
+    const ix2 = cx + inner * Math.cos(start), iy2 = cy + inner * Math.sin(start);
+    const large = angle > Math.PI ? 1 : 0;
+    paths += `<path d="M${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} L${ix1},${iy1} A${inner},${inner} 0 ${large},0 ${ix2},${iy2} Z" fill="${item.color}" opacity=".85"/>`;
+    start += angle;
+  }
+
+  // Centre text
+  paths += `<text x="${cx}" y="${cy-6}" text-anchor="middle" fill="#e2e8f0" font-size="20" font-weight="700">${total}</text>`;
+  paths += `<text x="${cx}" y="${cy+10}" text-anchor="middle" fill="#8892a4" font-size="10">findings</text>`;
+
+  // Legend
+  let ly = 20;
+  for (const item of items) {
+    paths += `<rect x="155" y="${ly-8}" width="10" height="10" rx="2" fill="${item.color}"/>`;
+    paths += `<text x="170" y="${ly}" fill="#e2e8f0" font-size="11">${item.label} (${item.value})</text>`;
+    ly += 22;
+  }
+
+  svg.innerHTML = paths;
+}
+
+function renderBar() {
+  const byPillar = R.Summary.ByPillar || {};
+  const entries = Object.entries(byPillar).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  if (entries.length === 0) return;
+
+  const svg = document.getElementById('bar-chart');
+  const maxVal = Math.max(...entries.map(e => e[1]));
+  const barH = 12, gap = 6, leftW = 120, rightPad = 40;
+  const chartW = 360 - leftW - rightPad;
+  let html = '';
+  let y = 10;
+
+  for (const [pillar, count] of entries) {
+    const barW = (count / maxVal) * chartW;
+    const color = barColorFor(pillar);
+    html += `<text x="${leftW - 6}" y="${y + 9}" text-anchor="end" fill="#8892a4" font-size="10" dominant-baseline="middle">${pillar}</text>`;
+    html += `<rect x="${leftW}" y="${y}" width="${barW}" height="${barH}" rx="3" fill="${color}" opacity=".8"/>`;
+    html += `<text x="${leftW + barW + 5}" y="${y + 9}" fill="#e2e8f0" font-size="10" dominant-baseline="middle">${count}</text>`;
+    y += barH + gap;
+  }
+
+  svg.setAttribute('viewBox', `0 0 360 ${y}`);
+  svg.innerHTML = html;
+}
+
+function barColorFor(pillar) {
+  const m = { security:'#ef4444', stability:'#f97316', complexity:'#eab308',
+               file_structure:'#a78bfa', type_safety:'#60a5fa', observability:'#34d399',
+               hardcoding:'#fb923c', documentation:'#94a3b8', performance:'#e879f9' };
+  return m[pillar] || '#60a5fa';
+}
+
+function renderPillars() {
+  const grid = document.getElementById('pillar-grid');
+  const pillars = R.Pillars || [];
+  if (pillars.length === 0) {
+    grid.innerHTML = '<div style="color:var(--muted);font-size:.85rem">No violations detected.</div>';
+    return;
+  }
+
+  grid.innerHTML = pillars.map(p => {
+    const pct = Math.round(p.Score * 100);
+    const color = p.Status === 'FAIL' ? '#ef4444' : p.Status === 'WARN' ? '#f97316' : '#22c55e';
+    const count = p.Findings ? p.Findings.length : 0;
+    return `<div class="pillar-card">
+      <div class="pillar-name status-${p.Status}">${p.Name.replace(/_/g,' ')}</div>
+      <div class="pillar-bar-bg"><div class="pillar-bar" style="width:${pct}%;background:${color}"></div></div>
+      <div class="pillar-count">${count} finding${count !== 1 ? 's' : ''} · score ${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Violations ────────────────────────────────────────────────────────────────
+let currentSevFilter = 'all';
+
+function renderViolations() {
+  rebuildViolationsTable(R.Findings || []);
+}
+
+function rebuildViolationsTable(findings) {
+  const query = (document.getElementById('v-search')?.value || '').toLowerCase();
+  let filtered = findings.filter(f => {
+    if (currentSevFilter !== 'all' && f.Severity !== currentSevFilter) return false;
+    if (query && !JSON.stringify(f).toLowerCase().includes(query)) return false;
+    return true;
+  });
+
+  document.getElementById('violations-count').textContent =
+    `Showing ${filtered.length} of ${findings.length} findings`;
+
+  const body = document.getElementById('violations-body');
+  if (filtered.length === 0) {
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:32px;color:var(--muted)">No violations match the current filter.</td></tr>';
+    return;
+  }
+
+  body.innerHTML = filtered.map((f, i) => {
+    const shortFile = f.File ? f.File.split('/').slice(-3).join('/') : '—';
+    const hasSnippet = f.Snippet && f.Snippet.trim().length > 0;
+    const snip = hasSnippet ? `<button class="snippet-toggle" onclick="toggleSnippet(${i})">show code</button><pre class="snippet" id="snip-${i}">${escHtml(f.Snippet)}</pre>` : '';
+    return `<tr>
+      <td><span class="sev sev-${f.Severity}">${f.Severity.toUpperCase()}</span></td>
+      <td><span class="rule-id">${f.Rule}</span></td>
+      <td><span class="file-link" title="${f.File}">${shortFile}</span>${f.Line ? `<br><span style="color:var(--muted);font-size:.7rem">line ${f.Line}</span>` : ''}</td>
+      <td>${escHtml(f.Message)}${snip}</td>
+      <td style="color:var(--muted);font-size:.78rem">${escHtml(f.Remediation || '')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function toggleSnippet(i) {
+  const el = document.getElementById('snip-' + i);
+  const btn = el.previousElementSibling;
+  el.classList.toggle('open');
+  btn.textContent = el.classList.contains('open') ? 'hide code' : 'show code';
+}
+
+function setSevFilter(sev, btn) {
+  currentSevFilter = sev;
+  document.querySelectorAll('.filter-btn[data-sev]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  rebuildViolationsTable(R.Findings || []);
+}
+
+function filterViolations() { rebuildViolationsTable(R.Findings || []); }
+
+// ── Files ─────────────────────────────────────────────────────────────────────
+function renderFiles() {
+  rebuildFileList(R.Files || []);
+}
+
+function rebuildFileList(files) {
+  const query = (document.getElementById('f-search')?.value || '').toLowerCase();
+  const filtered = files.filter(f => !query || f.Path.toLowerCase().includes(query));
+  const el = document.getElementById('file-list');
+
+  if (filtered.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:20px">No files match.</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map((file, i) => {
+    const shortPath = file.Path.split('/').slice(-4).join('/');
+    const heatColor = heatToColor(file.HeatScore);
+    const count = file.Findings ? file.Findings.length : 0;
+    const inner = count > 0 ? file.Findings.map(f =>
+      `<div style="display:flex;gap:8px;align-items:flex-start;padding:4px 0;border-bottom:1px solid var(--border)">
+        <span class="sev sev-${f.Severity}" style="margin-top:1px">${f.Severity[0].toUpperCase()}</span>
+        <div><span class="rule-id">${f.Rule}</span>${f.Line ? ` <span style="color:var(--muted);font-size:.7rem">:${f.Line}</span>` : ''}<br><span style="font-size:.78rem;color:var(--muted)">${escHtml(f.Message)}</span></div>
+      </div>`
+    ).join('') : '<div style="color:var(--muted);font-size:.8rem">No violations.</div>';
+
+    return `<div class="file-row" id="frow-${i}" onclick="toggleFile(${i})">
+      <div class="file-row-header">
+        <span class="file-path" title="${file.Path}">${shortPath}</span>
+        <span class="file-heat" style="background:${heatColor}"></span>
+        <span class="file-count">${count} issue${count !== 1 ? 's' : ''} · ${file.Lines} lines · ${file.Language}</span>
+      </div>
+      <div class="file-findings">${inner}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleFile(i) {
+  document.getElementById('frow-' + i).classList.toggle('open');
+}
+
+function filterFiles() { rebuildFileList(R.Files || []); }
+
+function heatToColor(score) {
+  if (score === 0) return 'var(--surface2)';
+  if (score < 0.33) return 'rgba(234,179,8,.6)';
+  if (score < 0.66) return 'rgba(249,115,22,.7)';
+  return 'rgba(239,68,68,.8)';
+}
+
+// ── Architecture ──────────────────────────────────────────────────────────────
+function renderArchitecture() {
+  const arch = R.Architecture;
+  const el = document.getElementById('arch-text');
+
+  if (!arch || !arch.Text) {
+    el.innerHTML = '<p style="color:var(--muted)">No architecture information available.</p>';
+    return;
+  }
+
+  el.innerHTML = markdownToHtml(arch.Text);
+
+  if (arch.Source === 'doc') {
+    el.insertAdjacentHTML('afterbegin',
+      `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--pass)">
+        ✓ Loaded from <code>${arch.DocFile}</code>
+      </div>`);
+  } else {
+    el.insertAdjacentHTML('afterbegin',
+      `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--advisory)">
+        ⚠ Architecture synthesised — add <code>docs/architecture.md</code> to provide a curated overview.
+      </div>`);
+  }
+
+  renderDepGraph(arch);
+}
+
+function renderDepGraph(arch) {
+  const container = document.getElementById('dep-graph');
+  if (!arch.Nodes || arch.Nodes.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:20px">No dependency graph data.</div>';
+    return;
+  }
+
+  const W = 388, H = 400;
+  const nodes = arch.Nodes;
+  const edges = arch.Edges || [];
+
+  // Simple force-free layout: arrange in a circle.
+  const nodeMap = {};
+  nodes.forEach((n, i) => {
+    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
+    const r = Math.min(W, H) / 2 - 40;
+    nodeMap[n.ID] = { x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle), ...n };
+  });
+
+  const typeColors = { app: '#60a5fa', lib: '#a78bfa', service: '#34d399', external: '#94a3b8' };
+
+  let svg = `<svg width="${W}" height="${H}" style="background:var(--surface2);border-radius:8px">`;
+
+  for (const edge of edges) {
+    const s = nodeMap[edge.from], t = nodeMap[edge.to];
+    if (!s || !t) continue;
+    svg += `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="var(--border)" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+  }
+
+  svg += `<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--muted)"/></marker></defs>`;
+
+  for (const n of Object.values(nodeMap)) {
+    const color = typeColors[n.type] || '#8892a4';
+    const label = n.label.length > 14 ? n.label.slice(0, 12) + '…' : n.label;
+    svg += `<circle cx="${n.x}" cy="${n.y}" r="18" fill="${color}" opacity=".2" stroke="${color}" stroke-width="1.5"/>`;
+    svg += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle" fill="${color}" font-size="9" font-weight="600">${label}</text>`;
+  }
+
+  svg += '</svg>';
+  container.innerHTML = svg;
+}
+
+// ── Exceptions ────────────────────────────────────────────────────────────────
+function renderExceptions() {
+  const el = document.getElementById('exceptions-content');
+  const excs = R.Exceptions || [];
+
+  if (excs.length === 0) {
+    el.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:20px">No active exceptions registered.</div>';
+    return;
+  }
+
+  el.innerHTML = `<table>
+    <thead><tr><th>Rule</th><th>Scope</th><th>Justification</th><th>Approved By</th><th>Expires</th><th>Ticket</th></tr></thead>
+    <tbody>${excs.map(e => `<tr>
+      <td><span class="rule-id">${e.rule || '—'}</span></td>
+      <td><span class="file-link">${e.file_or_module || '—'}</span></td>
+      <td style="font-size:.78rem">${escHtml(e.justification || '')}</td>
+      <td style="font-size:.78rem;color:var(--muted)">${e.approved_by || '—'}</td>
+      <td style="font-size:.78rem;color:${isExpired(e.expires) ? 'var(--fail)' : 'var(--muted)'}">${e.expires || '—'}</td>
+      <td>${e.ticket ? `<a href="${escHtml(e.ticket)}" target="_blank">${escHtml(e.ticket)}</a>` : '—'}</td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+}
+
+function isExpired(dateStr) {
+  if (!dateStr) return false;
+  return new Date(dateStr) < new Date();
+}
+
+// ── Tab navigation ────────────────────────────────────────────────────────────
+function showTab(name, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function markdownToHtml(md) {
+  return md
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
+    .replace(/^- (.+)$/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, s => '<ul>' + s + '</ul>')
+    .replace(/\n\n/g, '</p><p>')
+    .replace(/^(?!<[hupb])/gm, '')
+    .trim();
+}
+</script>
+</body>
+</html>

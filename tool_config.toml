@@ -1,0 +1,66 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Tool Adapter Configuration
+#
+# This file controls which tool handles which rules and how each tool is invoked.
+# Swap any adapter by changing its settings here — no Go source changes needed.
+# Add your own tools under [[adapters.custom]].
+# ─────────────────────────────────────────────────────────────────────────────
+
+[adapters.treesitter]
+enabled = true
+# Tree-sitter is the primary engine — pure Go, no external binary.
+# Handles all structural, complexity, type-safety, and pattern checks.
+rules = [
+"complexity.*",
+"file_structure.file_length",
+"file_structure.class_length",
+"type_safety.no_any",
+"type_safety.null_safety",
+"hardcoding.magic_numbers",
+"hardcoding.urls_and_paths",
+"documentation.comment_quality",
+"documentation.no_comment_tombstones",
+"documentation.todo_format",
+"observability.logging",
+"stability.error_handling",
+]
+
+[adapters.semgrep]
+enabled = true
+binary  = "semgrep"     # must be on $PATH: pip install semgrep
+rules   = ["security.injection.*", "security.auth.*", "security.cryptography"]
+args    = []            # extra args appended to semgrep invocation
+
+[adapters.gitleaks]
+enabled = true
+binary  = "gitleaks"    # brew install gitleaks
+rules   = ["security.secrets"]
+args    = []
+
+[adapters.madge]
+enabled = true
+binary  = "madge"       # npm install -g madge
+rules   = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+args    = []
+
+[adapters.npmaudit]
+enabled = true
+binary  = "npm"         # built into Node.js
+rules   = ["security.dependencies"]
+args    = []
+
+# ── Custom adapters ───────────────────────────────────────────────────────────
+# Any program that outputs NDJSON (one Finding JSON per line) or a JSON array
+# of Findings can plug in here. Use {{target}} as a placeholder for the repo path.
+#
+# Finding schema (must match internal/analysis/finding.go):
+#   { "Rule": "...", "Pillar": "...", "Severity": "blocker|major|advisory|info",
+#     "File": "...", "Line": 0, "Message": "...", "Remediation": "..." }
+#
+# [[adapters.custom]]
+# name     = "my-checker"
+# binary   = "/usr/local/bin/my-checker"
+# enabled  = false
+# protocol = "ndjson"
+# rules    = ["complexity.*"]
+# args     = ["--format=coderev-json", "{{target}}"]

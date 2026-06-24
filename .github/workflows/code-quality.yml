@@ -1,0 +1,102 @@
+name: Code Quality Gate
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  coderev:
+    name: coderev scan
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: read         # pull image from GHCR
+      pull-requests: write   # post inline PR annotations
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # full history so --diff origin/<base> works
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Try to pull the published image; fall back to building it locally.
+      # After the first tag is published this step becomes a fast `docker pull`.
+      - name: Build coderev image (with layer cache)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          load: true          # make image available to docker run in this job
+          tags: coderev:ci
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.IMAGE }}:latest
+          cache-to: type=gha,mode=max
+
+      - name: Scan — full (push to main)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            coderev:ci /src
+
+      - name: Scan — incremental diff (pull request)
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            -e GH_TOKEN \
+            coderev:ci \
+              --diff "origin/${BASE_REF}" \
+              --annotate-pr \
+              --repo "${PR_REPO}" \
+              --pr "${PR_NUMBER}" \
+              /src
+          # --repo and --pr are passed explicitly in CI because git remote
+          # may not be configured in the detached checkout. For local runs
+          # both are auto-detected and can be omitted.
+
+      - name: Scan — incremental diff (feature branch push)
+        if: github.event_name == 'push' && github.ref != 'refs/heads/main'
+        run: |
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/src" \
+            coderev:ci --diff HEAD~1 /src
+
+      - name: Upload SARIF to GitHub Code Scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: coderev-report.sarif
+        continue-on-error: true
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coderev-report
+          path: |
+            coderev-report.md
+            coderev-report.sarif
+          retention-days: 30

@@ -1,0 +1,13 @@
+# compiled binary
+bin/
+
+# knowledge graph (auto-rebuilt by post-commit hook)
+graphify-out/
+
+# agent / dev-environment files (not part of the deliverable)
+.claude/
+.mcp.json
+project_manifest.toml
+
+# OS
+.DS_Store
