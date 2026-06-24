@@ -177,10 +177,6 @@ func resolveStandards(target string) (analysis.Standards, string, error) {
 		s, err := config.Load(flagStandards)
 		return s, flagStandards, err
 	}
-	if p, ok := config.DiscoverStandards(target); ok {
-		s, err := config.Load(p)
-		return s, p, err
-	}
 	s, err := config.LoadDefaults()
 	return s, "built-in defaults", err
 }

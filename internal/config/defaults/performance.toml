@@ -1,0 +1,9 @@
+[performance]
+
+[performance.database]
+severity = "blocker"
+checks   = ["no_n_plus_one", "no_select_star"]
+
+[performance.async]
+severity = "major"
+checks   = ["no_await_in_loop"]

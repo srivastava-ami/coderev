@@ -1,0 +1,86 @@
+You are implementing a specific task. Follow these instructions exactly.
+
+## HARD CONSTRAINTS — read these first
+
+1. Do NOT add any external dependencies or packages not already in go.mod.
+2. Only use existing imports in this repo (e.g. github.com/srivastava-ami/coderev/internal/analysis) plus Go stdlib.
+3. Do NOT create files not listed below. Do NOT modify files not listed below.
+4. After all changes: run `go build ./...` — it must pass with zero errors.
+5. Then run `go test ./...` — all tests must pass.
+6. Do not commit. Leave changes unstaged.
+
+## Task: v110_docs_cleanup
+
+## What to build
+
+Update docs and CLI help text to reflect the new architecture:
+- Remove all references to code_review_standards.toml auto-discovery
+- Add security.secret_fallback_literal to the rules reference
+- Update rule count (54 -> 55)
+- Document the category file structure
+- Update README quick-start
+
+## Exact implementation spec — follow this precisely
+
+The spec below contains the EXACT code to write. Copy it verbatim.
+Do not invent alternative implementations.
+
+### rules_reference_changes
+
+In docs/rules-reference.md:
+
+1. Change the opening line from "All 54 built-in rules" to "All 55 built-in rules".
+
+2. Replace the Quick start section with:
+
+  ## Default standards
+
+  coderev ships with built-in standards embedded in the binary, organised by pillar.
+  No configuration file is needed — just run `coderev .`.
+
+  | File | Pillar |
+  |---|---|
+  | complexity.toml | Cyclomatic, cognitive, nesting, parameters, function length |
+  | security.toml | Secrets, dependencies |
+  | stability.toml | Error handling, async |
+  | hardcoding.toml | Magic numbers, hardcoded URLs |
+  | type_safety.toml | TypeScript any, null assertions |
+  | observability.toml | Logging |
+  | documentation.toml | TODOs, commented-out code |
+  | file_structure.toml | File and class length, circular deps |
+  | testing.toml | Coverage thresholds |
+  | go.toml | Go conventions |
+  | python.toml | Python conventions |
+  | rust.toml | Rust conventions |
+  | nx.toml | NX monorepo boundaries |
+
+  To override for a specific repo: `coderev --standards /path/to/custom.toml .`
+
+3. In the Security table (section 6), add a new row:
+   | `security.secret_fallback_literal` | Env secret with hardcoded fallback | TS/JS | blocker (advisory in NODE_ENV guard) | — | treesitter + semgrep |
+
+4. Update the adapter rule-count line near the bottom:
+   Change "47 rules" to "48 rules" for the treesitter entry.
+
+### readme_changes
+
+In README.md:
+- Remove any paragraph that tells users to create code_review_standards.toml.
+- In the quick-start section, the first example should be just: coderev .
+- Remove references to '~/.config/coderev/code_review_standards.toml'.
+- Add one sentence: 'Standards are built in — no config file needed.'
+
+### main_change
+
+In cmd/coderev/main.go, update the Long field of the root command.
+Replace:
+  'Standards and tool-config files are auto-discovered (target dir -> cwd -> ~/.config/coderev/).'
+With:
+  'Standards are built into the binary. Run coderev . with no configuration needed.'
+
+## Acceptance criteria (verify each one)
+
+1. 'coderev --help' output contains no mention of code_review_standards.toml discovery.
+2. docs/rules-reference.md lists security.secret_fallback_literal in the Security table.
+3. Rule count in docs reads 55.
+4. README quick-start shows 'coderev .' with no prerequisite config step.

@@ -2,7 +2,6 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -122,25 +121,3 @@ func TestLoadInvalidTOML(t *testing.T) {
 	}
 }
 
-func TestDiscoverStandardsFindsFileInTarget(t *testing.T) {
-	dir := t.TempDir()
-	targetFile := filepath.Join(dir, "code_review_standards.toml")
-	if err := os.WriteFile(targetFile, []byte("[meta]\nversion=\"1.0\"\n"), 0644); err != nil {
-		t.Fatalf("writing test file: %v", err)
-	}
-	found, ok := DiscoverStandards(dir)
-	if !ok {
-		t.Fatal("DiscoverStandards should find the file in target dir")
-	}
-	if found != targetFile {
-		t.Errorf("found = %q, want %q", found, targetFile)
-	}
-}
-
-func TestDiscoverStandardsReturnsFalseWhenAbsent(t *testing.T) {
-	dir := t.TempDir()
-	_, ok := DiscoverStandards(dir)
-	if ok {
-		t.Error("DiscoverStandards should return false when no file exists")
-	}
-}

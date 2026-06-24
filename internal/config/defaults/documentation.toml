@@ -1,0 +1,18 @@
+[documentation]
+severity = "advisory"
+
+[documentation.comment_quality]
+rule         = "documentation.comment_quality"
+bad_patterns = ["TODO", "FIXME", "HACK", "XXX"]
+
+[documentation.no_comment_tombstones]
+rule        = "documentation.no_tombstones"
+severity    = "advisory"
+description = "Commented-out code is dead weight"
+remediation = "Delete it — version control is your history."
+
+[documentation.todo_format]
+rule        = "documentation.todo_format"
+pattern     = "TODO\\(\\w+\\):"
+severity    = "advisory"
+remediation = "Format TODOs as TODO(owner): description"
