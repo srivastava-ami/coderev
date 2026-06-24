@@ -1,0 +1,6 @@
+[stability]
+severity = "blocker"
+
+[stability.error_handling]
+rule   = "stability.error_handling"
+checks = ["no_empty_catch", "no_swallowed_exceptions"]

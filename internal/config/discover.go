@@ -6,17 +6,10 @@ import (
 )
 
 const (
-	defaultStandardsFile  = "code_review_standards.toml"
 	defaultToolConfigFile = "tool_config.toml"
 	defaultOutputFile     = "coderev-report.html"
 	globalConfigDir       = "~/.config/coderev"
 )
-
-// DiscoverStandards walks target → cwd → ~/.config/coderev looking for the
-// standards file. Returns the path of the first file found.
-func DiscoverStandards(target string) (string, bool) {
-	return discoverFile(target, defaultStandardsFile)
-}
 
 // DiscoverToolConfig walks the same search path for the tool adapter config.
 func DiscoverToolConfig(target string) (string, bool) {

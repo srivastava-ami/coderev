@@ -1,0 +1,9 @@
+[security]
+severity = "blocker"
+
+[security.secrets]
+rule = "security.secrets"
+
+[security.supply_chain]
+rule   = "security.dependencies"
+checks = ["npm_audit", "known_cves"]

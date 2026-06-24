@@ -1,0 +1,10 @@
+[type_safety]
+severity = "blocker"
+
+[type_safety.no_any]
+rule   = "type_safety.no_any"
+checks = ["no_any_type", "no_ts_ignore"]
+
+[type_safety.null_safety]
+rule   = "type_safety.null_safety"
+checks = ["no_non_null_assertion"]

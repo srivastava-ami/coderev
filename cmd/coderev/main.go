@@ -32,13 +32,13 @@ var (
 func main() {
 	root := &cobra.Command{
 		Use:   "coderev [directory]",
-		Short: "Local code review against code_review_standards.toml",
-		Long: `coderev analyses a codebase against the rules defined in
-code_review_standards.toml and produces an interactive Markdown report
-(default) or a self-contained HTML report — no LLMs, no cloud, no network.
+		Short: "Local code review against built-in coding standards",
+		Long: `coderev analyses a codebase against built-in coding standards and
+produces an interactive Markdown report (default) or a self-contained HTML
+report — no LLMs, no cloud, no network.
 
 If [directory] is omitted the current directory is used.
-Standards and tool-config files are auto-discovered (target dir → cwd → ~/.config/coderev/).`,
+Tool-config files are auto-discovered (target dir → cwd → ~/.config/coderev/).`,
 		Version: version,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    run,
@@ -48,7 +48,8 @@ Standards and tool-config files are auto-discovered (target dir → cwd → ~/.c
   coderev --output ./reports/review.md    # custom output path`,
 	}
 
-	root.Flags().StringVar(&flagStandards, "standards", "", "path to code_review_standards.toml (auto-discovered, falls back to built-in defaults)")
+	root.Flags().StringVar(&flagStandards, "standards", "", "path to code_review_standards.toml (escape hatch — usually not needed)")
+	root.Flags().MarkHidden("standards")
 	root.Flags().StringVar(&flagOutput, "output", "", "output file path (default depends on --format)")
 	root.Flags().StringVar(&flagConfig, "config", "", "path to tool_config.toml (auto-discovered if omitted)")
 	root.Flags().StringVar(&flagFormat, "format", "markdown", "output format: markdown (default), html, sarif")

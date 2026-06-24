@@ -1,0 +1,29 @@
+[complexity]
+severity = "blocker"
+
+[complexity.cyclomatic]
+max_value    = 10
+advisory_at  = 7
+hard_block_at = 15
+remediation  = "Extract branches into named helpers. Each function should do one thing."
+
+[complexity.cognitive]
+max_value = 15
+tool      = "treesitter"
+
+[complexity.function_length]
+max_lines   = 40
+advisory_at = 30
+remediation = "Split into smaller focused functions."
+
+[complexity.parameter_count]
+max_count   = 3
+remediation = "Introduce a parameter object or builder."
+
+[complexity.nesting]
+max_depth   = 3
+remediation = "Invert conditions (early return) or extract inner blocks to helpers."
+
+[complexity.duplication]
+rule             = "file_structure.duplication"
+threshold_tokens = 25
