@@ -5,7 +5,6 @@ import (
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/architecture"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 func sampleFindings() []analysis.Finding {
@@ -28,7 +27,7 @@ func sampleFiles() []analysis.FileInfo {
 func req(findings []analysis.Finding, files []analysis.FileInfo, warnings []analysis.AdapterWarning) BuildRequest {
 	return BuildRequest{
 		Target:    "/a",
-		Standards: config.Standards{},
+		Standards: analysis.Standards{},
 		StdFile:   "standards.toml",
 		Files:     files,
 		Findings:  findings,

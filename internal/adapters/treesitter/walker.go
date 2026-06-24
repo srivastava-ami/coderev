@@ -4,7 +4,6 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 // fileWalker performs all AST-based checks on a single parsed file.
@@ -13,11 +12,11 @@ type fileWalker struct {
 	src      []byte
 	file     string
 	lang     analysis.Language
-	stds     config.Standards
+	stds     analysis.Standards
 	findings []analysis.Finding
 }
 
-func newFileWalker(def *LangDef, fi analysis.FileInfo, stds config.Standards) *fileWalker {
+func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards) *fileWalker {
 	return &fileWalker{def: def, src: fi.Content, file: fi.Path, lang: fi.Language, stds: stds}
 }
 

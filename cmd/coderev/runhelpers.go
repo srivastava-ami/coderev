@@ -17,6 +17,8 @@ import (
 	"github.com/srivastava-ami/coderev/internal/report"
 )
 
+var gitDiff gitDiffService
+
 func discoverAndPrintPlugins() {
 	pluginDir := flagPluginDir
 	if pluginDir == "" {
@@ -73,10 +75,10 @@ func printGateResult(gateResult quality.GateResult) error {
 	return fmt.Errorf(gateResult.Message)
 }
 
-func runAnalysis(target string, stds config.Standards, tc config.ToolConfig, ads []analysis.ToolAdapter) (analysis.RunResult, error) {
+func runAnalysis(target string, stds analysis.Standards, tc analysis.ToolConfig, ads []analysis.ToolAdapter) (analysis.RunResult, error) {
 	runner := analysis.NewRunner(stds, tc, ads)
 	if flagDiff != "" {
-		runner = runner.WithDiff(flagDiff)
+		runner = runner.WithDiff(flagDiff, gitDiff)
 	}
 	result, err := runner.Run(context.Background(), target)
 	if err != nil {
@@ -85,7 +87,7 @@ func runAnalysis(target string, stds config.Standards, tc config.ToolConfig, ads
 	return result, nil
 }
 
-func buildAndWrite(target, stdFile string, stds config.Standards, result analysis.RunResult) (report.Report, string, error) {
+func buildAndWrite(target, stdFile string, stds analysis.Standards, result analysis.RunResult) (report.Report, string, error) {
 	base, _ := baseline.Load(target)
 	delta := baseline.Compute(base, result.Findings)
 	r := report.Build(report.BuildRequest{
@@ -170,7 +172,7 @@ func resolveTarget(args []string) (string, error) {
 	return abs, nil
 }
 
-func resolveStandards(target string) (config.Standards, string, error) {
+func resolveStandards(target string) (analysis.Standards, string, error) {
 	if flagStandards != "" {
 		s, err := config.Load(flagStandards)
 		return s, flagStandards, err

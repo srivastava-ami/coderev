@@ -8,6 +8,7 @@ import (
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/config"
+	"github.com/srivastava-ami/coderev/internal/toolmgr"
 )
 
 // version is set at build time via -ldflags "-X main.version=<tag>".
@@ -68,6 +69,10 @@ Standards and tool-config files are auto-discovered (target dir → cwd → ~/.c
 }
 
 func run(cmd *cobra.Command, args []string) error {
+	if err := toolmgr.EnsureAll(); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠  some external tools could not be installed: %v\n", err)
+	}
+
 	s := setupRun(args)
 	if s.err != nil {
 		return s.err
@@ -90,9 +95,9 @@ func run(cmd *cobra.Command, args []string) error {
 
 type runSetup struct {
 	target   string
-	stds     config.Standards
+	stds     analysis.Standards
 	stdLabel string
-	tc       config.ToolConfig
+	tc       analysis.ToolConfig
 	err      error
 }
 
@@ -121,7 +126,7 @@ func jsonRun(result analysis.RunResult) error {
 	return writeJSONOutput(result, gateResult)
 }
 
-func stdRun(target, stdLabel string, stds config.Standards, result analysis.RunResult) error {
+func stdRun(target, stdLabel string, stds analysis.Standards, result analysis.RunResult) error {
 	gateResult, err := resolveGate(result.Findings)
 	if err != nil {
 		return err

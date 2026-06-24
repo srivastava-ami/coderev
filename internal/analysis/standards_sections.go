@@ -1,4 +1,4 @@
-package config
+package analysis
 
 // ── Security ──────────────────────────────────────────────────────────────────
 
@@ -241,4 +241,3 @@ type TagsStd struct {
 	Rule            string   `toml:"rule"`
 	RequiredTagAxes []string `toml:"required_axes"`
 }
-

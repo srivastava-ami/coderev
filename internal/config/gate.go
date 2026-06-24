@@ -5,17 +5,12 @@ import (
 	"os"
 
 	"github.com/BurntSushi/toml"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
-type GateConfig struct {
-	Blockers   int `toml:"max_blockers"`
-	Majors     int `toml:"max_majors"`
-	Advisories int `toml:"max_advisories"`
-	Total      int `toml:"max_total"`
-}
-
-func DefaultGateConfig() GateConfig {
-	return GateConfig{
+func DefaultGateConfig() analysis.GateConfig {
+	return analysis.GateConfig{
 		Blockers:   0,
 		Majors:     5,
 		Advisories: 10,
@@ -23,12 +18,12 @@ func DefaultGateConfig() GateConfig {
 	}
 }
 
-func LoadGate(path string) (*GateConfig, error) {
+func LoadGate(path string) (*analysis.GateConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading gate config: %w", err)
 	}
-	var gc GateConfig
+	var gc analysis.GateConfig
 	if _, err := toml.Decode(string(data), &gc); err != nil {
 		return nil, fmt.Errorf("parsing gate config: %w", err)
 	}

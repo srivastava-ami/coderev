@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 type GateResult struct {
@@ -16,7 +15,7 @@ type GateResult struct {
 	Message    string `json:"message"`
 }
 
-func Evaluate(findings []analysis.Finding, gate config.GateConfig) GateResult {
+func Evaluate(findings []analysis.Finding, gate analysis.GateConfig) GateResult {
 	blockers, majors, advisories := 0, 0, 0
 	for _, f := range findings {
 		switch f.Severity {
@@ -40,7 +39,7 @@ func Evaluate(findings []analysis.Finding, gate config.GateConfig) GateResult {
 	}
 }
 
-func gateMessage(blockers, majors, advisories, total int, gate config.GateConfig) string {
+func gateMessage(blockers, majors, advisories, total int, gate analysis.GateConfig) string {
 	switch {
 	case blockers > gate.Blockers:
 		return fmt.Sprintf("%d blocker(s) exceed threshold of %d", blockers, gate.Blockers)

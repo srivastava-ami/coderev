@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 
 	"github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
@@ -24,6 +25,9 @@ func New(binary string) *Adapter {
 func (a *Adapter) Name() string { return "semgrep" }
 
 func (a *Adapter) IsAvailable() bool {
+	if _, err := os.Stat(a.binary); err == nil {
+		return true
+	}
 	_, err := exec.LookPath(a.binary)
 	return err == nil
 }
