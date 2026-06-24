@@ -10,51 +10,61 @@ env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/${{ github.repository }}
 
-# ── branch push: native Go build, no Docker — fast feedback ──────────────────
+# ── branch push: full scan → report committed back to branch ─────────────────
 jobs:
   scan-branch:
     name: coderev scan (branch)
     if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+      packages: write
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version: "1.22"
-          cache: true
+      - uses: docker/setup-buildx-action@v3
 
-      - name: Build
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ env.IMAGE }}:ci-latest
+          cache-from: |
+            type=registry,ref=${{ env.IMAGE }}:ci-latest
+            type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Full scan
         run: |
           mkdir -p .tmp
-          go build -o /tmp/coderev ./cmd/coderev > .tmp/build.log 2>&1
-          echo "build lines: $(wc -l < .tmp/build.log | tr -d ' ')"
-
-      - name: Scan diff
-        run: |
-          mkdir -p .tmp
-          /tmp/coderev --diff HEAD~1 . > .tmp/scan.log 2>&1 || true
-          cp coderev-report.md .tmp/branch-report.md 2>/dev/null || true
+          docker run --rm -v "$GITHUB_WORKSPACE:/src" \
+            ${{ env.IMAGE }}:ci-latest /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
+
+      - name: Commit report to branch
+        if: always()
+        run: |
+          if [ -f coderev-report.md ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add coderev-report.md
+            git diff --staged --quiet || git commit -m "Update coderev scan report [skip ci]"
+            git push
+          fi
 
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coderev-report-${{ github.sha }}
-          path: coderev-report.md
-          if-no-files-found: ignore
-          retention-days: 7
-
-# ── PR scan: Docker (all adapters), inline comments + PR summary comment ──────
+# ── PR to main: diff scan → inline annotations on changed lines ───────────────
   scan-pr:
     name: coderev scan
     if: github.event_name == 'pull_request'
@@ -63,7 +73,6 @@ jobs:
       contents: read
       packages: write
       pull-requests: write
-      security-events: write
 
     steps:
       - uses: actions/checkout@v4
@@ -78,7 +87,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -89,7 +98,7 @@ jobs:
             type=gha
           cache-to: type=gha,mode=max
 
-      - name: Scan and annotate PR
+      - name: Scan diff and annotate PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -108,35 +117,11 @@ jobs:
               /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
 
-      - name: Post PR summary comment
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_REPO: ${{ github.repository }}
-        run: |
-          REPORT=$(cat coderev-report.md 2>/dev/null || echo "_no report generated_")
-          BODY="<!-- coderev-scan-result -->
-          ${REPORT}"
-          # update existing coderev comment if present, otherwise create
-          gh pr comment "${PR_NUMBER}" --repo "${PR_REPO}" \
-            --body "${BODY}" --edit-last 2>/dev/null || \
-          gh pr comment "${PR_NUMBER}" --repo "${PR_REPO}" \
-            --body "${BODY}"
-
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coderev-report-pr-${{ github.event.pull_request.number }}
-          path: coderev-report.md
-          if-no-files-found: ignore
-          retention-days: 30
-
-# ── main push: full Docker scan, step summary ─────────────────────────────────
+# ── main push: full scan → report committed back to main, image tagged :latest ─
   scan-main:
     name: coderev scan (main)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -147,8 +132,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - uses: docker/setup-buildx-action@v3
 
@@ -158,7 +141,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and tag image as latest
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -174,12 +157,11 @@ jobs:
       - name: Full scan
         run: |
           mkdir -p .tmp
-          docker run --rm \
-            -v "$GITHUB_WORKSPACE:/src" \
+          docker run --rm -v "$GITHUB_WORKSPACE:/src" \
             ${{ env.IMAGE }}:latest /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
 
-      - name: Commit report back to main
+      - name: Commit report to main
         if: always()
         run: |
           if [ -f coderev-report.md ]; then
@@ -193,11 +175,3 @@ jobs:
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coderev-report-main-${{ github.sha }}
-          path: coderev-report.md
-          if-no-files-found: ignore
-          retention-days: 30
