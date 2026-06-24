@@ -120,17 +120,21 @@ func gitleaksURL(ver string) string {
 }
 
 func ensureSemgrep() error {
-	// pipx works everywhere and isolates the install correctly
+	// uv: fastest, isolated, works on any OS without touching system Python
+	if onPATH("uv") {
+		return runVisible("uv", "tool", "install", "semgrep")
+	}
+	// pipx: also isolated, widely available
 	if onPATH("pipx") {
 		return runVisible("pipx", "install", "semgrep")
 	}
-	// macOS system Python is PEP 668 externally managed — pip3 will always fail;
-	// use brew which has semgrep as a formula
+	// macOS system Python is PEP 668 externally managed — pip3 always fails;
+	// brew has semgrep as a formula
 	if runtime.GOOS == "darwin" {
 		if onPATH("brew") {
 			return runVisible("brew", "install", "semgrep")
 		}
-		return fmt.Errorf("install semgrep manually: brew install semgrep  OR  brew install pipx && pipx install semgrep")
+		return fmt.Errorf("install semgrep: brew install semgrep  OR  brew install uv && uv tool install semgrep")
 	}
 	// Linux: pip3 --user works, static binary as last resort
 	if onPATH("pip3") {
