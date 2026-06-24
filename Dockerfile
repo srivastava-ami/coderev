@@ -15,13 +15,21 @@ RUN CGO_ENABLED=1 GOOS=linux go build -ldflags "-s -w" -o /coderev ./cmd/coderev
 FROM debian:bookworm-slim
 
 ARG GITLEAKS_VERSION=8.30.0
+ARG GH_VERSION=2.65.0
 
-# Python (semgrep), Node (madge), curl (gitleaks download)
+# git (--diff mode), Python (semgrep), Node (madge), curl (gitleaks + gh download)
 RUN apt-get update && apt-get install -y --no-install-recommends \
+      git \
       python3 python3-pip \
       nodejs npm \
       curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# gh CLI — required for --annotate-pr to post inline PR comments
+RUN curl -fsSL \
+      "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_linux_amd64.tar.gz" \
+    | tar -xz --strip-components=2 -C /usr/local/bin \
+        "gh_${GH_VERSION}_linux_amd64/bin/gh"
 
 # gitleaks — secrets & credential scanning
 RUN curl -fsSL \
