@@ -9,5 +9,8 @@ graphify-out/
 .mcp.json
 project_manifest.toml
 
+# temporary logs from Claude tool executions
+.tmp/
+
 # OS
 .DS_Store
