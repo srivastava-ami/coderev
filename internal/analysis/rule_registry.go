@@ -66,9 +66,14 @@ var RuleRegistry = map[string]RuleMeta{
 	"nx_conventions.boundaries":     {},
 
 	// rust_conventions
-	"rust.no_unwrap": {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
-	"rust.no_panic":  {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
-	"rust.no_expect": {},
+	"rust.no_unwrap":     {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_panic":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_expect":     {},
+	"rust.no_unsafe":     {Tags: []string{"cwe:119"}, Standards: []string{"CWE-119"}},
+	"rust.no_transmute":  {Tags: []string{"cwe:704"}, Standards: []string{"CWE-704"}},
+	"rust.clone_on_copy": {},
+	"rust.no_todo":       {},
+	"rust.no_dbg_macro":  {},
 
 	// go_conventions
 	"go.fmt_print":         {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},

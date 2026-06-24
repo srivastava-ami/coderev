@@ -42,6 +42,11 @@ func (w *fileWalker) checkPatterns() {
 		w.checkRustUnwrap(line, lineNum)
 		w.checkRustPanic(line, lineNum)
 		w.checkRustExpect(line, lineNum)
+		w.checkRustUnsafe(line, lineNum)
+		w.checkRustTransmute(line, lineNum)
+		w.checkRustCloneOnCopy(line, lineNum)
+		w.checkRustTodo(line, lineNum)
+		w.checkRustDbgMacro(line, lineNum)
 	}
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)
