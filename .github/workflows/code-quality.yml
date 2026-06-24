@@ -14,13 +14,10 @@ env:
 jobs:
   scan-branch:
     name: coderev scan (branch)
-    if: >
-      github.event_name == 'push' &&
-      github.ref != 'refs/heads/main' &&
-      !contains(github.event.head_commit.message, 'Update coderev scan report')
+    if: github.event_name == 'push' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -52,20 +49,17 @@ jobs:
             ${{ env.IMAGE }}:ci-latest /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
 
-      - name: Commit report to branch
-        if: always()
-        run: |
-          if [ -f coderev-report.md ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add coderev-report.md
-            git diff --staged --quiet || git commit -m "Update coderev scan report"
-            git push
-          fi
-
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coderev-report-${{ github.ref_name }}-${{ github.sha }}
+          path: coderev-report.md
+          if-no-files-found: ignore
+          retention-days: 14
 
 # ── PR to main: diff scan → inline annotations on changed lines ───────────────
   scan-pr:
