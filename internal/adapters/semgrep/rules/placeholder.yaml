@@ -1,0 +1,3 @@
+# coderev built-in semgrep rules
+# Real rules are added per category. This file satisfies the embed directive.
+rules: []

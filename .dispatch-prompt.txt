@@ -1,0 +1,132 @@
+You are implementing a specific task. Follow these instructions exactly.
+
+## HARD CONSTRAINTS — read these first
+
+1. Do NOT add any external dependencies or packages not already in go.mod.
+2. Only use existing imports in this repo (e.g. github.com/srivastava-ami/coderev/internal/analysis) plus Go stdlib.
+3. Do NOT create files not listed below. Do NOT modify files not listed below.
+4. After all changes: run `go build ./...` — it must pass with zero errors.
+5. Then run `go test ./...` — all tests must pass.
+6. Do not commit. Leave changes unstaged.
+
+## Task: v110_semgrep_infra
+
+## What to build
+
+Replace the semgrep adapter's runtime cloud-pack fetch with embedded YAML
+rules. The adapter embeds internal/adapters/semgrep/rules/*.yaml at build
+time via //go:embed, extracts them to a temp directory at scan time, and
+runs semgrep --config <tmpdir>. No network call is made during a scan.
+A placeholder YAML file is added so the embed directive compiles before
+Task D (rule-yaml) adds the real rule files.
+
+## Why
+
+The current adapter fetches p/owasp-top-ten and p/secrets from semgrep's
+cloud registry at scan time. This breaks offline use, pins quality to
+third-party rule maintenance, and violates the zero-network-at-scan-time
+guarantee. Embedding coderev-owned YAML files restores all three properties.
+
+## Exact implementation spec — follow this precisely
+
+The spec below contains the EXACT code to write. Copy it verbatim.
+Do not invent alternative implementations.
+
+### placeholder_yaml
+
+Write this exact content to internal/adapters/semgrep/rules/placeholder.yaml.
+It is a valid semgrep file that matches nothing. Task D (rule-yaml) will
+replace it with real rules and delete this file.
+
+  # coderev built-in semgrep rules
+  # Real rules are added per category. This file satisfies the embed directive.
+  rules: []
+
+### adapter_change
+
+Replace internal/adapters/semgrep/adapter.go entirely with the following.
+The parseSemgrepOutput and mapSeverity functions are unchanged from the current
+file — copy them verbatim. Only execSemgrep and the top of the file change.
+
+  package semgrep
+
+  import (
+      "context"
+      "embed"
+      "encoding/json"
+      "fmt"
+      "io/fs"
+      "os"
+      "path/filepath"
+      "strings"
+
+      "github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
+      "github.com/srivastava-ami/coderev/internal/analysis"
+  )
+
+  //go:embed rules/*.yaml
+  var embeddedRules embed.FS
+
+  type Adapter struct{ binary string }
+
+  func New(binary string) *Adapter {
+      if binary == "" { binary = "semgrep" }
+      return &Adapter{binary: binary}
+  }
+
+  func (a *Adapter) Name() string      { return "semgrep" }
+  func (a *Adapter) IsAvailable() bool { return cmdutil.BinaryAvailable(a.binary) }
+  func (a *Adapter) Capabilities() []string {
+      return []string{"security.pattern.*"}
+  }
+
+  func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.Finding, error) {
+      data, err := a.execSemgrep(ctx, req)
+      if err != nil { return nil, err }
+      return parseSemgrepOutput(data)
+  }
+
+  func (a *Adapter) execSemgrep(ctx context.Context, req analysis.RunRequest) ([]byte, error) {
+      rulesDir, err := extractRulesToTemp(embeddedRules)
+      if err != nil {
+          return nil, fmt.Errorf("semgrep: extracting embedded rules: %w", err)
+      }
+      defer os.RemoveAll(rulesDir)
+      args := []string{"--config", rulesDir, "--json", "--quiet", req.Target}
+      args = append(args, req.ExtraArgs...)
+      return cmdutil.RunTool(ctx, a.binary, "semgrep", args)
+  }
+
+  func extractRulesToTemp(rules embed.FS) (string, error) {
+      dir, err := os.MkdirTemp("", "coderev-semgrep-*")
+      if err != nil { return "", err }
+      entries, err := fs.ReadDir(rules, "rules")
+      if err != nil {
+          os.RemoveAll(dir)
+          return "", err
+      }
+      for _, e := range entries {
+          if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") { continue }
+          data, err := fs.ReadFile(rules, "rules/"+e.Name())
+          if err != nil {
+              os.RemoveAll(dir)
+              return "", err
+          }
+          if err := os.WriteFile(filepath.Join(dir, e.Name()), data, 0o644); err != nil {
+              os.RemoveAll(dir)
+              return "", err
+          }
+      }
+      return dir, nil
+  }
+
+  // parseSemgrepOutput, semgrepOutput, semgrepResult, mapSeverity — copy unchanged
+  // from the existing adapter.go. Do not modify them.
+
+## Acceptance criteria (verify each one)
+
+1. go build ./... passes.
+2. When semgrep is not installed: coderev . completes cleanly (adapter skips).
+3. When semgrep is installed: coderev . does not make any network calls
+   (verify with: SEMGREP_SEND_METRICS=off and no --config URL in semgrep args).
+4. The rules/ directory contains placeholder.yaml and the embed compiles.
