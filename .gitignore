@@ -1,6 +1,9 @@
 # compiled binary
 bin/
 
+# generated scan report (artifact, never committed — view in Actions step summary or as artifact)
+coderev-report.md
+
 # knowledge graph (auto-rebuilt by post-commit hook)
 graphify-out/
 

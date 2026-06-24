@@ -131,13 +131,13 @@ jobs:
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
-# ── main push: full scan → report committed back to main, image tagged :latest ─
+# ── main push: full scan → step summary + artifact, image tagged :latest ─────
   scan-main:
     name: coderev scan (main)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
       packages: write
 
     steps:
@@ -171,17 +171,14 @@ jobs:
             ${{ env.IMAGE }}:latest /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings|warning:|posted" .tmp/scan.log | tail -5
 
-      - name: Commit report to main
-        if: always()
-        run: |
-          if [ -f coderev-report.md ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add coderev-report.md
-            git diff --staged --quiet || git commit -m "Update coderev scan report [skip ci]"
-            git push
-          fi
-
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coderev-report-${{ github.sha }}
+          path: coderev-report.md
+          if-no-files-found: ignore
+          retention-days: 14
