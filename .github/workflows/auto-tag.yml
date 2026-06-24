@@ -1,7 +1,8 @@
 name: Auto-tag and release on merge
 
 on:
-  push:
+  pull_request_target:
+    types: [closed]
     branches: [main]
 
 permissions:
@@ -9,6 +10,7 @@ permissions:
 
 jobs:
   tag:
+    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     outputs:
       next_tag: ${{ steps.calc.outputs.next_tag }}
@@ -28,8 +30,8 @@ jobs:
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
-          MSG=$(git log -1 --pretty=%s)
-          echo "Commit: $MSG"
+          MSG="${{ github.event.pull_request.title }}"
+          echo "PR title: $MSG"
           echo "Current tag: $LATEST"
 
           if echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
