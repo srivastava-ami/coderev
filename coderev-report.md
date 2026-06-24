@@ -1,7 +1,7 @@
 # Code Review Report: src
 
 > ✅ **PASS** · 40 findings · 0 blocker(s) · 0 major · 40 advisory  
-> Scanned **46 files** · Generated Wed, 24 Jun 2026 03:21:59 UTC  
+> Scanned **46 files** · Generated Wed, 24 Jun 2026 03:34:24 UTC  
 > Standards: `/src/code_review_standards.toml` v2.1.0
 
 > 📊 **Baseline saved** — future runs will track trends against these 40 findings.
@@ -232,8 +232,6 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
 | `/src/cmd/coderev/main.go` | 221 | `complexity.boolean_param_flag` | 🔵 advisory | function 'resolveOutputPath': boolean flag parameter 'flag, format string' — flag arguments make callers hard to read |
 | | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/internal/report/generator.go` | 15 | `complexity.max_return_count` | 🔵 advisory | function 'Generate': 5 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
 | `/src/cmd/coderev/setup.go` | 77 | `complexity.max_return_count` | 🔵 advisory | function 'runInstallHooks': 5 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
 | `/src/cmd/coderev/setup.go` | 156 | `complexity.boolean_param_flag` | 🔵 advisory | function 'installGitleaks': boolean flag parameter 'hasBrew bool' — flag arguments make callers hard to read |
@@ -248,39 +246,41 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/cmd/coderev/setup.go` | 198 | `complexity.max_return_count` | 🔵 advisory | function 'installGitleaksFromRelease': 6 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/config/toolconfig.go` | 78 | `complexity.function_length` | 🔵 advisory | function 'defaultToolConfig': 34 lines (max 30) |
-| | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/internal/report/markdown.go` | 20 | `complexity.function_length` | 🔵 advisory | function 'writeMarkdown': 33 lines (max 30) |
-| | | | | 💡 *Each function = one verb acting on one noun.* |
-| `/src/internal/report/markdown.go` | 140 | `complexity.cyclomatic` | 🔵 advisory | function 'writeExceptions': cyclomatic complexity 7 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.cyclomatic` | 🔵 advisory | function 'ratingBadge': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.max_return_count` | 🔵 advisory | function 'ratingBadge': 6 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/report/model.go` | 118 | `complexity.max_return_count` | 🔵 advisory | function 'pillarRating': 5 return statements (max 4) — consider restructuring |
-| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
-| `/src/internal/report/model.go` | 166 | `complexity.cyclomatic` | 🔵 advisory | function 'buildPillar': cyclomatic complexity 6 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/adapters/treesitter/walker.go` | 89 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 8 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/internal/adapters/treesitter/duplication.go` | 46 | `complexity.boolean_param_flag` | 🔵 advisory | function 'indexFile': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
 | | | | | 💡 *Replace flag params with two separate functions or an options object.* |
 | `/src/internal/adapters/treesitter/duplication.go` | 58 | `complexity.boolean_param_flag` | 🔵 advisory | function 'emitDupFindings': boolean flag parameter 'hashMap map[uint64][]dupLoc' — flag arguments make callers hard to read |
 | | | | | 💡 *Replace flag params with two separate functions or an options object.* |
-| `/src/internal/config/standards_test.go` | 65 | `complexity.cyclomatic` | 🔵 advisory | function 'TestLoadParsesComplexityThresholds': cyclomatic complexity 7 (advisory at 5) |
-| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/internal/analysis/runner.go` | 116 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/internal/analysis/runner.go` | 116 | `complexity.max_return_count` | 🔵 advisory | function '<anonymous>': 6 return statements (max 4) — consider restructuring |
 | | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
 | `/src/internal/analysis/runner.go` | 108 | `complexity.function_length` | 🔵 advisory | function 'walkFiles': 36 lines (max 30) |
 | | | | | 💡 *Each function = one verb acting on one noun.* |
+| `/src/internal/adapters/treesitter/walker_metrics.go` | 21 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 7 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `/src/internal/adapters/treesitter/walker.go` | 89 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 8 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `/src/internal/config/toolconfig.go` | 78 | `complexity.function_length` | 🔵 advisory | function 'defaultToolConfig': 34 lines (max 30) |
+| | | | | 💡 *Each function = one verb acting on one noun.* |
+| `/src/internal/report/generator.go` | 15 | `complexity.max_return_count` | 🔵 advisory | function 'Generate': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.cyclomatic` | 🔵 advisory | function 'ratingBadge': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `/src/internal/report/markdown_helpers.go` | 57 | `complexity.max_return_count` | 🔵 advisory | function 'ratingBadge': 6 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `/src/internal/config/standards_test.go` | 65 | `complexity.cyclomatic` | 🔵 advisory | function 'TestLoadParsesComplexityThresholds': cyclomatic complexity 7 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/internal/adapters/treesitter/walker_patterns.go` | 75 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 | `/src/internal/adapters/treesitter/walker_patterns.go` | 118 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 6 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
-| `/src/internal/adapters/treesitter/walker_metrics.go` | 21 | `complexity.cyclomatic` | 🔵 advisory | function '<anonymous>': cyclomatic complexity 7 (advisory at 5) |
+| `/src/internal/report/model.go` | 118 | `complexity.max_return_count` | 🔵 advisory | function 'pillarRating': 5 return statements (max 4) — consider restructuring |
+| | | | | 💡 *Use a single return with a result variable, or extract the branches to named helpers.* |
+| `/src/internal/report/model.go` | 166 | `complexity.cyclomatic` | 🔵 advisory | function 'buildPillar': cyclomatic complexity 6 (advisory at 5) |
+| | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
+| `/src/internal/report/markdown.go` | 20 | `complexity.function_length` | 🔵 advisory | function 'writeMarkdown': 33 lines (max 30) |
+| | | | | 💡 *Each function = one verb acting on one noun.* |
+| `/src/internal/report/markdown.go` | 140 | `complexity.cyclomatic` | 🔵 advisory | function 'writeExceptions': cyclomatic complexity 7 (advisory at 5) |
 | | | | | 💡 *Extract branches to named helpers; prefer strategy/policy objects over switch trees.* |
 
 </details>
@@ -290,21 +290,21 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 
 | File | Line | Rule | Severity | Message |
 |------|------|------|----------|---------|
-| `/src/cmd/coderev/main.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 240 lines (advisory threshold 150) |
-| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/config/standards_sections.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 232 lines (advisory threshold 150) |
-| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
 | `/src/internal/architecture/detector.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 204 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/report/markdown.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 175 lines (advisory threshold 150) |
-| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/report/model.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 217 lines (advisory threshold 150) |
+| `/src/cmd/coderev/main.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 240 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
 | `/src/internal/adapters/treesitter/duplication.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
+| `/src/internal/analysis/runner.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 226 lines (advisory threshold 150) |
+| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
+| `/src/internal/config/standards_sections.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 232 lines (advisory threshold 150) |
+| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
 | `/src/internal/report/sarif.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 177 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
-| `/src/internal/analysis/runner.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 226 lines (advisory threshold 150) |
+| `/src/internal/report/model.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 217 lines (advisory threshold 150) |
+| | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
+| `/src/internal/report/markdown.go` | 1 | `file_structure.file_length` | 🔵 advisory | file has 175 lines (advisory threshold 150) |
 | | | | | 💡 *Split by concern: types.ts, constants.ts, helpers.ts, <feature>.service.ts.* |
 
 </details>
@@ -361,4 +361,4 @@ This wires coderev into the agent's behaviour without any LLM involvement in the
 
 ---
 
-*Generated by [coderev](https://github.com/srivastava-ami/coderev) · Wed, 24 Jun 2026 03:21:59 UTC*
+*Generated by [coderev](https://github.com/srivastava-ami/coderev) · Wed, 24 Jun 2026 03:34:24 UTC*
