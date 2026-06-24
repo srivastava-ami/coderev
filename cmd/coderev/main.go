@@ -13,6 +13,7 @@ import (
 	"github.com/srivastava-ami/coderev/internal/baseline"
 	"github.com/srivastava-ami/coderev/internal/config"
 	"github.com/srivastava-ami/coderev/internal/output/ghpr"
+	"github.com/srivastava-ami/coderev/internal/plugin"
 	"github.com/srivastava-ami/coderev/internal/report"
 )
 
@@ -29,6 +30,7 @@ var (
 	flagAnnotatePR     bool
 	flagDiff           string
 	flagUpdateBaseline bool
+	flagPluginDir      string
 )
 
 func main() {
@@ -59,8 +61,9 @@ Standards and tool-config files are auto-discovered (target dir → cwd → ~/.c
 	root.Flags().BoolVar(&flagAnnotatePR, "annotate-pr", false, "post findings as inline GitHub PR comments (requires gh CLI)")
 	root.Flags().StringVar(&flagDiff, "diff", "", "incremental mode: only scan files changed since this git ref (e.g. HEAD~1, main)")
 	root.Flags().BoolVar(&flagUpdateBaseline, "update-baseline", false, "save current findings as new baseline in .coderev/baseline.json")
+	root.Flags().StringVar(&flagPluginDir, "plugin-dir", "", "custom plugin directory (default: ~/.config/coderev/plugins)")
 
-	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps)
+	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps, cmdPlugin)
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
@@ -83,6 +86,25 @@ func run(cmd *cobra.Command, args []string) error {
 
 	ads := buildAdapters(stds, tc)
 	printStartup(target, stdLabel, ads)
+
+	pluginDir := flagPluginDir
+	if pluginDir == "" {
+		var err error
+		pluginDir, err = getPluginDir()
+		if err != nil {
+			return fmt.Errorf("resolving plugin directory: %w", err)
+		}
+	}
+	plugins, err := plugin.DiscoverPlugins(pluginDir)
+	if err != nil {
+		return fmt.Errorf("discovering plugins: %w", err)
+	}
+	if len(plugins) > 0 {
+		fmt.Printf("          plugins: %d found\n", len(plugins))
+		for _, p := range plugins {
+			fmt.Printf("            • %s %s (%s)\n", p.Manifest.Name, p.Manifest.Version, p.Manifest.Description)
+		}
+	}
 
 	result, err := runAnalysis(target, stds, tc, ads)
 	if err != nil {
