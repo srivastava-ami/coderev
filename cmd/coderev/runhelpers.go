@@ -1,0 +1,213 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
+	"github.com/srivastava-ami/coderev/internal/architecture"
+	"github.com/srivastava-ami/coderev/internal/baseline"
+	"github.com/srivastava-ami/coderev/internal/config"
+	"github.com/srivastava-ami/coderev/internal/output"
+	"github.com/srivastava-ami/coderev/internal/output/ghpr"
+	"github.com/srivastava-ami/coderev/internal/plugin"
+	"github.com/srivastava-ami/coderev/internal/quality"
+	"github.com/srivastava-ami/coderev/internal/report"
+)
+
+var gitDiff gitDiffService
+
+func discoverAndPrintPlugins() {
+	pluginDir := flagPluginDir
+	if pluginDir == "" {
+		var err error
+		pluginDir, err = getPluginDir()
+		if err != nil {
+			return
+		}
+	}
+	plugins, err := plugin.DiscoverPlugins(pluginDir)
+	if err != nil || len(plugins) == 0 {
+		return
+	}
+	fmt.Printf("          plugins: %d found\n", len(plugins))
+	for _, p := range plugins {
+		fmt.Printf("            • %s %s (%s)\n", p.Manifest.Name, p.Manifest.Version, p.Manifest.Description)
+	}
+}
+
+func resolveGate(findings []analysis.Finding) (quality.GateResult, error) {
+	if flagGate == "" && !flagJSON {
+		return quality.GateResult{}, nil
+	}
+	gc := config.DefaultGateConfig()
+	if flagGate != "" {
+		loaded, err := config.LoadGate(flagGate)
+		if err != nil {
+			return quality.GateResult{}, fmt.Errorf("loading gate config: %w", err)
+		}
+		gc = *loaded
+	}
+	return quality.Evaluate(findings, gc), nil
+}
+
+func writeJSONOutput(result analysis.RunResult, gateResult quality.GateResult) error {
+	if err := output.WriteJSON(result, os.Stdout, gateResult); err != nil {
+		return fmt.Errorf("writing JSON output: %w", err)
+	}
+	if !gateResult.Passed {
+		return fmt.Errorf("quality gate: FAILED — %s", gateResult.Message)
+	}
+	return nil
+}
+
+func printGateResult(gateResult quality.GateResult) error {
+	if flagGate == "" {
+		return nil
+	}
+	if gateResult.Passed {
+		fmt.Println("quality gate: PASSED")
+		return nil
+	}
+	fmt.Printf("quality gate: FAILED — %s\n", gateResult.Message)
+	return fmt.Errorf("%s", gateResult.Message)
+}
+
+func runAnalysis(target string, stds analysis.Standards, tc analysis.ToolConfig, ads []analysis.ToolAdapter) (analysis.RunResult, error) {
+	runner := analysis.NewRunner(stds, tc, ads)
+	if flagDiff != "" {
+		runner = runner.WithDiff(flagDiff, gitDiff)
+	}
+	result, err := runner.Run(context.Background(), target)
+	if err != nil {
+		return analysis.RunResult{}, fmt.Errorf("running analysis: %w", err)
+	}
+	return result, nil
+}
+
+func buildAndWrite(target, stdFile string, stds analysis.Standards, result analysis.RunResult) (report.Report, string, error) {
+	base, _ := baseline.Load(target)
+	delta := baseline.Compute(base, result.Findings)
+	r := report.Build(report.BuildRequest{
+		Target:    target,
+		Standards: stds,
+		StdFile:   stdFile,
+		Files:     result.Files,
+		Findings:  result.Findings,
+		Warnings:  result.Warnings,
+		Arch:      architecture.Detect(target),
+		Delta:     &delta,
+	})
+	if flagUpdateBaseline {
+		if err := baseline.Save(target, result.Findings); err != nil {
+			fmt.Printf("warning: saving baseline failed: %v\n", err)
+		} else {
+			fmt.Println("baseline: saved current findings as new baseline")
+		}
+	}
+	outputPath := resolveOutputPath(flagOutput, flagFormat)
+	if err := generateReport(r, outputPath, flagFormat, flagRepo); err != nil {
+		return report.Report{}, "", fmt.Errorf("generating report: %w", err)
+	}
+	return r, outputPath, nil
+}
+
+func postAnnotate(r report.Report, target string) error {
+	if !flagAnnotatePR {
+		return nil
+	}
+
+	repoSlug := flagRepo
+	if repoSlug == "" {
+		var err error
+		repoSlug, err = ghpr.RepoSlug(target)
+		if err != nil {
+			return fmt.Errorf("--annotate-pr: cannot detect GitHub repo from git remote: %w\nPass --repo owner/repo explicitly", err)
+		}
+	}
+
+	prNumber := flagPR
+	if prNumber == 0 {
+		var err error
+		prNumber, err = ghpr.OpenPR(target)
+		if err != nil {
+			return fmt.Errorf("--annotate-pr: cannot detect open PR: %w\nPass --pr <number> explicitly", err)
+		}
+	}
+
+	if err := ghpr.Annotate(ghpr.AnnotateRequest{Report: r, RepoSlug: repoSlug, PRNumber: prNumber, Target: target}); err != nil {
+		fmt.Printf("warning: PR annotation failed: %v\n", err)
+	}
+	return nil
+}
+
+func generateReport(r report.Report, outputPath, format, repoURI string) error {
+	switch format {
+	case "html":
+		return report.Generate(r, outputPath)
+	case "sarif":
+		return report.GenerateSARIF(r, outputPath, repoURI)
+	default:
+		return report.GenerateMarkdown(r, outputPath)
+	}
+}
+
+func resolveTarget(args []string) (string, error) {
+	if len(args) == 0 {
+		cwd, err := os.Getwd()
+		if err != nil {
+			return "", fmt.Errorf("getting current directory: %w", err)
+		}
+		return cwd, nil
+	}
+	abs, err := filepath.Abs(args[0])
+	if err != nil {
+		return "", fmt.Errorf("resolving path: %w", err)
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return "", fmt.Errorf("target directory not found: %s", abs)
+	}
+	return abs, nil
+}
+
+func resolveStandards(target string) (analysis.Standards, string, error) {
+	if flagStandards != "" {
+		s, err := config.Load(flagStandards)
+		return s, flagStandards, err
+	}
+	if p, ok := config.DiscoverStandards(target); ok {
+		s, err := config.Load(p)
+		return s, p, err
+	}
+	s, err := config.LoadDefaults()
+	return s, "built-in defaults", err
+}
+
+func resolveToolConfigFile(target string) string {
+	if flagConfig != "" {
+		return flagConfig
+	}
+	p, _ := config.DiscoverToolConfig(target)
+	return p
+}
+
+func resolveOutputPath(flag, format string) string {
+	f := flag
+	if f == "" {
+		switch format {
+		case "html":
+			f = "coderev-report.html"
+		case "sarif":
+			f = "coderev-report.sarif"
+		default:
+			f = "coderev-report.md"
+		}
+	}
+	if filepath.IsAbs(f) {
+		return f
+	}
+	cwd, _ := os.Getwd()
+	return filepath.Join(cwd, f)
+}

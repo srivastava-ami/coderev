@@ -6,7 +6,7 @@
 [meta]
 version      = "built-in"
 last_updated = "2026-06-23"
-applies_to   = ["typescript", "javascript", "go"]
+applies_to   = ["typescript", "javascript", "go", "python", "rust"]
 
 [security]
 severity = "blocker"
@@ -75,7 +75,7 @@ max_depth   = 3
 remediation = "Invert conditions (early return) or extract inner blocks to helpers."
 
 [complexity.duplication]
-rule             = "complexity.cross_file_duplication"
+rule             = "file_structure.duplication"
 threshold_tokens = 25
 
 [file_structure]
@@ -149,3 +149,11 @@ tool        = "madge"
 [nx_conventions.tags]
 rule           = "nx_conventions.tags"
 required_axes  = ["scope", "type"]
+
+# ── Python Conventions ────────────────────────────────────────────────────────
+[python_conventions]
+severity = "advisory"
+
+# ── Rust Conventions ──────────────────────────────────────────────────────────
+[rust_conventions]
+severity = "advisory"

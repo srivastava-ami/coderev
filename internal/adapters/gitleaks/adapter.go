@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/exec"
-
 	"github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
@@ -23,10 +21,7 @@ func New(binary string) *Adapter {
 
 func (a *Adapter) Name() string { return "gitleaks" }
 
-func (a *Adapter) IsAvailable() bool {
-	_, err := exec.LookPath(a.binary)
-	return err == nil
-}
+func (a *Adapter) IsAvailable() bool { return cmdutil.BinaryAvailable(a.binary) }
 
 func (a *Adapter) Capabilities() []string {
 	return []string{"security.secrets"}

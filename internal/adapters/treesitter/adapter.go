@@ -9,7 +9,6 @@ import (
 	sitter "github.com/smacker/go-tree-sitter"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 const adapterName = "treesitter"
@@ -17,10 +16,10 @@ const adapterName = "treesitter"
 // Adapter parses source files with tree-sitter and runs all structural checks.
 // It is the primary analysis engine — no external binaries required.
 type Adapter struct {
-	stds config.Standards
+	stds analysis.Standards
 }
 
-func New(stds config.Standards) *Adapter {
+func New(stds analysis.Standards) *Adapter {
 	return &Adapter{stds: stds}
 }
 
@@ -70,7 +69,10 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 
 	findings, err := collectAnalyseResults(results)
 	dupFindings := DetectDuplication(req.Files)
-	return append(findings, dupFindings...), err
+	magicFindings := checkMagicNumbers(req.Files, a.stds.Hardcoding.MagicNumbers.Exceptions)
+	findings = append(findings, dupFindings...)
+	findings = append(findings, magicFindings...)
+	return findings, err
 }
 
 func (a *Adapter) runFile(ctx context.Context, fi analysis.FileInfo, out chan<- analyseResult) {

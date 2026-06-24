@@ -36,34 +36,97 @@ coderev [target]
     │      --standards flag → target dir → ~/.config/coderev/ → embedded defaults
     │      (binary never fails on missing standards — always has a fallback)
     │
-    ├─ 2. Walk target directory
-    │      classify files by language; apply skip rules (node_modules, vendor, …)
-    │      in --diff mode: intersect with `git diff --name-only <ref>`
+    ├─ 2. Auto-install external tools (toolmgr)
+    │      ensure gitleaks, semgrep, madge are available in ~/.coderev/tools/
+    │      downloads static binaries (gitleaks) or uses pipx/brew/npm (semgrep, madge)
+    │      warns on failure, never fails the scan — degraded coverage is not a hard error
     │
-    ├─ 3. Run adapters in parallel
-    │       ├─ treesitter  →  AST-based: complexity, type safety, patterns, security
+    ├─ 3. Discover plugins
+    │      scan ~/.config/coderev/plugins/ (or --plugin-dir) for *-plugin.toml manifests
+    │      resolve plugin binaries via $PATH; register into in-memory registry
+    │
+    ├─ 4. Walk target directory
+    │      classify files by language; apply skip rules (node_modules, vendor, …)
+    │      in --diff mode: DiffService.ChangedFiles() filters to changed files
+    │
+    ├─ 5. Run adapters in parallel
+    │       ├─ treesitter  →  AST-based: 55 rules across TS/JS/Go/Python/Rust
     │       ├─ semgrep     →  OWASP injection / auth / crypto          (if installed)
     │       ├─ gitleaks    →  secret scanning                          (if installed)
     │       ├─ madge       →  circular deps, NX boundaries             (if installed)
     │       ├─ npmaudit    →  vulnerable npm packages                  (if npm present)
     │       ├─ coverage    →  line coverage threshold                  (if report file exists)
-    │       └─ custom[*]  →  any NDJSON-emitting binary               (if configured)
+    │       ├─ custom[*]   →  any NDJSON-emitting binary               (if configured)
+    │       └─ plugins[*]  →  registered plugin binaries               (if installed)
     │
-    ├─ 4. Merge + deduplicate findings  (key: Rule | File | Line)
-    ├─ 5. Apply exceptions from standards file
-    ├─ 6. Compute baseline delta  (▲ regressions / ▼ improvements vs last run)
-    ├─ 7. Detect or synthesise architecture doc
+    ├─ 6. Merge + deduplicate findings  (key: Rule | File | Line)
+    ├─ 7. Apply exceptions from standards file
+    ├─ 8. Compute baseline delta  (▲ regressions / ▼ improvements vs last run)
+    ├─ 9. Detect or synthesise architecture doc
+    ├─ 10. Evaluate quality gate  (--gate or --json)
+    │       compare finding counts against .coderev-gate.toml thresholds
+    │       default gate: 0 blockers, 5 majors, 10 advisories, 20 total
     │
-    └─ 8. Output
+    └─ 11. Output
             ├─ markdown  →  coderev-report.md         (default)
             ├─ html      →  coderev-report.html        (--format html)
             ├─ sarif     →  coderev-report.sarif       (--format sarif → GitHub Code Scanning)
+            ├─ json      →  stdout                     (--json, includes gate result)
             └─ gh PR     →  inline review comments     (--annotate-pr, via gh CLI)
 ```
 
-### The adapter boundary
+### Ports (hexagonal architecture)
 
-The entire tool is built around one interface:
+The domain lives entirely in `internal/analysis/`. Two ports define the boundary from domain → outer layers:
+
+#### 1. `ToolAdapter` — analysis port
+
+```go
+type ToolAdapter interface {
+    Name()         string
+    IsAvailable()  bool
+    Capabilities() []string
+    Run(ctx context.Context, req RunRequest) ([]Finding, error)
+}
+```
+
+All domain types (`Standards`, `ToolConfig`, `Exception`, `GateConfig`, `Finding`, `FileInfo`) are defined in `internal/analysis/` — the TOML deserialization in `internal/config/` imports the domain, never the reverse. Adapters (`treesitter`, `gitleaks`, etc.) import only `analysis` types and implement `ToolAdapter`.
+
+#### 2. `DiffService` — SCM port
+
+```go
+type DiffService interface {
+    ChangedFiles(target, baseRef string) (map[string]bool, error)
+}
+```
+
+The concrete `gitDiffService` lives in `cmd/coderev/` (the composition root). The domain never shells out to git — it calls the interface.
+
+```
+                    ┌──────────────────────────────────┐
+                    │   cmd/coderev/ (composition root) │
+                    └──────┬───────────────────────────┘
+          ┌──────────────┬─┼───────────┬───────────┐
+          ▼              ▼ ▼           ▼           ▼
+  ┌──────────────┐  ┌──────────┐ ┌──────────┐ ┌──────────┐
+  │ adapters/*   │  │toolmgr/  │ │ config/  │ │ report/  │
+  │ (driven)     │  │(infra)   │ │(TOML)    │ │ quality/ │
+  └──────┬───────┘  └──────────┘ └────┬─────┘ └────┬─────┘
+         │  imports                   │  imports   │  imports
+         ▼                            ▼            ▼
+  ┌────────────────────────────────────────────────────┐
+  │           internal/analysis/ ★ DOMAIN              │
+  │  (ToolAdapter port, DiffService port, types)       │
+  └────────────────────────────────────────────────────┘
+         ▲
+         │  never imports infra
+         │
+  all other packages
+```
+
+Dependencies always point **inward**: adapters → domain, config → domain, report → domain. Domain imports nothing outside stdlib.
+
+### The adapter boundary
 
 ```go
 type ToolAdapter interface {
@@ -74,17 +137,37 @@ type ToolAdapter interface {
 }
 ```
 
-Every scanner — tree-sitter, semgrep, gitleaks, madge, coverage — implements this. Nothing else in the codebase cares which tools are installed or how many. Adding a new tool means implementing four methods. Replacing a built-in means setting `enabled = false` in `tool_config.toml` and wiring a replacement in `buildAdapters()`.
+Every scanner — tree-sitter, semgrep, gitleaks, madge, coverage — implements this. Nothing else in the codebase cares which tools are installed or how many. Adding a new tool means implementing four methods and wiring it in `cmd/coderev/adapters.go`.
 
-For tools that emit NDJSON output, no Go is needed at all — the `script` adapter bridges any external binary directly via `tool_config.toml`.
+For tools that emit NDJSON output, no Go is needed at all — the `script` adapter bridges any external binary via `tool_config.toml`.
 
 ### Tree-sitter as the primary engine
 
-The majority of rules are satisfied by tree-sitter running in-process (pure Go / CGO). It parses source files from text alone — no running build, no language server, no network. Supported: TypeScript, TSX, JavaScript, Go, Python, Rust.
+The majority of rules are satisfied by tree-sitter running in-process (pure Go / CGO). It parses source files from text alone — no running build, no language server, no network. Supported: TypeScript, TSX, JavaScript, Go, **Python**, **Rust** (5 languages, 55 built-in rules).
 
-Rules it covers: cyclomatic complexity, cognitive complexity, function length, parameter count, nesting depth, `any` type, empty catch, hardcoded URLs, `eval`, `innerHTML`, weak crypto, `__proto__`, non-null assertions, await-in-loop, floating promises, commented-out code, TODO format, NX deep imports, cross-file duplication.
+**Cross-cutting rules (all languages):** cyclomatic complexity, cognitive complexity, function length, parameter count, nesting depth, hardcoded URLs, magic number literals, cross-file duplication.
+
+**TypeScript / JavaScript:** `any` type, empty catch, `eval`, `innerHTML`, weak crypto, `__proto__` pollution, non-null assertions, await-in-loop, floating promises, commented-out code, TODO format, NX deep imports.
+
+**Go:** `fmt.Print` detection, `panic` in libraries, SQL string concatenation, `context.TODO` usage, `defer` inside loops.
+
+**Python:** `print()` detection, bare `except:`, `eval()`/`exec()`, SQL injection via string concat, `subprocess(..., shell=True)`, mutable default arguments, wildcard imports.
+
+**Rust:** `.unwrap()`, `panic!()`, `.expect()`, `unsafe { }` blocks, `transmute`, `.clone()` on copy types, `todo!()` / `unimplemented!()`, `dbg!()` macro.
 
 External adapters cover what tree-sitter cannot: secret scanning (gitleaks), OWASP injection patterns (semgrep), dependency CVEs (npm audit), circular imports (madge).
+
+### Tool Manager (auto-install)
+
+External scanners (gitleaks, semgrep, madge) are automatically downloaded on first scan via `internal/toolmgr/`. Tools are stored in `~/.coderev/tools/` — user-scoped, no sudo, clean uninstall by removing the directory.
+
+| Tool | Install strategy | Download source |
+|---|---|---|
+| gitleaks | Static binary from GitHub release | `github.com/gitleaks/gitleaks/releases/` |
+| semgrep | `pipx` → `pip3` → `brew` → Linux static binary | PyPI / GitHub |
+| madge | `npm install --prefix` to tool cache | npm registry |
+
+The composition root (`cmd/coderev/main.go`) calls `toolmgr.EnsureAll()` at scan start. Toolmgr never blocks — if a tool cannot be installed, it logs a warning and the adapter reports `IsAvailable() == false`. `internal/toolmgr/` is infrastructure (it shells out, downloads, writes to disk); it is never imported by the domain.
 
 ### Standards configuration
 

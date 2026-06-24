@@ -8,6 +8,18 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// rustGuard returns (trimmed, skip=true) when the line is not Rust or is a comment.
+func (w *fileWalker) rustGuard(line string) (string, bool) {
+	if w.lang != analysis.LangRust {
+		return "", true
+	}
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "*") {
+		return "", true
+	}
+	return trimmed, false
+}
+
 // emitFinding appends a finding, auto-filling File/Source/Snippet and
 // enriching Tags/Standards from the rule registry if not already set.
 // jsTSGuard returns (trimmed, skip=true) when the line should not be checked.
@@ -18,6 +30,19 @@ func (w *fileWalker) jsTSGuard(line string) (string, bool) {
 	}
 	t := strings.TrimSpace(line)
 	return t, strings.HasPrefix(t, "//") || strings.HasPrefix(t, "*")
+}
+
+// pythonGuard returns (trimmed, skip=true) when the line is not Python or is a
+// comment or string literal.
+func (w *fileWalker) pythonGuard(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "\"") || strings.HasPrefix(trimmed, "'") {
+		return "", true
+	}
+	if w.lang != analysis.LangPython {
+		return "", true
+	}
+	return trimmed, false
 }
 
 // codeLineSkip returns true when the line is a comment or import — for checks

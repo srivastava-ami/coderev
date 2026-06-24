@@ -8,7 +8,6 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/architecture"
 	"github.com/srivastava-ami/coderev/internal/baseline"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 // Report is the complete data model serialised into the HTML report.
@@ -20,7 +19,7 @@ type Report struct {
 	Files        []FileResult
 	Findings     []analysis.Finding
 	Warnings     []analysis.AdapterWarning
-	Exceptions   []config.Exception
+	Exceptions   []analysis.Exception
 	Generated    time.Time
 }
 
@@ -60,7 +59,7 @@ type FileResult struct {
 // BuildRequest bundles all inputs for Build so callers don't need positional args.
 type BuildRequest struct {
 	Target    string
-	Standards config.Standards
+	Standards analysis.Standards
 	StdFile   string
 	Files     []analysis.FileInfo
 	Findings  []analysis.Finding
@@ -84,7 +83,7 @@ func Build(req BuildRequest) Report {
 	}
 }
 
-func buildMeta(target, stdFile string, stds config.Standards) Meta {
+func buildMeta(target, stdFile string, stds analysis.Standards) Meta {
 	return Meta{
 		RepoName:         filepath.Base(target),
 		RepoPath:         target,

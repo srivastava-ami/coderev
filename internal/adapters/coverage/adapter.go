@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 const defaultThreshold = 80.0
@@ -15,10 +14,10 @@ const defaultThreshold = 80.0
 // Adapter reads coverage reports (lcov.info or go coverage.out) and emits
 // testing.coverage findings for files that fall below the configured threshold.
 type Adapter struct {
-	cfg config.CoverageConfig
+	cfg analysis.CoverageConfig
 }
 
-func New(cfg config.CoverageConfig) *Adapter {
+func New(cfg analysis.CoverageConfig) *Adapter {
 	return &Adapter{cfg: cfg}
 }
 

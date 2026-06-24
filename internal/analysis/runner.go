@@ -5,15 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
-
-	"github.com/srivastava-ami/coderev/internal/config"
 )
-
-// AdapterWarning records that an adapter was skipped (not available or failed).
 type AdapterWarning struct {
 	Adapter string
 	Reason  string
@@ -26,22 +21,29 @@ type RunResult struct {
 	Warnings []AdapterWarning
 }
 
-// Runner orchestrates file walking, adapter dispatch, and result merging.
-type Runner struct {
-	stds     config.Standards
-	tc       config.ToolConfig
-	adapters []ToolAdapter
-	baseRef  string // non-empty: only scan files changed since this git ref
+// DiffService abstracts the SCM operation to list files changed since a ref.
+type DiffService interface {
+	ChangedFiles(target, baseRef string) (map[string]bool, error)
 }
 
-func NewRunner(stds config.Standards, tc config.ToolConfig, ads []ToolAdapter) *Runner {
+// Runner orchestrates file walking, adapter dispatch, and result merging.
+type Runner struct {
+	stds     Standards
+	tc       ToolConfig
+	adapters []ToolAdapter
+	diffSvc  DiffService // nil means no diff filtering
+	baseRef  string
+}
+
+func NewRunner(stds Standards, tc ToolConfig, ads []ToolAdapter) *Runner {
 	return &Runner{stds: stds, tc: tc, adapters: ads}
 }
 
 // WithDiff returns a copy of the runner that only analyses files changed since ref.
-func (r *Runner) WithDiff(ref string) *Runner {
+func (r *Runner) WithDiff(ref string, svc DiffService) *Runner {
 	c := *r
 	c.baseRef = ref
+	c.diffSvc = svc
 	return &c
 }
 
@@ -60,8 +62,8 @@ func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
 	if err != nil {
 		return RunResult{}, fmt.Errorf("walking target: %w", err)
 	}
-	if r.baseRef != "" {
-		changed, err := changedFiles(target, r.baseRef)
+	if r.diffSvc != nil && r.baseRef != "" {
+		changed, err := r.diffSvc.ChangedFiles(target, r.baseRef)
 		if err != nil {
 			return RunResult{}, fmt.Errorf("resolving diff against %s: %w", r.baseRef, err)
 		}
@@ -167,7 +169,7 @@ func dedup(findings []Finding) []Finding {
 }
 
 // applyExceptions removes findings that match a declared exception entry.
-func applyExceptions(findings []Finding, exceptions []config.Exception) []Finding {
+func applyExceptions(findings []Finding, exceptions []Exception) []Finding {
 	if len(exceptions) == 0 {
 		return findings
 	}
@@ -180,7 +182,7 @@ func applyExceptions(findings []Finding, exceptions []config.Exception) []Findin
 	return out
 }
 
-func matchesException(f Finding, exceptions []config.Exception) bool {
+func matchesException(f Finding, exceptions []Exception) bool {
 	for _, ex := range exceptions {
 		if ex.Rule == "" || ex.FileOrModule == "" {
 			continue
@@ -188,32 +190,36 @@ func matchesException(f Finding, exceptions []config.Exception) bool {
 		if ex.Rule != f.Rule {
 			continue
 		}
-		if strings.Contains(f.File, ex.FileOrModule) {
+		if matchExceptionPath(f.File, ex.FileOrModule) {
 			return true
 		}
 	}
 	return false
 }
-
-// changedFiles returns absolute paths of files modified since baseRef.
-func changedFiles(target, baseRef string) (map[string]bool, error) {
-	cmd := exec.Command("git", "-C", target, "diff", "--name-only", baseRef)
-	out, err := cmd.Output()
-	if err != nil {
-		return nil, fmt.Errorf("git diff: %w", err)
-	}
-	set := make(map[string]bool)
-	for _, rel := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if rel == "" {
-			continue
+func matchExceptionPath(file, pattern string) bool {
+	// glob match — pattern contains * or ?
+	if strings.ContainsAny(pattern, "*?") {
+		matched, _ := filepath.Match(pattern, file)
+		if matched {
+			return true
 		}
-		abs := filepath.Join(target, rel)
-		set[abs] = true
+		// also try matching against just the filename
+		_, base := filepath.Split(file)
+		matched, _ = filepath.Match(pattern, base)
+		return matched
 	}
-	return set, nil
+
+	// exact suffix match anchored at a separator boundary
+	if strings.HasSuffix(file, pattern) {
+		suffixStart := len(file) - len(pattern)
+		if suffixStart == 0 || file[suffixStart-1] == '/' || file[suffixStart-1] == '\\' {
+			return true
+		}
+	}
+
+	return false
 }
 
-// filterFiles returns only the FileInfo entries whose path is in the changed set.
 func filterFiles(files []FileInfo, changed map[string]bool) []FileInfo {
 	out := make([]FileInfo, 0, len(changed))
 	for _, f := range files {

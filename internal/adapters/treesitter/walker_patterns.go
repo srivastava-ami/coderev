@@ -10,22 +10,26 @@ import (
 
 func (w *fileWalker) checkPatterns() {
 	lines := strings.Split(string(w.src), "\n")
+	checks := []func(string, int){
+		w.checkConsolLog, w.checkAnyType, w.checkEmptyCatch, w.checkHardcodedURL,
+		w.checkEval, w.checkInnerHTML, w.checkWeakCrypto, w.checkPrototypePollution,
+		w.checkThrowLiteral, w.checkNonNullAssertion, w.checkForceCast, w.checkDeepImport,
+		w.checkGoFmtPrint, w.checkGoPanicInLib, w.checkGoSQLStringConcat,
+		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
+		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
+		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
+		w.checkPythonWildcardImport,
+		w.checkRustUnwrap, w.checkRustPanic, w.checkRustExpect, w.checkRustUnsafe,
+		w.checkRustTransmute, w.checkRustCloneOnCopy, w.checkRustTodo, w.checkRustDbgMacro,
+	}
 	for i, line := range lines {
-		lineNum := i + 1
-		w.checkConsolLog(line, lineNum)
-		w.checkAnyType(line, lineNum)
-		w.checkEmptyCatch(line, lineNum)
-		w.checkHardcodedURL(line, lineNum)
-		w.checkEval(line, lineNum)
-		w.checkInnerHTML(line, lineNum)
-		w.checkWeakCrypto(line, lineNum)
-		w.checkPrototypePollution(line, lineNum)
-		w.checkThrowLiteral(line, lineNum)
-		w.checkNonNullAssertion(line, lineNum)
-		w.checkForceCast(line, lineNum)
-		w.checkDeepImport(line, lineNum)
+		for _, check := range checks {
+			check(line, i+1)
+		}
 	}
 	w.checkAwaitInLoop(lines)
+	w.checkGoDeferInLoop(lines)
+	w.checkGoIOCopyNoLimit(lines)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {
@@ -110,7 +114,7 @@ func (w *fileWalker) checkEmptyCatch(line string, lineNum int) {
 
 func isTestFile(path string) bool {
 	base := filepath.Base(path)
-	return strings.HasSuffix(base, "_test.go") ||
+	return strings.HasSuffix(base, "_test.go") || strings.HasSuffix(base, "_test.rs") ||
 		strings.HasSuffix(base, ".spec.ts") || strings.HasSuffix(base, ".test.ts") ||
 		strings.HasSuffix(base, ".spec.js") || strings.HasSuffix(base, ".test.js")
 }

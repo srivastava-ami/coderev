@@ -115,8 +115,8 @@ func dupFinding(a, b dupLoc, seen map[string]bool) (analysis.Finding, bool) {
 	}
 	seen[key] = true
 	return analysis.Finding{
-		Rule:        "duplication.cross_file",
-		Pillar:      "duplication",
+		Rule:        "file_structure.duplication",
+		Pillar:      "file_structure",
 		Severity:    analysis.SeverityMajor,
 		File:        a.file,
 		Line:        a.line,

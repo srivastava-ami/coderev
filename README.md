@@ -5,6 +5,8 @@
 
 **Deterministic, polyglot code-standards enforcement. No server. No LLM. No per-seat licence.**
 
+TypeScript · JavaScript · Go · **Python** · **Rust**
+
 ```bash
 coderev .
 ```
@@ -14,6 +16,8 @@ coderev .
   status: ✗ FAIL (blockers must be resolved)
   report: coderev-report.md
 ```
+
+All findings are produced by deterministic static analysis — zero LLM calls, zero network, zero cost.
 
 ---
 
@@ -33,6 +37,21 @@ make install
 # Docker (zero host dependencies)
 docker pull ghcr.io/srivastava-ami/coderev:latest
 ```
+
+**External scanners auto-install on first run.** Run `coderev .` in any repo and gitleaks, semgrep, and madge are downloaded to `~/.coderev/tools/` automatically. No `brew install`, `npm install`, or `pip install` needed.
+
+## Distribution
+
+| Method | What happens | Who runs it |
+|---|---|---|
+| **Homebrew tap** | Casks in `Formula/coderev.rb` — points to GitHub release assets | Automated on tag push (`release.yml`) |
+| **curl installer** | `scripts/install.sh` — fetches latest GitHub release, copies to `~/.local/bin/` | User-initiated |
+| **`make dist`** | Cross-compiles for darwin/linux × amd64/arm64 → `bin/dist/` | Developer or CI |
+| **GitHub release** | `release.yml` — tags `v*` trigger `make dist`, create release, upload binaries, update Homebrew formula | Tag push |
+| **Docker image** | `docker-publish.yml` — multi-arch (`linux/amd64`, `linux/arm64`) published to `ghcr.io` | Tag push or manual |
+| **`make install`** | `go build` + copy to `/usr/local/bin/` | Developer |
+
+All release binaries are built by `release.yml` with `-ldflags="-s -w"` (stripped, DWARF removed), versioned via `git describe`.
 
 ---
 
@@ -70,7 +89,25 @@ coderev [directory] [flags]
   --standards <path>   path to code_review_standards.toml (auto-discovered if omitted)
   --config <path>      path to tool_config.toml (auto-discovered if omitted)
   --update-baseline    save current findings as baseline; future runs show delta (▲/▼)
+  --json               output findings as structured JSON (machine-readable)
+  --gate <path>        evaluate against quality gate thresholds (.coderev-gate.toml)
+  --plugin-dir <path>  custom plugin directory (default: ~/.config/coderev/plugins)
+
+Subcommands:
+  plugin install <manifest>   install a plugin from its coderev-plugin.toml manifest
+  plugin list                 list installed plugins
 ```
+
+Quality gate TOML (`--gate`):
+```toml
+# .coderev-gate.toml  (defaults: 0 blockers, 5 majors, 10 advisories, 20 total)
+max_blockers  = 0
+max_majors    = 5
+max_advisories = 10
+max_total     = 20
+```
+
+With `--json`, gate result is embedded in the JSON output. Without `--json`, pass/fail is printed after the summary. Exit code `1` on failure.
 
 ---
 
@@ -95,6 +132,11 @@ Exit code `1` when blockers are found — blocks the merge.
 Full workflow: `.github/workflows/code-quality.yml`
 
 ---
+
+## Rules catalog
+
+All 55 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
+→ **[docs/rules-reference.md](docs/rules-reference.md)**
 
 ## Standards file
 
@@ -122,18 +164,22 @@ No standards file? Built-in defaults apply automatically — scan any repo with 
 
 ## Adapters
 
-| Adapter | Checks | Install |
-|---------|--------|---------|
-| `treesitter` | complexity, type safety, patterns, security | built-in |
-| `gitleaks` | secrets & credentials | `brew install gitleaks` |
-| `semgrep` | OWASP / injection / crypto | `brew install semgrep` |
-| `madge` | circular deps, NX boundaries | `npm i -g madge` |
-| `npmaudit` | vulnerable npm packages | ships with Node |
-| `coverage` | line coverage threshold | reads existing lcov / go cover |
-| `custom` | any tool via NDJSON | your binary |
+| Adapter | Checks | Auto-installed | Built-in |
+|---|---|---|---|---|
+| `treesitter` | complexity, type safety, hardcoding, security patterns, documentation, structure, duplication — **all 5 languages** | — | ✅ |
+| `gitleaks` | secrets & credentials | ✅ `~/.coderev/tools/gitleaks` | ❌ |
+| `semgrep` | OWASP / injection / crypto | ✅ `~/.coderev/tools/semgrep` | ❌ |
+| `madge` | circular deps, NX boundaries | ✅ `~/.coderev/tools/madge` | ❌ |
+| `npmaudit` | vulnerable npm packages | ships with Node | ❌ |
+| `coverage` | line coverage threshold (lcov, cobertura) | reads existing report | ❌ |
+| `custom` | any tool via NDJSON | your binary | ❌ |
+
+Built-in tree-sitter walkers cover **TypeScript, JavaScript, Go, Python, and Rust** — no external tools required for 70% of rules. External adapters cover what tree-sitter cannot: secret scanning, dependency CVEs, OWASP injection patterns, circular imports.
+
+External scanners are auto-installed on first scan — no manual step needed. To pre-install explicitly:
 
 ```bash
-make install-deps   # installs gitleaks + semgrep + madge
+coderev install-deps   # downloads gitleaks + semgrep + madge to ~/.coderev/tools/
 ```
 
 Custom adapter — no Go required:
@@ -147,6 +193,29 @@ protocol = "ndjson"
 rules    = ["security.custom.*"]
 args     = ["--format=coderev-json", "{{target}}"]
 ```
+
+---
+
+## Plugins
+
+Plugins are external binaries discovered automatically from `~/.config/coderev/plugins/`. Each plugin ships with a `coderev-plugin.toml` manifest:
+
+```toml
+# my-linter-plugin.toml
+name         = "my-linter"
+version      = "1.0.0"
+description  = "Custom linter for internal conventions"
+binary       = "my-linter"
+capabilities = ["conventions.custom.*"]
+languages    = ["go", "python"]
+```
+
+```bash
+coderev plugin install my-linter-plugin.toml   # copy to ~/.config/coderev/plugins/
+coderev plugin list                             # list installed
+```
+
+On every scan, coderev discovers and loads all plugins from the plugin directory. Plugin binaries must be on `$PATH`.
 
 ---
 
@@ -181,11 +250,14 @@ AI coding agents (Claude Code, Copilot, Cursor) now write most of the code in fa
 
 | | coderev | SonarQube | ESLint/Biome | CodeRabbit |
 |---|---|---|---|---|
-| Polyglot (one tool) | ✅ | ✅ | ❌ per language | ✅ |
+| Polyglot (one tool) | ✅ TS/JS/Go/Python/Rust | ✅ | ❌ per language | ✅ |
 | Local / offline | ✅ | ❌ server | ✅ | ❌ cloud |
 | Standards in git | ✅ TOML | ❌ UI | partial | ❌ |
 | Inline PR comments | ✅ | ✅ | ❌ | ✅ |
 | Zero infrastructure | ✅ | ❌ | ✅ | ❌ |
+| Machine-readable output | ✅ JSON | ✅ SARIF | ❌ | ❌ |
+| Quality gate (pass/fail) | ✅ | ✅ | ❌ | ❌ |
+| Plugin ecosystem | ✅ | ✅ | ✅ | ❌ |
 | Per-seat cost | free | $$ | free | $24–40/mo |
 
 ---

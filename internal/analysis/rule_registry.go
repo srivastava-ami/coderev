@@ -42,7 +42,7 @@ var RuleRegistry = map[string]RuleMeta{
 
 	// hardcoding
 	"hardcoding.urls_and_paths": {Tags: []string{"owasp:A05:2021", "cwe:259"}, Standards: []string{"OWASP-2021-A05", "CWE-259"}},
-	"hardcoding.magic_number":   {},
+	"hardcoding.magic_numbers":  {Tags: []string{"cwe:1121"}, Standards: []string{"CWE-1121"}},
 
 	// documentation
 	"documentation.no_comment_tombstones": {},
@@ -64,4 +64,32 @@ var RuleRegistry = map[string]RuleMeta{
 	// nx_conventions
 	"nx_conventions.no_deep_import": {},
 	"nx_conventions.boundaries":     {},
+
+	// rust_conventions
+	"rust.no_unwrap":     {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_panic":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"rust.no_expect":     {},
+	"rust.no_unsafe":     {Tags: []string{"cwe:119"}, Standards: []string{"CWE-119"}},
+	"rust.no_transmute":  {Tags: []string{"cwe:704"}, Standards: []string{"CWE-704"}},
+	"rust.clone_on_copy": {},
+	"rust.no_todo":       {},
+	"rust.no_dbg_macro":  {},
+
+	// go_conventions
+	"go.fmt_print":               {Tags: []string{"owasp:A09:2021"}, Standards: []string{"OWASP-2021-A09"}},
+	"go.panic_in_lib":            {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"go.sql_string_concat":       {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
+	"go.context_todo":            {},
+	"go.defer_in_loop":           {Tags: []string{"cwe:772"}, Standards: []string{"CWE-772"}},
+	"go.fmt_errorf_no_format":    {Tags: []string{"cwe:134"}, Standards: []string{"CWE-134"}},
+	"go.io_copy_no_limit":        {Tags: []string{"cwe:400"}, Standards: []string{"CWE-400"}},
+
+	// python_conventions
+	"python.fmt_print":           {},
+	"python.no_bare_except":      {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"python.no_eval_exec":        {Tags: []string{"owasp:A03:2021", "cwe:95"}, Standards: []string{"OWASP-2021-A03", "CWE-95"}},
+	"python.sql_injection":       {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
+	"python.no_subprocess_shell": {Tags: []string{"owasp:A03:2021", "cwe:78"}, Standards: []string{"OWASP-2021-A03", "CWE-78"}},
+	"python.no_mutable_default":  {},
+	"python.no_wildcard_import":  {},
 }

@@ -4,22 +4,21 @@ import (
 	"testing"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
-	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 // defaultStds returns standards with all thresholds at professional-services defaults.
-func defaultStds() config.Standards {
-	return config.Standards{
-		Complexity: config.ComplexityStd{
-			Cyclomatic: config.CyclomaticStd{MaxValue: 8, AdvisoryAt: 5, HardBlockAt: 12},
-			Cognitive:  config.CognitiveStd{MaxValue: 10},
-			Function:   config.FunctionLengthStd{MaxLines: 30, AdvisoryAt: 20},
-			Parameters: config.ParameterStd{MaxCount: 3},
-			Nesting:    config.NestingStd{MaxDepth: 2},
+func defaultStds() analysis.Standards {
+	return analysis.Standards{
+		Complexity: analysis.ComplexityStd{
+			Cyclomatic: analysis.CyclomaticStd{MaxValue: 8, AdvisoryAt: 5, HardBlockAt: 12},
+			Cognitive:  analysis.CognitiveStd{MaxValue: 10},
+			Function:   analysis.FunctionLengthStd{MaxLines: 30, AdvisoryAt: 20},
+			Parameters: analysis.ParameterStd{MaxCount: 3},
+			Nesting:    analysis.NestingStd{MaxDepth: 2},
 		},
-		FileStructure: config.FileStructureStd{
-			FileLength:  config.FileLengthStd{MaxLines: 250, AdvisoryAt: 150},
-			ClassLength: config.ClassLengthStd{MaxLines: 120},
+		FileStructure: analysis.FileStructureStd{
+			FileLength:  analysis.FileLengthStd{MaxLines: 250, AdvisoryAt: 150},
+			ClassLength: analysis.ClassLengthStd{MaxLines: 120},
 		},
 	}
 }

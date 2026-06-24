@@ -14,5 +14,8 @@ AGENTS.md
 # temporary logs from Claude tool executions
 .tmp/
 
+# implementation plan (dev-only, never shipped)
+plan.md
+
 # OS
 .DS_Store
