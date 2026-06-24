@@ -1,0 +1,48 @@
+name: Auto-tag on merge
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine next version and tag
+        run: |
+          # Get latest semver tag (vX.Y.Z). Skip if this push IS already a tag push.
+          LATEST=$(git tag --list 'v*.*.*' --sort=-version:refname | head -1)
+          if [[ -z "$LATEST" ]]; then
+            LATEST="v0.0.0"
+          fi
+
+          MAJOR=$(echo "$LATEST" | cut -d. -f1 | tr -d 'v')
+          MINOR=$(echo "$LATEST" | cut -d. -f2)
+          PATCH=$(echo "$LATEST" | cut -d. -f3)
+
+          # Read the merge commit message (squash merge uses PR title)
+          MSG=$(git log -1 --pretty=%s)
+          echo "Commit: $MSG"
+          echo "Current tag: $LATEST"
+
+          # Minor bump if commit adds new capabilities; patch otherwise.
+          # Major is always a manual explicit tag — never auto-bumped here.
+          if echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
+            NEXT="v${MAJOR}.$((MINOR + 1)).0"
+          else
+            NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+
+          echo "Next tag: $NEXT"
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$NEXT" -m "$NEXT"
+          git push origin "$NEXT"
