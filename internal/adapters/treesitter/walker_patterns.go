@@ -30,6 +30,10 @@ func (w *fileWalker) checkPatterns() {
 		w.checkGoSQLStringConcat(line, lineNum)
 		w.checkGoContextTODO(line, lineNum)
 		w.checkFloatingPromise(line, lineNum)
+		// Python-specific checks
+		w.checkPythonPrint(line, lineNum)
+		w.checkPythonBareExcept(line, lineNum)
+		w.checkPythonEvalExec(line, lineNum)
 	}
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)

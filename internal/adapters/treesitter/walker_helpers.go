@@ -20,6 +20,19 @@ func (w *fileWalker) jsTSGuard(line string) (string, bool) {
 	return t, strings.HasPrefix(t, "//") || strings.HasPrefix(t, "*")
 }
 
+// pythonGuard returns (trimmed, skip=true) when the line is not Python or is a
+// comment or string literal.
+func (w *fileWalker) pythonGuard(line string) (string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "\"") || strings.HasPrefix(trimmed, "'") {
+		return "", true
+	}
+	if w.lang != analysis.LangPython {
+		return "", true
+	}
+	return trimmed, false
+}
+
 // codeLineSkip returns true when the line is a comment or import — for checks
 // that apply to all languages and share this identical preamble.
 func codeLineSkip(line string) bool {
