@@ -193,3 +193,75 @@ const mock = jest.fn() as any;
 		}
 	}
 }
+
+func TestSecretFallbackJWTBlocker(t *testing.T) {
+	src := `const secret = process.env.JWT_SECRET ?? 'local-dev-secret-change-me';`
+	f := findingsForSrc(t, src, analysis.LangTypeScript)
+	if !hasRule(f, "security.secret_fallback_literal") {
+		t.Fatal("must flag JWT_SECRET ?? literal")
+	}
+	for _, finding := range f {
+		if finding.Rule == "security.secret_fallback_literal" && finding.Severity != analysis.SeverityBlocker {
+			t.Errorf("expected blocker, got %s", finding.Severity)
+		}
+	}
+}
+
+func TestSecretFallbackAPIKeyOr(t *testing.T) {
+	src := `const s = process.env.API_KEY || "changeme";`
+	if !hasRule(findingsForSrc(t, src, analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must flag API_KEY || literal")
+	}
+}
+
+func TestSecretFallbackBracketNotation(t *testing.T) {
+	src := `process.env["DB_PASSWORD"] ?? "postgres";`
+	if !hasRule(findingsForSrc(t, src, analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must flag bracket notation DB_PASSWORD")
+	}
+}
+
+func TestSecretFallbackEmptyNoFP(t *testing.T) {
+	src := `const s = process.env.JWT_SECRET ?? '';`
+	if hasRule(findingsForSrc(t, src, analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must NOT flag empty string fallback")
+	}
+}
+
+func TestSecretFallbackPortNoFP(t *testing.T) {
+	src := `const p = process.env.PORT ?? '3000';`
+	if hasRule(findingsForSrc(t, src, analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must NOT flag PORT — not a secret key name")
+	}
+}
+
+func TestSecretFallbackLogLevelNoFP(t *testing.T) {
+	src := `const l = process.env.LOG_LEVEL || 'info';`
+	if hasRule(findingsForSrc(t, src, analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must NOT flag LOG_LEVEL — not a secret key name")
+	}
+}
+
+func TestSecretFallbackTestFileNoFP(t *testing.T) {
+	src := `const secret = process.env.JWT_SECRET ?? 'test-secret';`
+	if hasRule(findingsForPath(t, src, "auth.test.ts", analysis.LangTypeScript), "security.secret_fallback_literal") {
+		t.Error("must NOT flag in test files")
+	}
+}
+
+func TestSecretFallbackNodeEnvGuardAdvisory(t *testing.T) {
+	src := `
+if (process.env.NODE_ENV !== 'production') {
+  secret = process.env.JWT_SECRET ?? 'dev-secret';
+}
+`
+	f := findingsForSrc(t, src, analysis.LangTypeScript)
+	if !hasRule(f, "security.secret_fallback_literal") {
+		t.Error("must still fire inside NODE_ENV guard (advisory, not suppressed)")
+	}
+	for _, finding := range f {
+		if finding.Rule == "security.secret_fallback_literal" && finding.Severity == analysis.SeverityBlocker {
+			t.Error("must be advisory inside NODE_ENV guard, not blocker")
+		}
+	}
+}
