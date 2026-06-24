@@ -12,7 +12,9 @@ import (
 	"github.com/srivastava-ami/coderev/internal/architecture"
 	"github.com/srivastava-ami/coderev/internal/baseline"
 	"github.com/srivastava-ami/coderev/internal/config"
+	"github.com/srivastava-ami/coderev/internal/output"
 	"github.com/srivastava-ami/coderev/internal/output/ghpr"
+	"github.com/srivastava-ami/coderev/internal/quality"
 	"github.com/srivastava-ami/coderev/internal/report"
 )
 
@@ -29,6 +31,8 @@ var (
 	flagAnnotatePR     bool
 	flagDiff           string
 	flagUpdateBaseline bool
+	flagJSON           bool
+	flagGate           string
 )
 
 func main() {
@@ -59,6 +63,8 @@ Standards and tool-config files are auto-discovered (target dir → cwd → ~/.c
 	root.Flags().BoolVar(&flagAnnotatePR, "annotate-pr", false, "post findings as inline GitHub PR comments (requires gh CLI)")
 	root.Flags().StringVar(&flagDiff, "diff", "", "incremental mode: only scan files changed since this git ref (e.g. HEAD~1, main)")
 	root.Flags().BoolVar(&flagUpdateBaseline, "update-baseline", false, "save current findings as new baseline in .coderev/baseline.json")
+	root.Flags().BoolVar(&flagJSON, "json", false, "output findings as JSON instead of markdown")
+	root.Flags().StringVar(&flagGate, "gate", "", "path to .coderev-gate.toml for quality gate check")
 
 	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps)
 
@@ -89,11 +95,44 @@ func run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	var gateResult quality.GateResult
+	if flagGate != "" || flagJSON {
+		gc := config.DefaultGateConfig()
+		if flagGate != "" {
+			loaded, err := config.LoadGate(flagGate)
+			if err != nil {
+				return fmt.Errorf("loading gate config: %w", err)
+			}
+			gc = *loaded
+		}
+		gateResult = quality.Evaluate(result.Findings, gc)
+	}
+
+	if flagJSON {
+		if err := output.WriteJSON(result, os.Stdout, gateResult); err != nil {
+			return fmt.Errorf("writing JSON output: %w", err)
+		}
+		if !gateResult.Passed {
+			return fmt.Errorf("quality gate: FAILED — %s", gateResult.Message)
+		}
+		return nil
+	}
+
 	r, outputPath, err := buildAndWrite(target, stdLabel, stds, result)
 	if err != nil {
 		return err
 	}
 	printSummary(r.Summary, result.Warnings, outputPath)
+
+	if flagGate != "" {
+		if gateResult.Passed {
+			fmt.Println("quality gate: PASSED")
+		} else {
+			fmt.Printf("quality gate: FAILED — %s\n", gateResult.Message)
+			return fmt.Errorf(gateResult.Message)
+		}
+	}
+
 	return postAnnotate(r, target)
 }
 
