@@ -114,6 +114,18 @@ jobs:
               /src > .tmp/scan.log 2>&1 || true
           grep -E "status:|blocker|findings" .tmp/scan.log | tail -3
 
+      - name: Post report as PR comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_REPO: ${{ github.repository }}
+        run: |
+          REPORT=$(cat coderev-report.md 2>/dev/null || echo "_no report generated_")
+          BODY=$(printf '<!-- coderev-scan -->\n%s' "$REPORT")
+          gh pr comment "$PR_NUMBER" --repo "$PR_REPO" --body "$BODY" --edit-last 2>/dev/null \
+            || gh pr comment "$PR_NUMBER" --repo "$PR_REPO" --body "$BODY"
+
       - name: Publish to step summary
         if: always()
         run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
