@@ -71,4 +71,9 @@ var RuleRegistry = map[string]RuleMeta{
 	"go.sql_string_concat": {Tags: []string{"owasp:A03:2021", "cwe:89"}, Standards: []string{"OWASP-2021-A03", "CWE-89"}},
 	"go.context_todo":      {},
 	"go.defer_in_loop":     {Tags: []string{"cwe:772"}, Standards: []string{"CWE-772"}},
+
+	// python_conventions
+	"python.fmt_print":      {},
+	"python.no_bare_except": {Tags: []string{"cwe:703"}, Standards: []string{"CWE-703"}},
+	"python.no_eval_exec":   {Tags: []string{"owasp:A03:2021", "cwe:95"}, Standards: []string{"OWASP-2021-A03", "CWE-95"}},
 }
