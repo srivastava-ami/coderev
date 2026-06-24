@@ -30,7 +30,10 @@ jobs:
           cache: true
 
       - name: Build
-        run: mkdir -p .tmp && go build -o /tmp/coderev ./cmd/coderev > .tmp/build.log 2>&1; grep -c "^" .tmp/build.log | xargs -I{} echo "build lines: {}"
+        run: |
+          mkdir -p .tmp
+          go build -o /tmp/coderev ./cmd/coderev > .tmp/build.log 2>&1
+          echo "build lines: $(wc -l < .tmp/build.log | tr -d ' ')"
 
       - name: Scan diff
         run: |
@@ -41,7 +44,7 @@ jobs:
 
       - name: Publish to step summary
         if: always()
-        run: cat coderev-report.md >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "no report generated" >> $GITHUB_STEP_SUMMARY
+        run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -123,7 +126,7 @@ jobs:
 
       - name: Publish to step summary
         if: always()
-        run: cat coderev-report.md >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "no report generated" >> $GITHUB_STEP_SUMMARY
+        run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -178,7 +181,7 @@ jobs:
 
       - name: Publish to step summary
         if: always()
-        run: cat coderev-report.md >> $GITHUB_STEP_SUMMARY 2>/dev/null || echo "no report generated" >> $GITHUB_STEP_SUMMARY
+        run: cat coderev-report.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "no report generated" >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@v4
         if: always()

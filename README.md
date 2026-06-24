@@ -1,5 +1,9 @@
 # coderev
 
+[![CI](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/srivastava-ami/coderev)](https://goreportcard.com/report/github.com/srivastava-ami/coderev)
+[![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
+
 **Deterministic, polyglot code-standards enforcement. No server. No LLM. No per-seat licence.**
 
 ```bash
