@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+
 	"github.com/srivastava-ami/coderev/internal/adapters/cmdutil"
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
@@ -45,9 +47,19 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 }
 
 func (a *Adapter) execGitleaks(ctx context.Context, req analysis.RunRequest) ([]byte, error) {
-	args := []string{"detect", "--source", req.Target, "--report-format", "json", "--report-path", "/dev/stdout", "--no-git", "--exit-code", "0"}
+	f, err := os.CreateTemp("", "coderev-gitleaks-*.json")
+	if err != nil {
+		return nil, fmt.Errorf("gitleaks: creating temp file: %w", err)
+	}
+	f.Close()
+	defer os.Remove(f.Name())
+
+	args := []string{"detect", "--source", req.Target, "--report-format", "json", "--report-path", f.Name(), "--no-git", "--exit-code", "0"}
 	args = append(args, req.ExtraArgs...)
-	return cmdutil.RunTool(ctx, a.binary, "gitleaks", args)
+	if _, err := cmdutil.RunTool(ctx, a.binary, "gitleaks", args); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(f.Name())
 }
 
 func parseGitleaksOutput(data []byte) ([]analysis.Finding, error) {
