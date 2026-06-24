@@ -1,0 +1,36 @@
+package config
+
+import (
+	"fmt"
+	"os"
+
+	"github.com/BurntSushi/toml"
+)
+
+type GateConfig struct {
+	Blockers   int `toml:"max_blockers"`
+	Majors     int `toml:"max_majors"`
+	Advisories int `toml:"max_advisories"`
+	Total      int `toml:"max_total"`
+}
+
+func DefaultGateConfig() GateConfig {
+	return GateConfig{
+		Blockers:   0,
+		Majors:     5,
+		Advisories: 10,
+		Total:      20,
+	}
+}
+
+func LoadGate(path string) (*GateConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading gate config: %w", err)
+	}
+	var gc GateConfig
+	if _, err := toml.Decode(string(data), &gc); err != nil {
+		return nil, fmt.Errorf("parsing gate config: %w", err)
+	}
+	return &gc, nil
+}
