@@ -41,7 +41,6 @@ func writeMarkdown(b *strings.Builder, r Report) {
 	b.WriteString("---\n\n")
 
 	writeSummaryTable(b, r)
-	writeArchSection(b, r)
 	writePillarSections(b, r)
 	writeFileHeatmap(b, r)
 	writeExceptions(b, r)
