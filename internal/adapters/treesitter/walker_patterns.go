@@ -24,8 +24,14 @@ func (w *fileWalker) checkPatterns() {
 		w.checkNonNullAssertion(line, lineNum)
 		w.checkForceCast(line, lineNum)
 		w.checkDeepImport(line, lineNum)
+		// Go-specific checks
+		w.checkGoFmtPrint(line, lineNum)
+		w.checkGoPanicInLib(line, lineNum)
+		w.checkGoSQLStringConcat(line, lineNum)
+		w.checkGoContextTODO(line, lineNum)
 	}
 	w.checkAwaitInLoop(lines)
+	w.checkGoDeferInLoop(lines)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {

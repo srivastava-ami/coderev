@@ -13,7 +13,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 [meta]
-version              = "2.1.0"
+version              = "2.2.0"
 last_updated         = "2026-06-23"
 applies_to           = ["nx-monorepo", "standalone-apps", "libs", "infra-as-code"]
 priority_order       = ["security", "stability", "quality", "performance"]
@@ -907,6 +907,138 @@ description         = "Bypassing CI ('I'll fix it in the next PR') is never acce
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 14. GO CONVENTIONS  (applies to *.go files; automated checks enforced by coderev)
+# ═════════════════════════════════════════════════════════════════════════════
+
+[go_conventions]
+severity             = "blocker"
+description          = "Go idioms prevent runtime failures unique to the language. Gaps here are common in codebases authored without Go-specific review."
+
+# ── Error Handling ─────────────────────────────────────────────────────────
+[go_conventions.error_handling]
+rule                = "go.error_handling"
+checks              = [
+"every_error_return_checked_not_silently_discarded",
+"errors_wrapped_with_context_using_fmt_errorf_percent_w",
+"sentinel_errors_defined_with_errors_new_not_as_fmt_errorf_result",
+"errors_is_or_errors_as_used_for_type_inspection_not_string_comparison",
+"no_panic_in_library_code",                    # automated — see go.panic_in_lib below
+]
+remediation         = "Use fmt.Errorf(\"operation: %w\", err) for wrapping. Use errors.Is/errors.As for inspection."
+
+# ── Automated: panic in library code ───────────────────────────────────────
+[go_conventions.no_panic_in_lib]
+rule                = "go.panic_in_lib"
+severity            = "major"
+applies_to          = ["*.go"]
+description         = "panic() in library code crashes callers with no recovery path — return an error instead"
+cwe                 = "CWE-703"
+remediation         = "Return an error. Reserve panic for programmer errors caught at init time (e.g. invalid config schema)."
+
+# ── Concurrency ────────────────────────────────────────────────────────────
+[go_conventions.concurrency]
+rule                = "go.concurrency"
+checks              = [
+"goroutines_have_bounded_lifetime_via_wg_errgroup_or_channel",
+"shared_state_protected_by_mutex_or_communicated_via_channel",
+"no_goroutine_started_without_a_way_to_wait_for_it",
+"channels_closed_by_sender_never_receiver",
+"context_cancellation_propagated_into_goroutines",
+"no_defer_in_loop",                            # automated — see go.defer_in_loop below
+]
+remediation         = "Use sync.WaitGroup or golang.org/x/sync/errgroup for lifecycle. Prefer channels over shared memory."
+
+# ── Automated: defer in loop ────────────────────────────────────────────────
+[go_conventions.no_defer_in_loop]
+rule                = "go.defer_in_loop"
+severity            = "major"
+applies_to          = ["*.go"]
+description         = "defer inside a for loop accumulates all deferred calls until function return — not per-iteration; resource leak"
+cwe                 = "CWE-772"
+remediation         = "Extract the loop body to a helper function so defer executes per-iteration."
+
+# ── Context Propagation ────────────────────────────────────────────────────
+[go_conventions.context_propagation]
+rule                = "go.context_propagation"
+checks              = [
+"context_is_first_parameter_of_every_function_that_performs_io",
+"context_background_only_in_main_test_or_server_entry_point",
+"context_todo_replaced_before_production_merge",  # automated — see go.context_todo below
+"context_not_stored_in_struct_fields",
+"context_cancellation_checked_in_tight_loops",
+]
+remediation         = "Thread ctx context.Context as first argument. Use context.WithTimeout/WithCancel at service boundaries."
+
+# ── Automated: context.TODO() ──────────────────────────────────────────────
+[go_conventions.no_context_todo]
+rule                = "go.context_todo"
+severity            = "advisory"
+applies_to          = ["*.go"]
+description         = "context.TODO() is a placeholder that must be replaced before production"
+remediation         = "Replace with propagated ctx from the calling function or context.Background() in main/test."
+
+# ── Structured Logging (Go) ────────────────────────────────────────────────
+[go_conventions.logging]
+rule                = "go.fmt_print"
+severity            = "advisory"
+applies_to          = ["*.go"]
+description         = "fmt.Println/Printf in production Go code bypasses structured logging — same issue as console.log in JS"
+remediation         = "Use slog (stdlib ≥ 1.21), zap, or zerolog with structured fields and log-level control."
+
+# ── SQL Safety (Go) ────────────────────────────────────────────────────────
+[go_conventions.sql_safety]
+rule                = "go.sql_string_concat"
+severity            = "blocker"
+applies_to          = ["*.go"]
+description         = "SQL query built with fmt.Sprintf or string concatenation — SQL injection vector"
+cwe                 = "CWE-89"
+owasp               = "A03:2021"
+remediation         = "Use parameterised queries (db.Query(q, args...)) or sqlc/squirrel. Never format user input into SQL."
+
+# ── Naming Conventions ─────────────────────────────────────────────────────
+[go_conventions.naming]
+rule                = "go.naming"
+checks              = [
+"interfaces_use_er_suffix_for_single_method_interfaces",  # io.Reader, http.Handler
+"exported_error_variables_use_Err_prefix",                 # ErrNotFound, ErrTimeout
+"no_stuttering_package_member_names",                      # bytes.ByteBuffer → bytes.Buffer
+"receivers_use_short_abbreviation_not_self_or_this",
+"unexported_test_helpers_have_no_special_prefix",
+]
+remediation         = "Follow Effective Go and the Go proverbs: https://go-proverbs.github.io/"
+
+# ── Interface Design ────────────────────────────────────────────────────────
+[go_conventions.interface_design]
+rule                = "go.interface_design"
+checks              = [
+"interfaces_defined_by_consumer_not_producer",
+"no_interface_with_more_than_5_methods",
+"prefer_embedding_single_method_interfaces",
+"accept_interfaces_return_concrete_types",
+]
+remediation         = "Small interfaces — io.Reader has one method. Large interfaces are implementation contracts, not polymorphism."
+
+# ── init() Usage ────────────────────────────────────────────────────────────
+[go_conventions.no_init]
+rule                = "go.no_init"
+severity            = "advisory"
+applies_to          = ["*.go"]
+description         = "init() executes hidden side effects at import time — breaks testability and import order reasoning"
+remediation         = "Replace with explicit initialisation functions called from main() or a DI container."
+
+# ── Module Hygiene ──────────────────────────────────────────────────────────
+[go_conventions.module_hygiene]
+rule                = "go.module_hygiene"
+checks              = [
+"go_mod_and_go_sum_committed_together",
+"no_replace_directives_in_production_modules",
+"dependencies_are_exact_not_pseudo_versions_for_releases",
+"no_unused_dependencies_in_go_mod",
+]
+remediation         = "Run go mod tidy before committing. Replace directives are for local development only."
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # 15. SEVERITY SUMMARY
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -931,6 +1063,7 @@ categories          = [
 "performance.async",
 "deployment_readiness.*",
 "nx_conventions.*",
+"go_conventions.sql_safety",
 "documentation.no_comment_tombstones",
 "review_process.ci_must_pass",
 ]
@@ -944,6 +1077,8 @@ categories          = [
 "documentation.adr",
 "performance.memory",
 "performance.caching",
+"go_conventions.no_panic_in_lib",
+"go_conventions.no_defer_in_loop",
 ]
 
 [severity_definitions.advisory]
@@ -951,6 +1086,9 @@ description         = "Fix or provide written justification in PR thread."
 categories          = [
 "documentation.comment_quality",
 "performance.bundle",
+"go_conventions.logging",
+"go_conventions.no_context_todo",
+"go_conventions.no_init",
 ]
 
 [severity_definitions.info]
@@ -1078,6 +1216,46 @@ ticket                = ""
 rule                  = "file_structure.file_length"
 file_or_module        = "cmd/coderev/setup.go"
 justification         = "setup.go contains all install subcommands (setup, install-deps, install-hooks) as a single cohesive unit; splitting it would fragment one feature across multiple files"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.fmt_print"
+file_or_module        = "internal/adapters/treesitter/walker_go.go"
+justification         = "Pattern strings (\"fmt.Println(\", etc.) in the detection array trigger the rule on the checker's own source — detection constants, not production print calls"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.panic_in_lib"
+file_or_module        = "internal/adapters/treesitter/walker_go.go"
+justification         = "String literal \"panic(\" in the detection pattern and message text triggers the rule on its own source code"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.sql_string_concat"
+file_or_module        = "internal/adapters/treesitter/walker_go.go"
+justification         = "SQL keyword strings in goSQLConcatPatterns and goLineHasSQLKeyword are detection constants — not user-facing SQL construction"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.context_todo"
+file_or_module        = "internal/adapters/treesitter/walker_go.go"
+justification         = "The string \"context.TODO()\" appears in detection logic and message text — detection constants, not production code"
+approved_by           = "coderev-maintainers"
+expires               = ""
+ticket                = ""
+
+[[exceptions]]
+rule                  = "go.defer_in_loop"
+file_or_module        = "internal/adapters/treesitter/walker_go.go"
+justification         = "The string \"defer \" appears inside the state-machine for-loop as a string literal being searched — detection constant, not a deferred call"
 approved_by           = "coderev-maintainers"
 expires               = ""
 ticket                = ""

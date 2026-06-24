@@ -19,7 +19,7 @@ func (w *fileWalker) checkComment(node *sitter.Node) {
 		return
 	}
 
-	if strings.Contains(strings.ToUpper(text), "TODO") && !todoHasTicket(text) {
+	if isTODOAnnotation(text) && !todoHasTicket(text) {
 		w.emitFinding(analysis.Finding{Rule: "documentation.todo_format", Pillar: "documentation", Severity: analysis.SeverityMajor, Line: line,
 			Message:     "TODO without ticket reference — use TODO(#<issue>)",
 			Remediation: "Convert to TODO(#<issue>) or create a ticket and link it."})
@@ -49,6 +49,14 @@ func stripCommentMarkers(s string) string {
 	s = strings.TrimSuffix(s, "*/")
 	s = strings.TrimPrefix(s, "#")
 	return strings.TrimSpace(s)
+}
+
+// isTODOAnnotation reports whether text is a TODO annotation comment.
+// Only matches when TODO opens the comment body — avoids false-positives on
+// identifiers and prose that mention the word "todo" mid-sentence.
+func isTODOAnnotation(text string) bool {
+	inner := strings.ToUpper(stripCommentMarkers(text))
+	return strings.HasPrefix(inner, "TODO")
 }
 
 func todoHasTicket(text string) bool {
