@@ -12,8 +12,6 @@ import (
 
 	"github.com/srivastava-ami/coderev/internal/config"
 )
-
-// AdapterWarning records that an adapter was skipped (not available or failed).
 type AdapterWarning struct {
 	Adapter string
 	Reason  string
@@ -194,11 +192,6 @@ func matchesException(f Finding, exceptions []config.Exception) bool {
 	}
 	return false
 }
-
-// matchExceptionPath checks whether the finding's file path matches the exception
-// pattern. The pattern can be an exact suffix (directory/file.go), a glob pattern
-// containing * or ?, or a full path. Matching is anchored at directory boundaries
-// to prevent substring false positives.
 func matchExceptionPath(file, pattern string) bool {
 	// glob match — pattern contains * or ?
 	if strings.ContainsAny(pattern, "*?") {
@@ -240,8 +233,6 @@ func changedFiles(target, baseRef string) (map[string]bool, error) {
 	}
 	return set, nil
 }
-
-// filterFiles returns only the FileInfo entries whose path is in the changed set.
 func filterFiles(files []FileInfo, changed map[string]bool) []FileInfo {
 	out := make([]FileInfo, 0, len(changed))
 	for _, f := range files {

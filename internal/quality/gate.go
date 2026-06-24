@@ -30,24 +30,26 @@ func Evaluate(findings []analysis.Finding, gate config.GateConfig) GateResult {
 	}
 	total := len(findings)
 
-	var msg string
-	switch {
-	case blockers > gate.Blockers:
-		msg = fmt.Sprintf("%d blocker(s) exceed threshold of %d", blockers, gate.Blockers)
-	case majors > gate.Majors:
-		msg = fmt.Sprintf("%d major(s) exceed threshold of %d", majors, gate.Majors)
-	case advisories > gate.Advisories:
-		msg = fmt.Sprintf("%d advisory(s) exceed threshold of %d", advisories, gate.Advisories)
-	case total > gate.Total:
-		msg = fmt.Sprintf("%d total finding(s) exceed threshold of %d", total, gate.Total)
-	}
-
 	return GateResult{
-		Passed:     msg == "",
+		Passed:     blockers <= gate.Blockers && majors <= gate.Majors && advisories <= gate.Advisories && total <= gate.Total,
 		Blockers:   blockers,
 		Majors:     majors,
 		Advisories: advisories,
 		Total:      total,
-		Message:    msg,
+		Message:    gateMessage(blockers, majors, advisories, total, gate),
 	}
+}
+
+func gateMessage(blockers, majors, advisories, total int, gate config.GateConfig) string {
+	switch {
+	case blockers > gate.Blockers:
+		return fmt.Sprintf("%d blocker(s) exceed threshold of %d", blockers, gate.Blockers)
+	case majors > gate.Majors:
+		return fmt.Sprintf("%d major(s) exceed threshold of %d", majors, gate.Majors)
+	case advisories > gate.Advisories:
+		return fmt.Sprintf("%d advisory(s) exceed threshold of %d", advisories, gate.Advisories)
+	case total > gate.Total:
+		return fmt.Sprintf("%d total finding(s) exceed threshold of %d", total, gate.Total)
+	}
+	return ""
 }

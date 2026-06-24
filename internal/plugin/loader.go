@@ -12,19 +12,20 @@ type DiscoveredPlugin struct {
 	ExecPath string
 }
 
+var skipPluginDirs = map[string]bool{".git": true, "node_modules": true, "target": true, "__pycache__": true}
+
 func DiscoverPlugins(dir string) ([]DiscoveredPlugin, error) {
 	var plugins []DiscoveredPlugin
-	err := filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
+	err := filepath.WalkDir(dir, walkPluginFn(&plugins))
+	return plugins, err
+}
+
+func walkPluginFn(plugins *[]DiscoveredPlugin) func(string, os.DirEntry, error) error {
+	return func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() && skipPluginDirs[d.Name()] {
+			return filepath.SkipDir
 		}
 		if d.IsDir() {
-			skipDirs := []string{".git", "node_modules", "target", "__pycache__"}
-			for _, skip := range skipDirs {
-				if d.Name() == skip {
-					return filepath.SkipDir
-				}
-			}
 			return nil
 		}
 		if !strings.HasSuffix(d.Name(), "-plugin.toml") {
@@ -38,8 +39,7 @@ func DiscoverPlugins(dir string) ([]DiscoveredPlugin, error) {
 		if err != nil {
 			return nil
 		}
-		plugins = append(plugins, DiscoveredPlugin{Manifest: *m, ExecPath: execPath})
+		*plugins = append(*plugins, DiscoveredPlugin{Manifest: *m, ExecPath: execPath})
 		return nil
-	})
-	return plugins, err
+	}
 }

@@ -32,26 +32,31 @@ func scanLinesForMagicNumbers(lines []string, path string, re *regexp.Regexp) []
 		if isCommentLine(trimmed, path) || skipLine(trimmed) {
 			continue
 		}
-		matches := re.FindAllStringSubmatch(line, -1)
-		for _, m := range matches {
-			num := m[1]
-			if num == "0" || num == "1" || num == "0.0" || num == "1.0" {
-				continue
-			}
-			if isConstantLike(trimmed) {
-				continue
-			}
-			findings = append(findings, analysis.Finding{
-				Rule:        "hardcoding.magic_number",
-				Pillar:      "hardcoding",
-				Severity:    analysis.SeverityAdvisory,
-				File:        path,
-				Line:        lineNum,
-				Source:      "treesitter",
-				Message:     "magic number literal: " + num + " — use a named constant",
-				Remediation: "Extract the literal into a const or enum with a descriptive name.",
-			})
+		findings = append(findings, emitMagicMatches(line, trimmed, path, lineNum, re)...)
+	}
+	return findings
+}
+
+func emitMagicMatches(line, trimmed, path string, lineNum int, re *regexp.Regexp) []analysis.Finding {
+	var findings []analysis.Finding
+	for _, m := range re.FindAllStringSubmatch(line, -1) {
+		num := m[1]
+		if num == "0" || num == "1" || num == "0.0" || num == "1.0" {
+			continue
 		}
+		if isConstantLike(trimmed) {
+			continue
+		}
+		findings = append(findings, analysis.Finding{
+			Rule:        "hardcoding.magic_number",
+			Pillar:      "hardcoding",
+			Severity:    analysis.SeverityAdvisory,
+			File:        path,
+			Line:        lineNum,
+			Source:      "treesitter",
+			Message:     "magic number literal: " + num + " — use a named constant",
+			Remediation: "Extract the literal into a const or enum with a descriptive name.",
+		})
 	}
 	return findings
 }
