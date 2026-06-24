@@ -8,8 +8,9 @@ permissions:
   contents: write
 
 jobs:
-  # Build each platform on its native runner — go-tree-sitter requires CGO
-  # and CGO cannot cross-compile without a C cross-toolchain.
+  # go-tree-sitter requires CGO. Darwin binaries both built on macos-latest (arm64)
+  # using clang's built-in cross-arch support (-arch x86_64 for amd64).
+  # macos-13 (Intel) is retired — do not use it.
   build:
     name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
     strategy:
@@ -20,7 +21,8 @@ jobs:
             runner: macos-latest
           - goos: darwin
             goarch: amd64
-            runner: macos-13
+            runner: macos-latest
+            cc: "clang -arch x86_64"
           - goos: linux
             goarch: amd64
             runner: ubuntu-latest
@@ -41,8 +43,8 @@ jobs:
           go-version: "1.22"
           cache: true
 
-      - name: Install arm64 cross-compiler (linux/arm64 only)
-        if: matrix.cc != ''
+      - name: Install linux/arm64 cross-compiler
+        if: matrix.cc == 'aarch64-linux-gnu-gcc'
         run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Build binary
@@ -58,7 +60,7 @@ jobs:
             -o "bin/dist/coderev-${VERSION}-${{ matrix.goos }}-${{ matrix.goarch }}" \
             ./cmd/coderev
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: coderev-${{ matrix.goos }}-${{ matrix.goarch }}
           path: bin/dist/coderev-*
@@ -75,7 +77,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           path: bin/dist
           merge-multiple: true
