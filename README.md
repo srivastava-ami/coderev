@@ -1,6 +1,6 @@
 # coderev
 
-[![CI](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/srivastava-ami/coderev/blob/main/coderev-report.md)
+[![CI](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 
 **Deterministic, polyglot code-standards enforcement. No server. No LLM. No per-seat licence.**
@@ -25,7 +25,7 @@ All findings are produced by deterministic static analysis — zero LLM calls, z
 
 ```bash
 # Homebrew (macOS / Linux) — recommended
-brew tap srivastava-ami/coderev
+brew tap srivastava-ami/coderev https://github.com/srivastava-ami/coderev
 brew install coderev
 
 # curl installer — also installs gitleaks, semgrep, madge
