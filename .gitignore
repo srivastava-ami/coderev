@@ -1,5 +1,6 @@
-# compiled binary
+# compiled binaries
 bin/
+/main
 
 # generated scan report (artifact, never committed — view in Actions step summary or as artifact)
 coderev-report.md
