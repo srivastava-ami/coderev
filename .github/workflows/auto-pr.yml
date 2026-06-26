@@ -1,0 +1,57 @@
+name: Auto PR (dev → main)
+
+# Pushing to dev is the only push we do. This opens (or reuses) the promotion PR
+# dev → main, which then flows through the existing pipeline:
+#   code-quality scan-pr  → coderev reviews the diff (inline annotations + comment)
+#   auto-merge            → rebase-merges once required checks are green
+#   auto-tag (on merge)   → version bump from PR title → tag
+#   release / docker      → build + publish the release on the new tag
+#
+# IMPORTANT: the PR must be created with a PAT or GitHub App token (AUTO_PR_TOKEN),
+# NOT the default GITHUB_TOKEN — a GITHUB_TOKEN-created PR does not trigger the
+# review/auto-merge workflows above (GitHub blocks that to prevent recursion).
+
+on:
+  push:
+    branches: [dev]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    name: open or update dev → main PR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create or update the promotion PR
+        env:
+          GH_TOKEN: ${{ secrets.AUTO_PR_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::warning::AUTO_PR_TOKEN is not set — skipping. Add a PAT (or GitHub App token) with 'repo' + 'pull_request' scope as the AUTO_PR_TOKEN secret so the auto-PR triggers coderev review + auto-merge."
+            exit 0
+          fi
+
+          # Nothing to promote if dev has no diff against main.
+          if git diff --quiet origin/main..HEAD; then
+            echo "dev has no changes vs main — no PR needed."
+            exit 0
+          fi
+
+          # Reuse an already-open promotion PR (it updates itself on each push).
+          existing=$(gh pr list --base main --head dev --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            echo "PR #$existing (dev → main) is already open; it updates automatically on push."
+            exit 0
+          fi
+
+          gh pr create --base main --head dev \
+            --title "Promote dev → main" \
+            --body "$(printf 'Automated promotion of **dev** to **main**.\n\n- Reviewed by the latest coderev (see the *coderev scan* check + inline annotations on the diff)\n- Auto-merges (rebase) once required checks pass\n- On merge: auto-tagged and released\n\n> The version bump is parsed from this PR title by auto-tag.yml — edit the title (e.g. add the target version) if you need a specific bump.')"
