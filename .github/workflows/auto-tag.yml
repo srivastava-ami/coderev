@@ -36,8 +36,17 @@ jobs:
           echo "PR title: $MSG"
           echo "Current tag: $LATEST"
 
-          if echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
+          # MAJOR — explicit breaking-change signal only (deliberately distinct from
+          # the broad minor keywords): a conventional `type!:` / `type(scope)!:`
+          # prefix, "BREAKING CHANGE", or the word "major". Checked first so it
+          # wins over a feature keyword in the same title.
+          if echo "$MSG" | grep -qE '^[a-z]+(\([^)]+\))?!:' \
+             || echo "$MSG" | grep -qiE 'breaking[ -]?change|\bmajor\b'; then
+            NEXT="v$((MAJOR + 1)).0.0"
+          # MINOR — a feature / addition.
+          elif echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
             NEXT="v${MAJOR}.$((MINOR + 1)).0"
+          # PATCH — everything else (fixes, chores, docs).
           else
             NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
