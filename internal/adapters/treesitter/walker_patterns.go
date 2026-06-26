@@ -31,6 +31,7 @@ func (w *fileWalker) checkPatterns() {
 	w.checkGoDeferInLoop(lines)
 	w.checkGoIOCopyNoLimit(lines)
 	w.checkSecretFallbackInEnv(lines)
+	w.checkInjectionPatterns(lines)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {
