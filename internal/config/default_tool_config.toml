@@ -1,0 +1,54 @@
+# Built-in default tool configuration, embedded in the binary. This is the
+# single source of truth for default adapter wiring and for every URL coderev
+# needs (tool download templates, SARIF output URLs) — kept in TOML, never as
+# hardcoded literals in Go source, so the hardcoding.urls_and_paths rule is
+# honoured rather than excepted.
+
+[adapters.treesitter]
+enabled = true
+rules = [
+  "complexity.*", "file_structure.*", "type_safety.*", "hardcoding.*",
+  "documentation.*", "observability.logging", "stability.error_handling",
+  "security.secret_fallback_literal",
+]
+
+# ── Native (pure-Go) adapters — zero-dependency defaults ──────────────────────
+[adapters.secrets]
+enabled = true
+rules = ["security.secrets"]
+
+[adapters.imports]
+enabled = true
+rules = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+
+# ── External tools — optional enrichment (off by default) ─────────────────────
+[adapters.semgrep]
+enabled      = false
+binary       = "semgrep"
+rules        = ["security.injection.*", "security.auth.*", "security.cryptography"]
+download_url = "https://github.com/semgrep/semgrep/releases/download/v%s/semgrep-v%s-ubuntu-16.04.tgz"
+
+[adapters.gitleaks]
+enabled      = false
+binary       = "gitleaks"
+rules        = ["security.secrets"]
+download_url = "https://github.com/gitleaks/gitleaks/releases/download/v%s/gitleaks_%s_%s_%s.tar.gz"
+
+[adapters.madge]
+enabled = false
+binary  = "madge"
+rules   = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+
+[adapters.npmaudit]
+enabled = true
+binary  = "npm"
+rules   = ["security.dependencies"]
+
+[adapters.coverage]
+enabled   = true
+threshold = 80.0
+
+# ── SARIF output URLs (configuration, not hardcoded constants) ────────────────
+[sarif]
+schema_url      = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
+information_uri = "https://github.com/srivastava-ami/coderev"

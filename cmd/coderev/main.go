@@ -70,13 +70,14 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 }
 
 func run(cmd *cobra.Command, args []string) error {
-	if err := toolmgr.EnsureAll(); err != nil {
-		fmt.Fprintf(os.Stderr, "⚠  some external tools could not be installed: %v\n", err)
-	}
-
 	s := setupRun(args)
 	if s.err != nil {
 		return s.err
+	}
+	// Download URLs come from the tool config (loaded above), not from hardcoded
+	// literals — so EnsureAll runs after the config is resolved.
+	if err := toolmgr.EnsureAll(toolSources(s.tc)); err != nil {
+		fmt.Fprintf(os.Stderr, "⚠  some external tools could not be installed: %v\n", err)
 	}
 	ads := buildAdapters(s.stds, s.tc)
 	printStartup(s.target, s.stdLabel, ads)
@@ -91,7 +92,15 @@ func run(cmd *cobra.Command, args []string) error {
 		return jsonRun(result)
 	}
 
-	return stdRun(s.target, s.stdLabel, s.stds, result)
+	return stdRun(s, result)
+}
+
+// toolSources extracts the download-URL templates from the tool config for toolmgr.
+func toolSources(tc analysis.ToolConfig) toolmgr.Sources {
+	return toolmgr.Sources{
+		GitleaksURL: tc.Adapters.Gitleaks.DownloadURL,
+		SemgrepURL:  tc.Adapters.Semgrep.DownloadURL,
+	}
 }
 
 type runSetup struct {
@@ -127,12 +136,12 @@ func jsonRun(result analysis.RunResult) error {
 	return writeJSONOutput(result, gateResult)
 }
 
-func stdRun(target, stdLabel string, stds analysis.Standards, result analysis.RunResult) error {
+func stdRun(s runSetup, result analysis.RunResult) error {
 	gateResult, err := resolveGate(result.Findings)
 	if err != nil {
 		return err
 	}
-	r, outputPath, err := buildAndWrite(target, stdLabel, stds, result)
+	r, outputPath, err := buildAndWrite(s, result)
 	if err != nil {
 		return err
 	}
@@ -140,7 +149,7 @@ func stdRun(target, stdLabel string, stds analysis.Standards, result analysis.Ru
 	if err := printGateResult(gateResult); err != nil {
 		return err
 	}
-	return postAnnotate(r, target)
+	return postAnnotate(r, s.target)
 }
 
 

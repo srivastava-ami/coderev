@@ -3,6 +3,15 @@ package analysis
 // ToolConfig controls which adapter handles which rules and how each is invoked.
 type ToolConfig struct {
 	Adapters AdaptersConfig `toml:"adapters"`
+	SARIF    SARIFConfig    `toml:"sarif"`
+}
+
+// SARIFConfig holds the URLs emitted in SARIF output. They are configuration —
+// not hardcoded constants — so they can be overridden and so coderev's own
+// source carries no hardcoded URLs.
+type SARIFConfig struct {
+	SchemaURL      string `toml:"schema_url"`
+	InformationURI string `toml:"information_uri"`
 }
 
 type AdaptersConfig struct {
@@ -31,10 +40,11 @@ type NativeToolConfig struct {
 }
 
 type ExternalToolConfig struct {
-	Enabled bool     `toml:"enabled"`
-	Binary  string   `toml:"binary"`
-	Rules   []string `toml:"rules"`
-	Args    []string `toml:"args"`
+	Enabled     bool     `toml:"enabled"`
+	Binary      string   `toml:"binary"`
+	Rules       []string `toml:"rules"`
+	Args        []string `toml:"args"`
+	DownloadURL string   `toml:"download_url"` // release URL template (toolmgr); printf %s slots
 }
 
 type CoverageConfig struct {

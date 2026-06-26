@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/srivastava-ami/coderev/internal/config"
 	"github.com/srivastava-ami/coderev/internal/toolmgr"
 )
 
@@ -129,8 +130,11 @@ func gitDir() (string, error) {
 
 func runInstallDeps(_ *cobra.Command, _ []string) error {
 	fmt.Println("── installing scanner dependencies ──────────────────────────────────────")
-	err := toolmgr.EnsureAll()
+	tc, err := config.LoadToolConfig("")
 	if err != nil {
+		return fmt.Errorf("loading tool config: %w", err)
+	}
+	if err := toolmgr.EnsureAll(toolSources(tc)); err != nil {
 		fmt.Printf("  ⚠  some tools could not be installed: %v\n", err)
 	}
 	fmt.Println("\n── done ─────────────────────────────────────────────────────────────────")

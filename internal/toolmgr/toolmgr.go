@@ -48,9 +48,9 @@ func Exists(name string) bool {
 
 // EnsureAll downloads and installs all external scanner tools that are not
 // yet available. Prints progress to stderr.
-func EnsureAll() error {
+func EnsureAll(src Sources) error {
 	var errs []string
-	for _, t := range tools {
+	for _, t := range toolList(src) {
 		if Exists(t.Name) {
 			continue
 		}
@@ -75,51 +75,36 @@ type tool struct {
 	Install func() error
 }
 
-var semgrepReleaseURL = "https://github.com/semgrep/semgrep/releases/download/v%s/semgrep-v%s-ubuntu-16.04.tgz"
-
-var tools = []tool{
-	{
-		Name:   "gitleaks",
-		Binary: "gitleaks",
-		Install: func() error {
-			return ensureGitleaks()
-		},
-	},
-	{
-		Name:   "semgrep",
-		Binary: "semgrep",
-		Install: func() error {
-			return ensureSemgrep()
-		},
-	},
-	{
-		Name:   "madge",
-		Binary: "madge",
-		Install: func() error {
-			return ensureMadge()
-		},
-	},
+// Sources carries the release-URL templates (from tool config) that toolmgr uses
+// to download optional external tools, so this package holds no hardcoded URLs.
+type Sources struct {
+	GitleaksURL string // printf template, slots: ver, ver, os, arch
+	SemgrepURL  string // printf template, slots: ver, ver
 }
 
-func ensureGitleaks() error {
+func toolList(src Sources) []tool {
+	return []tool{
+		{Name: "gitleaks", Binary: "gitleaks", Install: func() error { return ensureGitleaks(src.GitleaksURL) }},
+		{Name: "semgrep", Binary: "semgrep", Install: func() error { return ensureSemgrep(src.SemgrepURL) }},
+		{Name: "madge", Binary: "madge", Install: func() error { return ensureMadge() }},
+	}
+}
+
+func ensureGitleaks(urlTmpl string) error {
 	ver := "8.18.2"
-	url := gitleaksURL(ver)
-	return downloadTGZ(url, "gitleaks", "gitleaks")
+	return downloadTGZ(gitleaksURL(urlTmpl, ver), "gitleaks", "gitleaks")
 }
 
-func gitleaksURL(ver string) string {
+func gitleaksURL(tmpl, ver string) string {
 	os_ := runtime.GOOS
 	arch := runtime.GOARCH
 	if arch == "amd64" {
 		arch = "x64"
 	}
-	return fmt.Sprintf(
-		"https://github.com/gitleaks/gitleaks/releases/download/v%s/gitleaks_%s_%s_%s.tar.gz",
-		ver, ver, os_, arch,
-	)
+	return fmt.Sprintf(tmpl, ver, ver, os_, arch)
 }
 
-func ensureSemgrep() error {
+func ensureSemgrep(urlTmpl string) error {
 	// uv: fastest, isolated, works on any OS without touching system Python
 	if onPATH("uv") {
 		return runVisible("uv", "tool", "install", "semgrep")
@@ -144,8 +129,7 @@ func ensureSemgrep() error {
 		return runVisible("brew", "install", "semgrep")
 	}
 	ver := "1.69.0"
-	url := fmt.Sprintf(semgrepReleaseURL, ver, ver)
-	return downloadTGZ(url, "semgrep", "semgrep")
+	return downloadTGZ(fmt.Sprintf(urlTmpl, ver, ver), "semgrep", "semgrep")
 }
 
 func ensureMadge() error {
