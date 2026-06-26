@@ -113,13 +113,17 @@ func (w *fileWalker) checkNesting(s *functionScope, loc string) {
 		Remediation: w.stds.Complexity.Nesting.Remediation})
 }
 
+// maxReturnsAdvisory is the early-return count above which a function is flagged.
+// 6 matches idiomatic Go guard-clause style; 4 was stricter than necessary and
+// pushed readable early-return code toward deeper nesting.
+const maxReturnsAdvisory = 6
+
 func (w *fileWalker) checkMaxReturnCount(s *functionScope, loc string) {
-	maxRet := 4
-	if s.returns <= maxRet {
+	if s.returns <= maxReturnsAdvisory {
 		return
 	}
 	w.emitFinding(analysis.Finding{Rule: "complexity.max_return_count", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
-		Message:     fmt.Sprintf("%s: %d return statements (max %d) — consider restructuring", loc, s.returns, maxRet),
+		Message:     fmt.Sprintf("%s: %d return statements (max %d) — consider restructuring", loc, s.returns, maxReturnsAdvisory),
 		Remediation: "Use a single return with a result variable, or extract the branches to named helpers."})
 }
 

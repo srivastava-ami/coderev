@@ -1,9 +1,12 @@
 [file_structure]
 severity = "advisory"
 
+# advisory_at matches max_lines: 300 is the limit, and a sub-limit warning at 200
+# is stricter than idiomatic Go (200–300 line files are normal). The blocker at
+# 300 still holds.
 [file_structure.file_length]
 max_lines   = 300
-advisory_at = 200
+advisory_at = 300
 remediation = "Split the file by responsibility. Each file should have a single concern."
 
 [file_structure.class_length]

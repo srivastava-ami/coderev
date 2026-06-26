@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
@@ -65,7 +66,7 @@ func (p *commentPoster) postAll(comments []prComment) error {
 	if len(errs) > 0 {
 		return fmt.Errorf("ghpr: %d comment(s) failed: %s", len(errs), strings.Join(errs, "; "))
 	}
-	fmt.Printf("ghpr: posted %d inline comment(s) on PR #%d\n", len(comments), p.prNumber)
+	fmt.Fprintf(os.Stderr, "ghpr: posted %d inline comment(s) on PR #%d\n", len(comments), p.prNumber)
 	return nil
 }
 
