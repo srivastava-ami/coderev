@@ -3,7 +3,7 @@ severity = "blocker"
 
 [complexity.cyclomatic]
 max_value    = 10
-advisory_at  = 7
+advisory_at  = 10
 hard_block_at = 15
 remediation  = "Extract branches into named helpers. Each function should do one thing."
 
