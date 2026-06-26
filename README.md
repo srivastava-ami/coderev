@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/srivastava-ami/coderev?style=social)](https://github.com/srivastava-ami/coderev)
+
+> ⭐ **If coderev is useful to you, please [star the repo](https://github.com/srivastava-ami/coderev)** — it's the easiest way to support the project and help others find it. Built by [Amit Srivastava](https://github.com/srivastava-ami).
 
 **Deterministic, polyglot code-standards enforcement. No server. No LLM. No per-seat licence.**
 

@@ -8,6 +8,7 @@ import (
 )
 
 func printStartup(target, stdFile string, ads []analysis.ToolAdapter) {
+	fmt.Printf("coderev™ %s — by Amit Srivastava · https://github.com/srivastava-ami/coderev\n\n", version)
 	fmt.Printf("coderev · target: %s\n", target)
 	fmt.Printf("          standards: %s\n", stdFile)
 	fmt.Printf("          adapters: %s\n", adapterNames(ads))
@@ -30,5 +31,6 @@ func printSummary(s report.Summary, warnings []analysis.AdapterWarning, outputPa
 		status = "✗ FAIL"
 	}
 	fmt.Printf("\n  status: %s\n", status)
-	fmt.Printf("  report: %s\n\n", outputPath)
+	fmt.Printf("  report: %s\n", outputPath)
+	fmt.Printf("\n  ⭐ useful? star coderev: https://github.com/srivastava-ami/coderev\n\n")
 }
