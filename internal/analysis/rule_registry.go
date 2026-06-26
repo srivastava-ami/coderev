@@ -54,6 +54,9 @@ var RuleRegistry = map[string]RuleMeta{
 	"security.no_inner_html":        {Tags: []string{"owasp:A03:2021", "cwe:79"}, Standards: []string{"OWASP-2021-A03", "CWE-79"}},
 	"security.no_weak_crypto":       {Tags: []string{"owasp:A02:2021", "cwe:327"}, Standards: []string{"OWASP-2021-A02", "CWE-327"}},
 	"security.no_prototype_pollution": {Tags: []string{"owasp:A08:2021", "cwe:1321"}, Standards: []string{"OWASP-2021-A08", "CWE-1321"}},
+	// secret_fallback_literal is fully native: dot/bracket forms in
+	// walker_security_fallback.go, destructuring-default form in walker_injection.go.
+	// semgrep is now optional enrichment, not required for this rule.
 	"security.secret_fallback_literal": {Tags: []string{"owasp:A07:2021", "cwe:798"}, Standards: []string{"OWASP-2021-A07", "CWE-798"}},
 	// security via external adapters
 	"security.secrets":      {Tags: []string{"owasp:A07:2021", "cwe:798"}, Standards: []string{"OWASP-2021-A07", "CWE-798"}},
