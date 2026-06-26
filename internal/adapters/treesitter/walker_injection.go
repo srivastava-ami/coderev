@@ -14,13 +14,9 @@ import (
 // The dot-notation (process.env.KEY ?? 'val') and bracket-notation
 // (process.env['KEY'] ?? 'val') forms are already native in
 // walker_security_fallback.go. The remaining form — only ever covered by the
-// owned semgrep YAML — is the destructuring default, which can span lines:
-//
-//	const { SIGNING_KEY = 'dev-key' } = process.env
-//	const {
-//	  JWT_SECRET = 'dev-secret',
-//	  PORT       = '3000',
-//	} = process.env
+// owned semgrep YAML — is the destructuring default: a const, let or var that
+// destructures process.env and gives a secret-named key a string-literal
+// default value, possibly spanning several lines.
 //
 // Porting it here makes the native engine the DEFAULT for security.pattern.*;
 // semgrep is no longer required for the owned rule set.
@@ -32,11 +28,11 @@ var reDestructureEnv = regexp.MustCompile(
 	`(?:const|let|var)\s*\{([^{}]*)\}\s*=\s*process\.env`,
 )
 
-// reDestructureDefault matches a `KEY = <string-literal>` default inside a
-// destructuring block. The optional `: local` group handles renamed
-// destructuring (`{ JWT_SECRET: secret = 'x' }`) — group 1 is always the env
-// var name. The literal alternation requires at least one character, so an
-// empty default ('' / "" / ``) never matches — mirroring the semgrep $VAL: '.+'.
+// reDestructureDefault matches a key with a string-literal default inside a
+// destructuring block. The optional rename group handles a renamed key (a name
+// followed by a local alias and then the default); group 1 is always the
+// environment variable name. The literal alternation requires at least one
+// character, so an empty default never matches — mirroring the semgrep pattern.
 var reDestructureDefault = regexp.MustCompile(
 	`([A-Za-z_$][A-Za-z0-9_$]*)\s*(?::\s*[A-Za-z_$][A-Za-z0-9_$]*\s*)?=\s*` +
 		"(?:'[^']+'|\"[^\"]+\"|`[^`]+`)",

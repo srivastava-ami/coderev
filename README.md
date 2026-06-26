@@ -32,7 +32,7 @@ brew tap srivastava-ami/tools
 brew trust srivastava-ami/tools   # one-time: Homebrew 4.x requires trusting third-party taps
 brew install coderev
 
-# curl installer — also installs gitleaks, semgrep, madge
+# curl installer
 curl -fsSL https://raw.githubusercontent.com/srivastava-ami/coderev/main/scripts/install.sh | bash
 
 # From source (Go 1.22+)
@@ -42,7 +42,7 @@ make install
 docker pull ghcr.io/srivastava-ami/coderev:latest
 ```
 
-**External scanners auto-install on first run.** Run `coderev .` in any repo and gitleaks, semgrep, and madge are downloaded to `~/.coderev/tools/` automatically. No `brew install`, `npm install`, or `pip install` needed.
+**Nothing else to install.** `coderev .` is self-contained: secret scanning, circular-dependency detection, and the injection rules are all native Go. No `brew install`, `npm install`, or `pip install`, and no external scanners required. (Optional: gitleaks/semgrep/madge add extra depth — enable them in `tool_config.toml` and they auto-install to `~/.coderev/tools/` only if turned on.)
 
 ## Distribution
 
@@ -156,19 +156,23 @@ coderev --standards /path/to/custom.toml .
 
 ## Adapters
 
-| Adapter | Checks | Auto-installed | Built-in |
-|---|---|---|---|---|
-| `treesitter` | complexity, type safety, hardcoding, security patterns, documentation, structure, duplication — **all 5 languages** | — | ✅ |
-| `gitleaks` | secrets & credentials | ✅ `~/.coderev/tools/gitleaks` | ❌ |
-| `semgrep` | OWASP / injection / crypto | ✅ `~/.coderev/tools/semgrep` | ❌ |
-| `madge` | circular deps, NX boundaries | ✅ `~/.coderev/tools/madge` | ❌ |
-| `npmaudit` | vulnerable npm packages | ships with Node | ❌ |
-| `coverage` | line coverage threshold (lcov, cobertura) | reads existing report | ❌ |
-| `custom` | any tool via NDJSON | your binary | ❌ |
+| Adapter | Checks | Type | Default |
+|---|---|---|---|
+| `treesitter` | complexity, type safety, hardcoding, security patterns, documentation, structure, duplication — **all 5 languages** | native (pure Go) | ✅ on |
+| `secrets` | secrets & credentials (regex + Shannon entropy) | native (pure Go) | ✅ on |
+| `imports` | circular deps, NX boundaries (Tarjan SCC) | native (pure Go) | ✅ on |
+| `npmaudit` | vulnerable npm packages | external (npm) | ✅ on \* |
+| `coverage` | line coverage threshold (lcov, cobertura) | reads existing report | ✅ on |
+| `gitleaks` | extra secret rules | external | ⚪ optional |
+| `semgrep` | wider OWASP / injection / crypto | external | ⚪ optional |
+| `madge` | circular-deps cross-check | external | ⚪ optional |
+| `custom` | any tool via NDJSON | external | ⚪ optional |
 
-Built-in tree-sitter walkers cover **TypeScript, JavaScript, Go, Python, and Rust** — no external tools required for 70% of rules. External adapters cover what tree-sitter cannot: secret scanning, dependency CVEs, OWASP injection patterns, circular imports.
+\* `npmaudit` is the one remaining external check (dependency-CVE); a native embedded-OSV replacement lands in v1.2.0.
 
-External scanners are auto-installed on first scan — no manual step needed. To pre-install explicitly:
+Native Go adapters cover **TypeScript, JavaScript, Go, Python, and Rust** with **no external tools**: tree-sitter walkers for structure/complexity/security patterns, plus native secret scanning and native circular-dependency detection. gitleaks/semgrep/madge are optional enrichment — the native adapters already cover their rules.
+
+The optional external scanners auto-install only when you enable them in `tool_config.toml`. To pre-install them explicitly:
 
 ```bash
 coderev install-deps   # downloads gitleaks + semgrep + madge to ~/.coderev/tools/

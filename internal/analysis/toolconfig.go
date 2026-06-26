@@ -6,16 +6,26 @@ type ToolConfig struct {
 }
 
 type AdaptersConfig struct {
-	TreeSitter TreeSitterConfig    `toml:"treesitter"`
-	Semgrep    ExternalToolConfig  `toml:"semgrep"`
-	Gitleaks   ExternalToolConfig  `toml:"gitleaks"`
-	Madge      ExternalToolConfig  `toml:"madge"`
-	NpmAudit   ExternalToolConfig  `toml:"npmaudit"`
-	Coverage   CoverageConfig      `toml:"coverage"`
-	Custom     []CustomToolConfig  `toml:"custom"`
+	TreeSitter TreeSitterConfig   `toml:"treesitter"`
+	Secrets    NativeToolConfig   `toml:"secrets"`
+	Imports    NativeToolConfig   `toml:"imports"`
+	Semgrep    ExternalToolConfig `toml:"semgrep"`
+	Gitleaks   ExternalToolConfig `toml:"gitleaks"`
+	Madge      ExternalToolConfig `toml:"madge"`
+	NpmAudit   ExternalToolConfig `toml:"npmaudit"`
+	Coverage   CoverageConfig     `toml:"coverage"`
+	Custom     []CustomToolConfig `toml:"custom"`
 }
 
 type TreeSitterConfig struct {
+	Enabled bool     `toml:"enabled"`
+	Rules   []string `toml:"rules"`
+}
+
+// NativeToolConfig configures a pure-Go adapter (no external binary). These are
+// the zero-dependency defaults; the matching ExternalToolConfig adapters
+// (gitleaks/madge/semgrep) are optional enrichment, off by default.
+type NativeToolConfig struct {
 	Enabled bool     `toml:"enabled"`
 	Rules   []string `toml:"rules"`
 }

@@ -20,8 +20,8 @@ type Node struct {
 // finding/severity concerns so later consumers — notably the v1.3.0 code
 // graph — can build on the same structure rather than re-parsing imports.
 type Graph struct {
-	Nodes map[string]*Node            // node ID -> node
-	Edges map[string]map[string]bool  // node ID -> set of imported node IDs
+	Nodes map[string]*Node            // node ID to its node
+	Edges map[string]map[string]bool  // node ID to its set of imported node IDs
 }
 
 // NewGraph returns an empty graph ready for AddNode/AddEdge.
@@ -112,37 +112,52 @@ func (t *tarjan) strongConnect(v string) {
 	t.stack = append(t.stack, v)
 	t.onStack[v] = true
 
-	for _, w := range t.graph.Successors(v) {
-		if _, seen := t.index[w]; !seen {
-			t.strongConnect(w)
-			if t.lowlink[w] < t.lowlink[v] {
-				t.lowlink[v] = t.lowlink[w]
-			}
-		} else if t.onStack[w] {
-			if t.index[w] < t.lowlink[v] {
-				t.lowlink[v] = t.index[w]
-			}
-		}
-	}
+	t.visit(v)
 
-	// v is the root of an SCC: pop it off the stack.
+	// v is the root of an SCC once its lowlink settles back to its own index.
 	if t.lowlink[v] == t.index[v] {
-		var scc []string
-		for {
-			w := t.stack[len(t.stack)-1]
-			t.stack = t.stack[:len(t.stack)-1]
-			t.onStack[w] = false
-			scc = append(scc, w)
-			if w == v {
-				break
-			}
-		}
-		if len(scc) > 1 {
-			// Tarjan pops in reverse discovery order; reverse for readability.
-			for i, j := 0, len(scc)-1; i < j; i, j = i+1, j-1 {
-				scc[i], scc[j] = scc[j], scc[i]
-			}
-			t.cycles = append(t.cycles, scc)
+		t.collectSCC(v)
+	}
+}
+
+// visit relaxes v's lowlink against each successor: recursing into unvisited
+// ones (tree edges) and considering on-stack ones (back edges).
+func (t *tarjan) visit(v string) {
+	for _, w := range t.graph.Successors(v) {
+		switch {
+		case !t.visited(w):
+			t.strongConnect(w)
+			t.lowlink[v] = min(t.lowlink[v], t.lowlink[w])
+		case t.onStack[w]:
+			t.lowlink[v] = min(t.lowlink[v], t.index[w])
 		}
 	}
+}
+
+func (t *tarjan) visited(id string) bool {
+	_, seen := t.index[id]
+	return seen
+}
+
+// collectSCC pops the stack down to v, recording the component as a cycle when
+// it has more than one member.
+func (t *tarjan) collectSCC(v string) {
+	var scc []string
+	for {
+		w := t.stack[len(t.stack)-1]
+		t.stack = t.stack[:len(t.stack)-1]
+		t.onStack[w] = false
+		scc = append(scc, w)
+		if w == v {
+			break
+		}
+	}
+	if len(scc) <= 1 {
+		return
+	}
+	// Tarjan pops in reverse discovery order; reverse for readability.
+	for i, j := 0, len(scc)-1; i < j; i, j = i+1, j-1 {
+		scc[i], scc[j] = scc[j], scc[i]
+	}
+	t.cycles = append(t.cycles, scc)
 }
