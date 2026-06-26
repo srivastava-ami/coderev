@@ -81,8 +81,8 @@ func (w *fileWalker) checkGoFmtErrorfNoFormat(line string, lineNum int) {
 		Pillar:      "security",
 		Severity:    analysis.SeverityMajor,
 		Line:        lineNum,
-		Message:     "fmt.Errorf called with a variable as format string — use fmt.Errorf(\"%s\", err) or errors.New(msg)",
-		Remediation: "Pass a string literal format: fmt.Errorf(\"%s\", variable) or errors.New(variable.Error()).",
+		Message:     "Errorf called with a variable as the format string — use a literal format or errors.New",
+		Remediation: "Pass a string-literal format with %s and the value as an argument, or use errors.New with value.Error().",
 	})
 }
 

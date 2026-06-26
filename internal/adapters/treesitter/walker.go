@@ -13,11 +13,15 @@ type fileWalker struct {
 	file     string
 	lang     analysis.Language
 	stds     analysis.Standards
+	isMain   bool // Go package main — stdout output is legitimate, not a logging bypass
 	findings []analysis.Finding
 }
 
 func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards) *fileWalker {
-	return &fileWalker{def: def, src: fi.Content, file: fi.Path, lang: fi.Language, stds: stds}
+	return &fileWalker{
+		def: def, src: fi.Content, file: fi.Path, lang: fi.Language, stds: stds,
+		isMain: fi.Language == analysis.LangGo && isGoMainPackage(fi.Content),
+	}
 }
 
 // walk is the entry point: runs all checks against the root node.
