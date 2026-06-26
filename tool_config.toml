@@ -43,16 +43,18 @@ rules = ["file_structure.circular_deps", "nx_conventions.boundaries"]
 # if you want its extra depth; it then runs additively and findings are deduped.
 
 [adapters.semgrep]
-enabled = false         # native treesitter walkers now cover the owned rules
-binary  = "semgrep"     # if enabled, must be on $PATH: pip install semgrep
-rules   = ["security.injection.*", "security.auth.*", "security.cryptography"]
-args    = []            # extra args appended to semgrep invocation
+enabled      = false    # native treesitter walkers now cover the owned rules
+binary       = "semgrep" # if enabled, must be on $PATH: pip install semgrep
+rules        = ["security.injection.*", "security.auth.*", "security.cryptography"]
+args         = []       # extra args appended to semgrep invocation
+download_url = "https://github.com/semgrep/semgrep/releases/download/v%s/semgrep-v%s-ubuntu-16.04.tgz"
 
 [adapters.gitleaks]
-enabled = false         # native [adapters.secrets] is the default
-binary  = "gitleaks"    # if enabled: brew install gitleaks
-rules   = ["security.secrets"]
-args    = []
+enabled      = false    # native [adapters.secrets] is the default
+binary       = "gitleaks" # if enabled: brew install gitleaks
+rules        = ["security.secrets"]
+args         = []
+download_url = "https://github.com/gitleaks/gitleaks/releases/download/v%s/gitleaks_%s_%s_%s.tar.gz"
 
 [adapters.madge]
 enabled = false         # native [adapters.imports] is the default
@@ -65,6 +67,11 @@ enabled = true
 binary  = "npm"         # built into Node.js
 rules   = ["security.dependencies"]
 args    = []
+
+# ── SARIF output URLs (configuration, not hardcoded constants) ────────────────
+[sarif]
+schema_url      = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
+information_uri = "https://github.com/srivastava-ami/coderev"
 
 # ── Custom adapters ───────────────────────────────────────────────────────────
 # Any program that outputs NDJSON (one Finding JSON per line) or a JSON array

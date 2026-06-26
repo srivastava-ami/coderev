@@ -87,13 +87,14 @@ func runAnalysis(target string, stds analysis.Standards, tc analysis.ToolConfig,
 	return result, nil
 }
 
-func buildAndWrite(target, stdFile string, stds analysis.Standards, result analysis.RunResult) (report.Report, string, error) {
+func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string, error) {
+	target := s.target
 	base, _ := baseline.Load(target)
 	delta := baseline.Compute(base, result.Findings)
 	r := report.Build(report.BuildRequest{
 		Target:    target,
-		Standards: stds,
-		StdFile:   stdFile,
+		Standards: s.stds,
+		StdFile:   s.stdLabel,
 		Files:     result.Files,
 		Findings:  result.Findings,
 		Warnings:  result.Warnings,
@@ -108,7 +109,7 @@ func buildAndWrite(target, stdFile string, stds analysis.Standards, result analy
 		}
 	}
 	outputPath := resolveOutputPath(flagOutput, flagFormat)
-	if err := generateReport(r, outputPath, flagFormat, flagRepo); err != nil {
+	if err := generateReport(r, outputPath, flagFormat, flagRepo, s.tc.SARIF); err != nil {
 		return report.Report{}, "", fmt.Errorf("generating report: %w", err)
 	}
 	return r, outputPath, nil
@@ -143,12 +144,12 @@ func postAnnotate(r report.Report, target string) error {
 	return nil
 }
 
-func generateReport(r report.Report, outputPath, format, repoURI string) error {
+func generateReport(r report.Report, outputPath, format, repoURI string, sarifCfg analysis.SARIFConfig) error {
 	switch format {
 	case "html":
 		return report.Generate(r, outputPath)
 	case "sarif":
-		return report.GenerateSARIF(r, outputPath, repoURI)
+		return report.GenerateSARIF(r, outputPath, repoURI, sarifCfg)
 	default:
 		return report.GenerateMarkdown(r, outputPath)
 	}

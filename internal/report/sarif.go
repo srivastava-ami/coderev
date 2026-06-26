@@ -11,8 +11,8 @@ import (
 
 // GenerateSARIF writes a SARIF 2.1.0 report to outputPath.
 // GitHub Code Scanning ingests this via the upload-sarif action.
-func GenerateSARIF(r Report, outputPath, repoURI string) error {
-	log := buildSARIFLog(r, repoURI)
+func GenerateSARIF(r Report, outputPath, repoURI string, cfg analysis.SARIFConfig) error {
+	log := buildSARIFLog(r, repoURI, cfg)
 	data, err := json.MarshalIndent(log, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshalling SARIF: %w", err)
@@ -82,17 +82,17 @@ type sarifRegion struct {
 	StartLine int `json:"startLine"`
 }
 
-func buildSARIFLog(r Report, repoURI string) sarifLog {
+func buildSARIFLog(r Report, repoURI string, cfg analysis.SARIFConfig) sarifLog {
 	rules := buildSARIFRules(r.Findings)
 	results := buildSARIFResults(r.Findings, r.Meta.RepoPath)
 	return sarifLog{
-		Schema:  "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
+		Schema:  cfg.SchemaURL,
 		Version: "2.1.0",
 		Runs: []sarifRun{{
 			Tool: sarifTool{Driver: sarifDriver{
 				Name:           "coderev",
 				Version:        "dev",
-				InformationURI: "https://github.com/srivastava-ami/coderev",
+				InformationURI: cfg.InformationURI,
 				Rules:          rules,
 			}},
 			Results: results,
