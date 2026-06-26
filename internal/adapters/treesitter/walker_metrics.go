@@ -7,6 +7,18 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// Fallback complexity thresholds used when the standards config leaves a value
+// unset (zero). They mirror the defaults shipped in the embedded standards.
+const (
+	defaultMaxCyclomatic       = 8  // max cyclomatic complexity before a finding
+	defaultCyclomaticHardBlock = 12 // cyclomatic complexity that hard-blocks
+	defaultCyclomaticAdvisory  = 5  // cyclomatic complexity that raises an advisory
+	defaultMaxCognitive        = 10 // max cognitive complexity before a finding
+	defaultMaxFunctionLines    = 30 // max function length in lines
+	defaultMaxParams           = 3  // max function parameters before a finding
+	functionLengthAdvisoryBand = 10 // lines a function may exceed max and stay advisory
+)
+
 func (w *fileWalker) emitFunctionFindings(s *functionScope, lines int) {
 	loc := fmt.Sprintf("function '%s'", s.name)
 	w.checkCyclomatic(s, loc)
@@ -30,15 +42,15 @@ func (w *fileWalker) testSev(sev analysis.Severity) analysis.Severity {
 func (w *fileWalker) checkCyclomatic(s *functionScope, loc string) {
 	maxCC := w.stds.Complexity.Cyclomatic.MaxValue
 	if maxCC == 0 {
-		maxCC = 8
+		maxCC = defaultMaxCyclomatic
 	}
 	hardBlock := w.stds.Complexity.Cyclomatic.HardBlockAt
 	if hardBlock == 0 {
-		hardBlock = 12
+		hardBlock = defaultCyclomaticHardBlock
 	}
 	advisory := w.stds.Complexity.Cyclomatic.AdvisoryAt
 	if advisory == 0 {
-		advisory = 5
+		advisory = defaultCyclomaticAdvisory
 	}
 
 	switch {
@@ -60,7 +72,7 @@ func (w *fileWalker) checkCyclomatic(s *functionScope, loc string) {
 func (w *fileWalker) checkCognitive(s *functionScope, loc string) {
 	maxCog := w.stds.Complexity.Cognitive.MaxValue
 	if maxCog == 0 {
-		maxCog = 10
+		maxCog = defaultMaxCognitive
 	}
 	if s.cognitive <= maxCog {
 		return
@@ -73,13 +85,13 @@ func (w *fileWalker) checkCognitive(s *functionScope, loc string) {
 func (w *fileWalker) checkFunctionLength(s *functionScope, lines int, loc string) {
 	maxLines := w.stds.Complexity.Function.MaxLines
 	if maxLines == 0 {
-		maxLines = 30
+		maxLines = defaultMaxFunctionLines
 	}
 	if lines <= maxLines {
 		return
 	}
 	sev := w.testSev(analysis.SeverityBlocker)
-	if lines <= maxLines+10 {
+	if lines <= maxLines+functionLengthAdvisoryBand {
 		sev = analysis.SeverityAdvisory
 	}
 	w.emitFinding(analysis.Finding{Rule: "complexity.function_length", Pillar: "complexity", Severity: sev, Line: s.startLine,
@@ -90,7 +102,7 @@ func (w *fileWalker) checkFunctionLength(s *functionScope, lines int, loc string
 func (w *fileWalker) checkParams(s *functionScope, loc string) {
 	maxParams := w.stds.Complexity.Parameters.MaxCount
 	if maxParams == 0 {
-		maxParams = 3
+		maxParams = defaultMaxParams
 	}
 	if s.params <= maxParams {
 		return

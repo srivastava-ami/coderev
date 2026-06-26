@@ -8,15 +8,23 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// Fallback file-structure length limits used when the standards config leaves a
+// value unset (zero). They mirror the defaults shipped in the embedded standards.
+const (
+	defaultMaxFileLines       = 250 // max file length in lines before a blocker
+	defaultFileLengthAdvisory = 150 // file length in lines that raises an advisory
+	defaultMaxClassLines      = 120 // max class/type length in lines before a blocker
+)
+
 func (w *fileWalker) checkFileLength(root *sitter.Node) {
 	lines := int(root.EndPoint().Row) + 1
 	maxL := w.stds.FileStructure.FileLength.MaxLines
 	if maxL == 0 {
-		maxL = 250
+		maxL = defaultMaxFileLines
 	}
 	advisory := w.stds.FileStructure.FileLength.AdvisoryAt
 	if advisory == 0 {
-		advisory = 150
+		advisory = defaultFileLengthAdvisory
 	}
 
 	switch {
@@ -38,7 +46,7 @@ func (w *fileWalker) checkClassLength(node *sitter.Node) {
 
 	maxL := w.stds.FileStructure.ClassLength.MaxLines
 	if maxL == 0 {
-		maxL = 120
+		maxL = defaultMaxClassLines
 	}
 	if lines <= maxL {
 		return

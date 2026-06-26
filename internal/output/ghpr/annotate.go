@@ -15,6 +15,10 @@ import (
 	"github.com/srivastava-ami/coderev/internal/report"
 )
 
+// interCommentDelay paces inline-comment posts to stay under GitHub's inline
+// comment rate limit.
+const interCommentDelay = 150 * time.Millisecond
+
 // AnnotateRequest bundles the parameters for Annotate.
 type AnnotateRequest struct {
 	Report   report.Report
@@ -57,7 +61,7 @@ func (p *commentPoster) postAll(comments []prComment) error {
 	var errs []string
 	for i, c := range comments {
 		if i > 0 {
-			time.Sleep(150 * time.Millisecond) // stay under GitHub's inline comment rate limit
+			time.Sleep(interCommentDelay)
 		}
 		if err := postComment(prPost{repoSlug: p.repoSlug, prNumber: p.prNumber, sha: p.sha, comment: c}); err != nil {
 			errs = append(errs, err.Error())

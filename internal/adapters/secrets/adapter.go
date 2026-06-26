@@ -103,11 +103,16 @@ func newFinding(path string, line int, ruleID, desc, match string) analysis.Find
 
 // maskSecret reveals only the first and last few characters of a match so the
 // report can locate the leak without re-printing the full credential.
+const (
+	maskRevealChars = 4                   // leading/trailing chars kept visible in a masked match
+	maskMinLength   = maskRevealChars * 2 // shortest match long enough to partially reveal
+)
+
 func maskSecret(s string) string {
-	if len(s) <= 8 {
+	if len(s) <= maskMinLength {
 		return "***"
 	}
-	return s[:4] + "***" + s[len(s)-4:]
+	return s[:maskRevealChars] + "***" + s[len(s)-maskRevealChars:]
 }
 
 // isTestFile reports whether a path is a test/spec/fixture file, which the

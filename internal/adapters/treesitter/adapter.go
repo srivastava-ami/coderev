@@ -13,6 +13,10 @@ import (
 
 const adapterName = "treesitter"
 
+// maxConcurrentFileAnalyses bounds how many files are parsed and walked in
+// parallel, capping memory and CPU use on large repositories.
+const maxConcurrentFileAnalyses = 8
+
 // Adapter parses source files with tree-sitter and runs all structural checks.
 // It is the primary analysis engine — no external binaries required.
 type Adapter struct {
@@ -49,7 +53,7 @@ type analyseResult struct {
 
 func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.Finding, error) {
 	results := make(chan analyseResult, len(req.Files))
-	sem := make(chan struct{}, 8)
+	sem := make(chan struct{}, maxConcurrentFileAnalyses)
 
 	var wg sync.WaitGroup
 	for _, fi := range req.Files {

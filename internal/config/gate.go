@@ -9,12 +9,20 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// Default gate thresholds: the maximum number of findings of each severity the
+// gate tolerates before failing. Blockers always fail the gate (limit 0).
+const (
+	defaultMaxMajors     = 5  // max major findings tolerated before the gate fails
+	defaultMaxAdvisories = 10 // max advisory findings tolerated before the gate fails
+	defaultMaxTotal      = 20 // max total findings tolerated before the gate fails
+)
+
 func DefaultGateConfig() analysis.GateConfig {
 	return analysis.GateConfig{
 		Blockers:   0,
-		Majors:     5,
-		Advisories: 10,
-		Total:      20,
+		Majors:     defaultMaxMajors,
+		Advisories: defaultMaxAdvisories,
+		Total:      defaultMaxTotal,
 	}
 }
 

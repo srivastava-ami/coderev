@@ -10,6 +10,15 @@ import (
 	"github.com/srivastava-ami/coderev/internal/plugin"
 )
 
+const (
+	// pluginFilePerm is the permission for an installed plugin manifest file
+	// (owner read/write, group/other read).
+	pluginFilePerm = 0o644
+	// pluginDirPerm is the permission for the plugin config directory
+	// (owner full, group/other read+execute).
+	pluginDirPerm = 0o755
+)
+
 var cmdPlugin = &cobra.Command{
 	Use:   "plugin",
 	Short: "Manage coderev plugins",
@@ -53,7 +62,7 @@ func runPluginInstall(args []string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(dest, data, 0644); err != nil {
+	if err := os.WriteFile(dest, data, pluginFilePerm); err != nil {
 		return err
 	}
 	fmt.Printf("installed plugin: %s (%s)\n", m.Name, m.Version)
@@ -86,7 +95,7 @@ func ensurePluginDir() (string, error) {
 		return "", err
 	}
 	dir := filepath.Join(home, ".config", "coderev", "plugins")
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, pluginDirPerm); err != nil {
 		return "", err
 	}
 	return dir, nil

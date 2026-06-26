@@ -38,6 +38,14 @@ var reDestructureDefault = regexp.MustCompile(
 		"(?:'[^']+'|\"[^\"]+\"|`[^`]+`)",
 )
 
+// Submatch index layout returned by regexp's FindSubmatchIndex family: results
+// are pairs of [start, end) byte offsets. Indices 0/1 span the whole match;
+// 2/3 span capture group 1.
+const (
+	group1Start = 2 // byte-offset index of capture group 1's start
+	group1End   = 3 // byte-offset index of capture group 1's end
+)
+
 // checkInjectionPatterns runs the native ports of coderev's owned semgrep
 // injection/pattern rules. Registered at the end of checkPatterns().
 func (w *fileWalker) checkInjectionPatterns(lines []string) {
@@ -59,13 +67,13 @@ func (w *fileWalker) checkSecretFallbackDestructure(lines []string) {
 	src := strings.Join(lines, "\n")
 	guard := guardMask(lines)
 	for _, outer := range reDestructureEnv.FindAllStringSubmatchIndex(src, -1) {
-		contentStart, contentEnd := outer[2], outer[3]
+		contentStart, contentEnd := outer[group1Start], outer[group1End]
 		if contentStart < 0 {
 			continue
 		}
 		content := src[contentStart:contentEnd]
 		for _, inner := range reDestructureDefault.FindAllStringSubmatchIndex(content, -1) {
-			key := content[inner[2]:inner[3]]
+			key := content[inner[group1Start]:inner[group1End]]
 			if !reSecretKey.MatchString(key) {
 				continue
 			}

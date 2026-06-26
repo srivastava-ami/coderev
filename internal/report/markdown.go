@@ -102,6 +102,10 @@ func writeFindingsTable(b *strings.Builder, findings []analysis.Finding) {
 	b.WriteString("\n")
 }
 
+// maxHotFilesShown caps how many files the heatmap table lists to keep the
+// report readable on repositories with many findings.
+const maxHotFilesShown = 30
+
 func writeFileHeatmap(b *strings.Builder, r Report) {
 	hot := hotFileCount(r.Files)
 	if hot == 0 {
@@ -119,7 +123,7 @@ func writeFileHeatmap(b *strings.Builder, r Report) {
 		fmt.Fprintf(b, "| `%s` | %s | %d | %d | %s |\n",
 			shortenPath(f.Path), f.Language, f.Lines, len(f.Findings), heatBar(f.HeatScore))
 		shown++
-		if shown >= 30 {
+		if shown >= maxHotFilesShown {
 			break
 		}
 	}
