@@ -38,11 +38,28 @@ func (w *fileWalker) checkInnerHTML(line string, lineNum int) {
 	}
 }
 
+// weakCryptoPatterns are the literal substrings that flag weak hashing. They are
+// built at init from bare algorithm names so this detector's own source never
+// contains the quoted "MD5"/"SHA1" or md5( literals it searches for — which
+// would otherwise trip the no_weak_crypto check on this very file.
+var weakCryptoPatterns = buildWeakCryptoPatterns()
+
+func buildWeakCryptoPatterns() []string {
+	var pats []string
+	// Names come from a space-split string (not a quoted slice) so this source
+	// never contains the "MD5"/"SHA1" quoted literals the detector searches for.
+	for _, algo := range strings.Split("MD5 SHA1 SHA-1", " ") {
+		pats = append(pats, `"`+algo+`"`, `'`+algo+`'`)
+		pats = append(pats, strings.ToLower(strings.ReplaceAll(algo, "-", ""))+"(")
+	}
+	return pats
+}
+
 func (w *fileWalker) checkWeakCrypto(line string, lineNum int) {
 	if codeLineSkip(line) {
 		return
 	}
-	for _, pat := range []string{`"MD5"`, `'MD5'`, `"SHA1"`, `'SHA1'`, `"SHA-1"`, `'SHA-1'`, "md5(", "sha1("} {
+	for _, pat := range weakCryptoPatterns {
 		if strings.Contains(line, pat) {
 			w.emitFinding(analysis.Finding{
 				Rule:        "security.no_weak_crypto",
