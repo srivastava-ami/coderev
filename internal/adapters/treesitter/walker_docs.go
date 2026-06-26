@@ -59,12 +59,15 @@ func isTODOAnnotation(text string) bool {
 	return strings.HasPrefix(inner, "TODO")
 }
 
+// Marker that opens an annotation comment requiring a ticket reference.
+const todoKeyword = "TODO"
+
 func todoHasTicket(text string) bool {
 	upper := strings.ToUpper(text)
-	idx := strings.Index(upper, "TODO")
+	idx := strings.Index(upper, todoKeyword)
 	if idx < 0 {
 		return false
 	}
-	after := text[idx+4:]
+	after := text[idx+len(todoKeyword):]
 	return strings.HasPrefix(after, "(#") || strings.Contains(after, "#")
 }

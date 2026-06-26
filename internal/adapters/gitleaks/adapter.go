@@ -86,9 +86,14 @@ func parseGitleaksOutput(data []byte) ([]analysis.Finding, error) {
 	return findings, nil
 }
 
+const (
+	maskRevealChars = 3                   // leading/trailing chars kept visible in a masked secret
+	maskMinLength   = maskRevealChars * 2 // shortest secret long enough to partially reveal
+)
+
 func maskSecret(s string) string {
-	if len(s) <= 6 {
+	if len(s) <= maskMinLength {
 		return "***"
 	}
-	return s[:3] + "***" + s[len(s)-3:]
+	return s[:maskRevealChars] + "***" + s[len(s)-maskRevealChars:]
 }

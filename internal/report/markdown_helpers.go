@@ -20,9 +20,12 @@ func severityIcon(s analysis.Severity) string {
 	}
 }
 
+// heatBarWidth is the number of cells in a rendered heat bar.
+const heatBarWidth = 5
+
 func heatBar(score float64) string {
-	filled := int(score * 5)
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", 5-filled)
+	filled := int(score * heatBarWidth)
+	bar := strings.Repeat("█", filled) + strings.Repeat("░", heatBarWidth-filled)
 	return fmt.Sprintf("`%s`", bar)
 }
 

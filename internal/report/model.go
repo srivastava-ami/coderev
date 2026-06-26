@@ -36,8 +36,8 @@ type Summary struct {
 	TotalFindings int
 	BySeverity    map[string]int
 	ByPillar      map[string]int
-	OverallStatus string           // "PASS" | "FAIL"
-	Delta         *baseline.Delta  // nil when no baseline exists
+	OverallStatus string          // "PASS" | "FAIL"
+	Delta         *baseline.Delta // nil when no baseline exists
 }
 
 type PillarResult struct {
@@ -114,13 +114,21 @@ func buildSummary(files []analysis.FileInfo, findings []analysis.Finding, delta 
 	}
 }
 
+// Pillar reliability-rating thresholds (A best, E worst). A rating drops a band
+// once the count of blockers or majors reaches these limits.
+const (
+	ratingBlockersForE = 5 // blockers at/above this → E
+	ratingBlockersForD = 3 // blockers at/above this → D
+	ratingManyMajors   = 5 // majors at/above this counts as a heavy major load
+)
+
 func pillarRating(blockers, majors int) string {
 	switch {
-	case blockers >= 5:
+	case blockers >= ratingBlockersForE:
 		return "E"
-	case blockers >= 3 || (blockers >= 1 && majors >= 5):
+	case blockers >= ratingBlockersForD || (blockers >= 1 && majors >= ratingManyMajors):
 		return "D"
-	case blockers >= 1 || majors >= 5:
+	case blockers >= 1 || majors >= ratingManyMajors:
 		return "C"
 	case majors >= 2:
 		return "B"

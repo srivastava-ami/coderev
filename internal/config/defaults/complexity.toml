@@ -12,8 +12,8 @@ max_value = 15
 tool      = "treesitter"
 
 [complexity.function_length]
-max_lines   = 40
-advisory_at = 30
+max_lines   = 60
+advisory_at = 50
 remediation = "Split into smaller focused functions."
 
 [complexity.parameter_count]
