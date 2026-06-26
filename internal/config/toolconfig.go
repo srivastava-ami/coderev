@@ -31,20 +31,32 @@ func defaultToolConfig() analysis.ToolConfig {
 		Adapters: analysis.AdaptersConfig{
 			TreeSitter: analysis.TreeSitterConfig{
 				Enabled: true,
-				Rules:   []string{"complexity.*", "file_structure.*", "type_safety.*", "hardcoding.*", "documentation.*", "observability.logging", "stability.error_handling"},
+				Rules:   []string{"complexity.*", "file_structure.*", "type_safety.*", "hardcoding.*", "documentation.*", "observability.logging", "stability.error_handling", "security.secret_fallback_literal"},
 			},
-			Semgrep: analysis.ExternalToolConfig{
+			// Native (pure-Go) defaults — zero external dependencies.
+			Secrets: analysis.NativeToolConfig{
 				Enabled: true,
+				Rules:   []string{"security.secrets"},
+			},
+			Imports: analysis.NativeToolConfig{
+				Enabled: true,
+				Rules:   []string{"file_structure.circular_deps", "nx_conventions.boundaries"},
+			},
+			// External tools are now OPTIONAL enrichment — off by default. Native
+			// adapters above cover the same rules with no binary required. Enable
+			// these in tool_config.toml only for extra depth.
+			Semgrep: analysis.ExternalToolConfig{
+				Enabled: false,
 				Binary:  "semgrep",
 				Rules:   []string{"security.injection.*", "security.auth.*", "security.cryptography"},
 			},
 			Gitleaks: analysis.ExternalToolConfig{
-				Enabled: true,
+				Enabled: false,
 				Binary:  "gitleaks",
 				Rules:   []string{"security.secrets"},
 			},
 			Madge: analysis.ExternalToolConfig{
-				Enabled: true,
+				Enabled: false,
 				Binary:  "madge",
 				Rules:   []string{"file_structure.circular_deps", "nx_conventions.boundaries"},
 			},

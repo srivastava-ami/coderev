@@ -25,21 +25,38 @@ rules = [
 "stability.error_handling",
 ]
 
-[adapters.semgrep]
+# ── Native (pure-Go) adapters — the zero-dependency defaults ──────────────────
+# These replace gitleaks/madge/semgrep with no external binary required.
+
+[adapters.secrets]
 enabled = true
-binary  = "semgrep"     # must be on $PATH: pip install semgrep
+# Native secret scanner (regex rules + Shannon entropy). No binary.
+rules = ["security.secrets"]
+
+[adapters.imports]
+enabled = true
+# Native import-graph + Tarjan circular-dependency detection. No binary.
+rules = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+
+# ── External tools — OPTIONAL enrichment (off by default) ─────────────────────
+# The native adapters above already cover these rules. Enable a tool below only
+# if you want its extra depth; it then runs additively and findings are deduped.
+
+[adapters.semgrep]
+enabled = false         # native treesitter walkers now cover the owned rules
+binary  = "semgrep"     # if enabled, must be on $PATH: pip install semgrep
 rules   = ["security.injection.*", "security.auth.*", "security.cryptography"]
 args    = []            # extra args appended to semgrep invocation
 
 [adapters.gitleaks]
-enabled = true
-binary  = "gitleaks"    # brew install gitleaks
+enabled = false         # native [adapters.secrets] is the default
+binary  = "gitleaks"    # if enabled: brew install gitleaks
 rules   = ["security.secrets"]
 args    = []
 
 [adapters.madge]
-enabled = true
-binary  = "madge"       # npm install -g madge
+enabled = false         # native [adapters.imports] is the default
+binary  = "madge"       # if enabled: npm install -g madge
 rules   = ["file_structure.circular_deps", "nx_conventions.boundaries"]
 args    = []
 

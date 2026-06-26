@@ -7,6 +7,7 @@ package secrets
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
@@ -38,6 +39,12 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 		case <-ctx.Done():
 			return findings, ctx.Err()
 		default:
+		}
+		// Test files are skipped: fixture credentials there are deliberate and
+		// would otherwise be noisy false positives — consistent with the
+		// treesitter walkers. Real secrets belong in non-test source anyway.
+		if isTestFile(fi.Path) {
+			continue
 		}
 		findings = append(findings, scanContent(fi.Path, fi.Content)...)
 	}
@@ -101,4 +108,26 @@ func maskSecret(s string) string {
 		return "***"
 	}
 	return s[:4] + "***" + s[len(s)-4:]
+}
+
+// isTestFile reports whether a path is a test/spec/fixture file, which the
+// scanner skips. Mirrors the treesitter walkers' convention.
+func isTestFile(path string) bool {
+	base := filepath.Base(path)
+	for _, suffix := range []string{
+		"_test.go", "_test.rs", "_test.py",
+		".spec.ts", ".test.ts", ".spec.tsx", ".test.tsx",
+		".spec.js", ".test.js",
+	} {
+		if strings.HasSuffix(base, suffix) {
+			return true
+		}
+	}
+	normalized := filepath.ToSlash(path)
+	for _, segment := range []string{"e2e", "__tests__", "test", "tests", "fixtures", "testdata"} {
+		if strings.Contains(normalized, "/"+segment+"/") || strings.HasPrefix(normalized, segment+"/") {
+			return true
+		}
+	}
+	return false
 }

@@ -145,7 +145,7 @@ func TestPackageImport_Excluded(t *testing.T) {
 	if len(g.Cycles()) != 0 {
 		t.Fatalf("expected no cycle, got %v", g.Cycles())
 	}
-	// a -> b is the only internal edge; react is dropped.
+	// a imports b is the only internal edge; react is dropped.
 	total := 0
 	for _, succ := range g.Edges {
 		total += len(succ)

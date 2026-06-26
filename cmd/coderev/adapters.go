@@ -8,9 +8,11 @@ import (
 
 	coverage "github.com/srivastava-ami/coderev/internal/adapters/coverage"
 	gitleaks "github.com/srivastava-ami/coderev/internal/adapters/gitleaks"
+	importsadapter "github.com/srivastava-ami/coderev/internal/adapters/imports"
 	madge "github.com/srivastava-ami/coderev/internal/adapters/madge"
 	npmaudit "github.com/srivastava-ami/coderev/internal/adapters/npmaudit"
 	script "github.com/srivastava-ami/coderev/internal/adapters/script"
+	secrets "github.com/srivastava-ami/coderev/internal/adapters/secrets"
 	semgrep "github.com/srivastava-ami/coderev/internal/adapters/semgrep"
 	tsadapter "github.com/srivastava-ami/coderev/internal/adapters/treesitter"
 	"github.com/srivastava-ami/coderev/internal/analysis"
@@ -21,6 +23,15 @@ func buildAdapters(stds analysis.Standards, tc analysis.ToolConfig) []analysis.T
 	var ads []analysis.ToolAdapter
 	if tc.Adapters.TreeSitter.Enabled {
 		ads = append(ads, tsadapter.New(stds))
+	}
+	// Native (pure-Go) adapters — the zero-dependency defaults. They run first so
+	// their findings take precedence; any enabled external tool below is additive
+	// enrichment, deduped by the runner.
+	if tc.Adapters.Secrets.Enabled {
+		ads = append(ads, secrets.New())
+	}
+	if tc.Adapters.Imports.Enabled {
+		ads = append(ads, importsadapter.New())
 	}
 	if tc.Adapters.Semgrep.Enabled {
 		ads = append(ads, semgrep.New(resolveTool("semgrep", tc.Adapters.Semgrep.Binary)))

@@ -19,7 +19,8 @@ The result: code that passes TypeScript's type checker and looks fine in a diff 
 **Design constraints that drove every decision:**
 
 - **No LLM at runtime.** Analysis is deterministic, reproducible, and costs nothing to run. The same repo scanned twice gives the same findings.
-- **No server, no network.** Everything runs locally. External scanners (gitleaks, semgrep, madge) run as subprocesses — they are never remote calls.
+- **No server, no network.** Everything runs locally.
+- **Zero external dependencies by default.** Every check ships as pure-Go: secret scanning, circular-dependency detection, and the owned injection rules are all native (no gitleaks/madge/semgrep binary required). The subprocess adapters remain as **optional** enrichment — off by default, enabled only for extra depth in `tool_config.toml`.
 - **Standards live in git.** The `code_review_standards.toml` is committed alongside the code. Every rule change is a pull request. Every exception is tracked with a justification and expiry date.
 - **One binary, zero setup.** Built-in defaults are embedded in the binary. A fresh clone can be scanned with `coderev .` — no config file required.
 
@@ -50,11 +51,15 @@ coderev [target]
     │      in --diff mode: DiffService.ChangedFiles() filters to changed files
     │
     ├─ 5. Run adapters in parallel
+    │      native (pure-Go, always on — the zero-dependency defaults):
     │       ├─ treesitter  →  AST-based: 55 rules across TS/JS/Go/Python/Rust
-    │       ├─ semgrep     →  OWASP injection / auth / crypto          (if installed)
-    │       ├─ gitleaks    →  secret scanning                          (if installed)
-    │       ├─ madge       →  circular deps, NX boundaries             (if installed)
-    │       ├─ npmaudit    →  vulnerable npm packages                  (if npm present)
+    │       ├─ secrets     →  native secret scan: regex rules + entropy
+    │       ├─ imports     →  native import graph + Tarjan circular deps, NX boundaries
+    │      optional external enrichment (off by default; deduped if enabled):
+    │       ├─ semgrep     →  wider OWASP injection / auth / crypto     (opt-in)
+    │       ├─ gitleaks    →  extra secret rules                        (opt-in)
+    │       ├─ madge       →  circular deps cross-check                 (opt-in)
+    │       ├─ npmaudit    →  vulnerable npm packages                   (if npm present)
     │       ├─ coverage    →  line coverage threshold                  (if report file exists)
     │       ├─ custom[*]   →  any NDJSON-emitting binary               (if configured)
     │       └─ plugins[*]  →  registered plugin binaries               (if installed)
@@ -137,7 +142,7 @@ type ToolAdapter interface {
 }
 ```
 
-Every scanner — tree-sitter, semgrep, gitleaks, madge, coverage — implements this. Nothing else in the codebase cares which tools are installed or how many. Adding a new tool means implementing four methods and wiring it in `cmd/coderev/adapters.go`.
+Every scanner — the native ones (tree-sitter, secrets, imports) and the optional external ones (semgrep, gitleaks, madge, coverage) — implements this identical port. Nothing else in the codebase cares which tools are installed or how many; native adapters simply return `IsAvailable() == true` unconditionally. Adding a new tool means implementing four methods and wiring it in `cmd/coderev/adapters.go`.
 
 For tools that emit NDJSON output, no Go is needed at all — the `script` adapter bridges any external binary via `tool_config.toml`.
 
@@ -155,11 +160,16 @@ The majority of rules are satisfied by tree-sitter running in-process (pure Go /
 
 **Rust:** `.unwrap()`, `panic!()`, `.expect()`, `unsafe { }` blocks, `transmute`, `.clone()` on copy types, `todo!()` / `unimplemented!()`, `dbg!()` macro.
 
-External adapters cover what tree-sitter cannot: secret scanning (gitleaks), OWASP injection patterns (semgrep), dependency CVEs (npm audit), circular imports (madge).
+Two more pure-Go adapters cover what tree-sitter doesn't, with **no external binary**:
+
+- **`secrets`** — native secret scanner: named regex rules (AWS keys, JWTs, PEM private keys, GitHub/Slack tokens) plus a Shannon-entropy heuristic gated on secret-ish assignment names. Skips test files. Default provider for `security.secrets`.
+- **`imports`** — native import-graph builder with Tarjan strongly-connected-component detection for circular dependencies and NX boundary checks. Its exported `BuildGraph()` is the substrate the v1.3.0 code graph builds on. Default provider for `file_structure.circular_deps` and `nx_conventions.boundaries`.
+
+The remaining external adapters (gitleaks, semgrep, madge) are **optional enrichment** — the native adapters already cover their rules, so they are disabled by default and only add depth when explicitly enabled. Dependency-CVE scanning (`npmaudit`) is the one check still external, pending the embedded-OSV native replacement in v1.2.0.
 
 ### Tool Manager (auto-install)
 
-External scanners (gitleaks, semgrep, madge) are automatically downloaded on first scan via `internal/toolmgr/`. Tools are stored in `~/.coderev/tools/` — user-scoped, no sudo, clean uninstall by removing the directory.
+The native adapters need **no installation** — they are compiled into the binary. The Tool Manager only matters for the **optional** external scanners (gitleaks, semgrep, madge): when one is explicitly enabled in `tool_config.toml`, it is automatically downloaded on first scan via `internal/toolmgr/`. Tools are stored in `~/.coderev/tools/` — user-scoped, no sudo, clean uninstall by removing the directory.
 
 | Tool | Install strategy | Download source |
 |---|---|---|

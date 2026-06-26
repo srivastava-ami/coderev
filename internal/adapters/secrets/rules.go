@@ -25,7 +25,7 @@ var patternRules = []patternRule{
 		id:   "jwt",
 		desc: "JSON Web Token",
 		// header.payload.signature, where header and payload are base64url of a
-		// JSON object beginning "{\"" -> starts "eyJ".
+		// JSON object whose leading bytes encode to the prefix eyJ.
 		re: regexp.MustCompile(`\beyJ[A-Za-z0-9_-]{6,}\.eyJ[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]{6,}\b`),
 	},
 	{

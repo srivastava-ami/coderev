@@ -35,7 +35,7 @@ var (
 // the analysis target so package and alias imports resolve correctly.
 type resolver struct {
 	target    string
-	index     map[string]*analysis.FileInfo // canonical path -> file
+	index     map[string]*analysis.FileInfo // canonical path to file
 	goModule  string                        // module path from go.mod (may be "")
 	tsBaseURL string                        // absolute baseUrl from tsconfig
 	tsPaths   map[string][]string           // tsconfig compilerOptions.paths
@@ -247,44 +247,4 @@ func (r *resolver) loadTSConfig() {
 	}
 }
 
-// stripJSONComments removes // line and /* */ block comments so JSONC-style
-// tsconfig files parse with encoding/json. String literals are respected.
-func stripJSONComments(data []byte) []byte {
-	var out []byte
-	inString, inLine, inBlock := false, false, false
-	for i := 0; i < len(data); i++ {
-		c := data[i]
-		switch {
-		case inLine:
-			if c == '\n' {
-				inLine = false
-				out = append(out, c)
-			}
-		case inBlock:
-			if c == '*' && i+1 < len(data) && data[i+1] == '/' {
-				inBlock = false
-				i++
-			}
-		case inString:
-			out = append(out, c)
-			if c == '\\' && i+1 < len(data) {
-				out = append(out, data[i+1])
-				i++
-			} else if c == '"' {
-				inString = false
-			}
-		case c == '"':
-			inString = true
-			out = append(out, c)
-		case c == '/' && i+1 < len(data) && data[i+1] == '/':
-			inLine = true
-			i++
-		case c == '/' && i+1 < len(data) && data[i+1] == '*':
-			inBlock = true
-			i++
-		default:
-			out = append(out, c)
-		}
-	}
-	return out
-}
+// JSONC comment stripping lives in jsonc.go.

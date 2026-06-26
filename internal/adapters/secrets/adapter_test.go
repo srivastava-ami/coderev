@@ -134,7 +134,7 @@ func TestDetectsGenericHighEntropyToken(t *testing.T) {
 // ── Negative fixtures (must NOT flag) ─────────────────────────────────────
 
 func TestIgnoresUUID(t *testing.T) {
-	// Secret-ish key name, but the value is a UUID -> must not flag.
+	// Secret-ish key name, but the value is a UUID, so it must not flag.
 	src := `const apiKey = "550e8400-e29b-41d4-a716-446655440000";`
 	if hasAnySecret(findingsFor(t, "ids.ts", src)) {
 		t.Fatal("must NOT flag a UUID value")
@@ -163,7 +163,7 @@ func TestIgnoresLowEntropyValue(t *testing.T) {
 }
 
 func TestIgnoresNonSecretKeyName(t *testing.T) {
-	// High-entropy value, but the key is not secret-ish -> generic rule skips.
+	// High-entropy value, but the key is not secret-ish, so the generic rule skips.
 	src := `const requestId = "x8Kf3jQ9pLm2Wz7vN4tR6yB1cD5eH0gAaSdFgHj";`
 	if hasAnySecret(findingsFor(t, "trace.ts", src)) {
 		t.Fatal("must NOT flag a high-entropy value behind a non-secret key name")
