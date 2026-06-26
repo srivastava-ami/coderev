@@ -54,4 +54,4 @@ jobs:
 
           gh pr create --base main --head dev \
             --title "Promote dev → main" \
-            --body "$(printf 'Automated promotion of **dev** to **main**.\n\n- Reviewed by the latest coderev (see the *coderev scan* check + inline annotations on the diff)\n- Auto-merges (rebase) once required checks pass\n- On merge: auto-tagged and released\n\n> The version bump is parsed from this PR title by auto-tag.yml — edit the title (e.g. add the target version) if you need a specific bump.')"
+            --body "$(printf 'Automated promotion of **dev** to **main**.\n\n- Reviewed by the latest coderev (see the *coderev scan* check + inline annotations on the diff)\n- Auto-merges (rebase) once required checks pass\n- On merge: auto-tagged and released\n\n**Version bump** is parsed from this PR title by auto-tag.yml — edit the title to control it:\n- **major** → a conventional `type!:` prefix (e.g. `feat!:`), `BREAKING CHANGE`, or the word `major`\n- **minor** → a feature word: add / new rule / feature / support / introduce / implement\n- **patch** → anything else (fixes, chores, docs)')"
