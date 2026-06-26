@@ -1,0 +1,20 @@
+# coderev self-scan exceptions (dogfooding).
+#
+# These suppress findings on coderev's OWN source where the rule fires correctly
+# but the flagged code is legitimate and must stay. Scoped to full repo-relative
+# paths (suffix-anchored at a separator), so they only ever match coderev's own
+# files — a consumer repo would need the exact same path to be affected.
+# Group-A detector self-flags (sql_string_concat, no_weak_crypto) were fixed in
+# code rather than excepted; only the irreducible hardcoded-URL constants are here.
+
+[[exceptions]]
+rule           = "hardcoding.urls_and_paths"
+file_or_module = "internal/report/sarif.go"
+justification  = "SARIF 2.1.0 $schema and the tool InformationURI are protocol-required constants and must be hardcoded to emit valid SARIF."
+approved_by    = "srivastava-ami"
+
+[[exceptions]]
+rule           = "hardcoding.urls_and_paths"
+file_or_module = "internal/toolmgr/toolmgr.go"
+justification  = "Pinned GitHub release-download URL templates for the optional external tools; hardcoding the release source is intentional."
+approved_by    = "srivastava-ami"
