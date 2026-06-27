@@ -62,105 +62,24 @@ func isSourceExt(ext string) bool {
 	return ok
 }
 
+func isIgnoredDir(base string) bool {
+	return base == "node_modules" || base == ".git" || base == "dist" || base == "build" ||
+		base == ".nx" || base == "coverage" || base == ".cache" || base == "vendor" ||
+		base == "__pycache__" || base == "target" || base == ".cargo"
+}
+
 // Build walks target, builds the code graph from source files.
 func Build(target string) (*Graph, error) {
-	var fis []analysis.FileInfo
-	if err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			base := d.Name()
-			if base == "node_modules" || base == ".git" || base == "dist" || base == "build" ||
-				base == ".nx" || base == "coverage" || base == ".cache" || base == "vendor" ||
-				base == "__pycache__" || base == "target" || base == ".cargo" {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		ext := filepath.Ext(path)
-		lang, ok := analysis.ExtToLanguage[ext]
-		if !ok {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		fis = append(fis, analysis.FileInfo{
-			Path:     path,
-			Language: lang,
-			Lines:    strings.Count(string(content), "\n") + 1,
-			Content:  content,
-		})
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("walking target: %w", err)
+	fis, err := walkSourceFiles(target)
+	if err != nil {
+		return nil, err
 	}
-
 	if len(fis) == 0 {
-		return &Graph{
-			FanIn:      make(map[string]int),
-			FanOut:     make(map[string]int),
-			Centrality: make(map[string]float64),
-		}, nil
+		return emptyGraph(), nil
 	}
-
-	// Reuse imports.BuildGraph for file-level import edges.
-	req := analysis.RunRequest{Target: target, Files: fis}
-	ig := imports.BuildGraph(req)
-
-	g := &Graph{
-		FanIn:      make(map[string]int),
-		FanOut:     make(map[string]int),
-		Centrality: make(map[string]float64),
-	}
-
-	// File nodes.
-	for id, n := range ig.Nodes {
-		g.Nodes = append(g.Nodes, Node{
-			ID:         id,
-			Label:      filepath.Base(n.Path),
-			Kind:       KindFile,
-			SourceFile: n.Path,
-		})
-	}
-
-	// Import edges.
-	for from, targets := range ig.Edges {
-		for to := range targets {
-			g.Edges = append(g.Edges, Edge{Source: from, Target: to, Relation: "imports"})
-		}
-	}
-
-	// Function / type extraction via tree-sitter.
-	parser := sitter.NewParser()
-	allFuncs := make(map[string]funcExtract)
-
-	for _, fi := range fis {
-		fileID := cleanPath(fi.Path)
-		ext := filepath.Ext(fi.Path)
-		cfg, ok := langConfigs[fi.Language]
-		if !ok {
-			continue
-		}
-		if cfg == nil {
-			continue
-		}
-		// Use TSX grammar for .tsx files.
-		if ext == ".tsx" {
-			cfg = tsxCfg
-		}
-		parser.SetLanguage(cfg.grammar)
-		tree := parser.Parse(nil, fi.Content)
-		if tree == nil {
-			continue
-		}
-		extractDeclarations(g, tree.RootNode(), fi, cfg, fileID, allFuncs)
-	}
-
-	detectCalls(g, allFuncs)
-
+	g := buildImportGraph(target, fis)
+	funcs := extractDeclarationsFromFiles(g, fis)
+	detectCalls(g, funcs)
 	return g, nil
 }
 
@@ -171,49 +90,57 @@ type funcExtract struct {
 	content    []byte
 }
 
+type declContext struct {
+	g      *Graph
+	fi     analysis.FileInfo
+	cfg    *langCfg
+	fileID string
+	funcs  map[string]funcExtract
+}
+
 // extractDeclarations walks the AST and registers function/type nodes.
-func extractDeclarations(g *Graph, node *sitter.Node, fi analysis.FileInfo, cfg *langCfg, fileID string, funcs map[string]funcExtract) {
+func extractDeclarations(ctx *declContext, node *sitter.Node) {
 	t := node.Type()
 
-	if contains(cfg.funcTypes, t) {
-		name := funcName(node, fi.Content)
+	if contains(ctx.cfg.funcTypes, t) {
+		name := funcName(node, ctx.fi.Content)
 		if name != "" {
-			nodeID := fileID + ":" + name
-			addNodeUnique(g, Node{
+			nodeID := ctx.fileID + ":" + name
+			addNodeUnique(ctx.g, Node{
 				ID:         nodeID,
 				Label:      name,
 				Kind:       KindFunction,
-				SourceFile: fi.Path,
+				SourceFile: ctx.fi.Path,
 			})
-			g.Edges = append(g.Edges, Edge{Source: fileID, Target: nodeID, Relation: "contains"})
-			funcs[nodeID] = funcExtract{
-				fileID:     fileID,
+			ctx.g.Edges = append(ctx.g.Edges, Edge{Source: ctx.fileID, Target: nodeID, Relation: "contains"})
+			ctx.funcs[nodeID] = funcExtract{
+				fileID:     ctx.fileID,
 				startBytes: node.StartByte(),
 				endBytes:   node.EndByte(),
-				content:    fi.Content,
+				content:    ctx.fi.Content,
 			}
 		}
 	}
 
-	if contains(cfg.typeTypes, t) {
-		names := typeNames(node, fi.Content)
+	if contains(ctx.cfg.typeTypes, t) {
+		names := typeNames(node, ctx.fi.Content)
 		for _, name := range names {
 			if name == "" {
 				continue
 			}
-			nodeID := fileID + ":" + name
-			addNodeUnique(g, Node{
+			nodeID := ctx.fileID + ":" + name
+			addNodeUnique(ctx.g, Node{
 				ID:         nodeID,
 				Label:      name,
 				Kind:       KindType,
-				SourceFile: fi.Path,
+				SourceFile: ctx.fi.Path,
 			})
-			g.Edges = append(g.Edges, Edge{Source: fileID, Target: nodeID, Relation: "contains"})
+			ctx.g.Edges = append(ctx.g.Edges, Edge{Source: ctx.fileID, Target: nodeID, Relation: "contains"})
 		}
 	}
 
 	for i := 0; i < int(node.NamedChildCount()); i++ {
-		extractDeclarations(g, node.NamedChild(i), fi, cfg, fileID, funcs)
+		extractDeclarations(ctx, node.NamedChild(i))
 	}
 }
 
@@ -279,6 +206,111 @@ func addNodeUnique(g *Graph, n Node) {
 		}
 	}
 	g.Nodes = append(g.Nodes, n)
+}
+
+func walkSourceFiles(target string) ([]analysis.FileInfo, error) {
+	var fis []analysis.FileInfo
+	if err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if d.IsDir() {
+			if isIgnoredDir(d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		ext := filepath.Ext(path)
+		lang, ok := analysis.ExtToLanguage[ext]
+		if !ok {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		fis = append(fis, analysis.FileInfo{
+			Path:     path,
+			Language: lang,
+			Lines:    strings.Count(string(content), "\n") + 1,
+			Content:  content,
+		})
+		return nil
+	}); err != nil {
+		return nil, fmt.Errorf("walking target: %w", err)
+	}
+	return fis, nil
+}
+
+func emptyGraph() *Graph {
+	return &Graph{
+		FanIn:      make(map[string]int),
+		FanOut:     make(map[string]int),
+		Centrality: make(map[string]float64),
+	}
+}
+
+func buildImportGraph(target string, fis []analysis.FileInfo) *Graph {
+	req := analysis.RunRequest{Target: target, Files: fis}
+	ig := imports.BuildGraph(req)
+
+	g := &Graph{
+		FanIn:      make(map[string]int),
+		FanOut:     make(map[string]int),
+		Centrality: make(map[string]float64),
+	}
+
+	for id, n := range ig.Nodes {
+		g.Nodes = append(g.Nodes, Node{
+			ID:         id,
+			Label:      filepath.Base(n.Path),
+			Kind:       KindFile,
+			SourceFile: n.Path,
+		})
+	}
+
+	for from, targets := range ig.Edges {
+		for to := range targets {
+			g.Edges = append(g.Edges, Edge{Source: from, Target: to, Relation: "imports"})
+		}
+	}
+
+	return g
+}
+
+func extractDeclarationsFromFiles(g *Graph, fis []analysis.FileInfo) map[string]funcExtract {
+	parser := sitter.NewParser()
+	funcs := make(map[string]funcExtract)
+
+	for _, fi := range fis {
+		fileID := cleanPath(fi.Path)
+		ext := filepath.Ext(fi.Path)
+		cfg, ok := langConfigs[fi.Language]
+		if !ok {
+			continue
+		}
+		if cfg == nil {
+			continue
+		}
+		if ext == ".tsx" {
+			cfg = tsxCfg
+		}
+		parser.SetLanguage(cfg.grammar)
+		tree := parser.Parse(nil, fi.Content)
+		if tree == nil {
+			continue
+		}
+		ctx := &declContext{
+			g:      g,
+			fi:     fi,
+			cfg:    cfg,
+			fileID: fileID,
+			funcs:  funcs,
+		}
+		extractDeclarations(ctx, tree.RootNode())
+	}
+
+	return funcs
 }
 
 func contains(haystack []string, needle string) bool {
