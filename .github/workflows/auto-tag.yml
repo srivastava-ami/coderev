@@ -44,18 +44,29 @@ jobs:
           echo "Current tag: $LATEST"
           echo "PR title: $PR_TITLE"
 
-          # MAJOR — a conventional `type!:` / `type(scope)!:` prefix, or an uppercase
-          # "BREAKING CHANGE" footer. Case-sensitive and anchored so a prose mention
-          # (e.g. "add major bump" in a ci commit) does NOT trigger a major release.
-          if echo "$SIGNAL" | grep -qE '^[a-z]+(\([^)]+\))?!:' \
-             || echo "$SIGNAL" | grep -qE '^BREAKING[ -]CHANGE:'; then
-            NEXT="v$((MAJOR + 1)).0.0"
-          # MINOR — any `feat:` / `feat(scope):` commit.
-          elif echo "$SIGNAL" | grep -qE '^feat(\([^)]+\))?:'; then
-            NEXT="v${MAJOR}.$((MINOR + 1)).0"
-          # PATCH — everything else (fix / chore / docs / ci).
+          # Conventional signals (anchored + case-sensitive so prose mentions in a
+          # commit body cannot misfire): `type!:` / `BREAKING CHANGE:` = breaking,
+          # `feat:` / `feat(scope):` = feature.
+          BREAKING=false; FEATURE=false
+          echo "$SIGNAL" | grep -qE '^[a-z]+(\([^)]+\))?!:' && BREAKING=true
+          echo "$SIGNAL" | grep -qE '^BREAKING[ -]CHANGE:'       && BREAKING=true
+          echo "$SIGNAL" | grep -qE '^feat(\([^)]+\))?:'         && FEATURE=true
+
+          if [ "$MAJOR" -eq 0 ]; then
+            # Pre-1.0 (0.x): per SemVer anything may change. A feature OR a breaking
+            # change bumps the minor (0.x -> 0.(x+1)); fixes bump the patch. 1.0.0 is a
+            # deliberate manual milestone — NEVER auto-promoted out of 0.x.
+            if [ "$BREAKING" = true ] || [ "$FEATURE" = true ]; then
+              NEXT="v0.$((MINOR + 1)).0"
+            else
+              NEXT="v0.${MINOR}.$((PATCH + 1))"
+            fi
           else
-            NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+            # 1.x and beyond: standard SemVer.
+            if   [ "$BREAKING" = true ]; then NEXT="v$((MAJOR + 1)).0.0"
+            elif [ "$FEATURE"  = true ]; then NEXT="v${MAJOR}.$((MINOR + 1)).0"
+            else                              NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
+            fi
           fi
 
           echo "Next tag: $NEXT"
