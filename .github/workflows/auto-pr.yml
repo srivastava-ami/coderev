@@ -52,6 +52,25 @@ jobs:
             exit 0
           fi
 
+          # Derive the release bump from the dev commits since the last tag and
+          # encode it in the PR title — so versioning is fully automatic (no
+          # hand-typed title) and lands correctly whether auto-tag reads the title
+          # or the commits.
+          LATEST=$(git tag -l 'v*.*.*' --sort=-version:refname | head -1)
+          if [ -n "$LATEST" ] && git rev-parse "$LATEST" >/dev/null 2>&1; then
+            COMMITS=$(git log "${LATEST}..HEAD" --format='%s%n%b')
+          else
+            COMMITS=$(git log --format='%s%n%b')
+          fi
+          if echo "$COMMITS" | grep -qE '^[a-z]+(\([^)]+\))?!:' || echo "$COMMITS" | grep -qE '^BREAKING[ -]CHANGE:'; then
+            TITLE="Promote dev → main — breaking change release"
+          elif echo "$COMMITS" | grep -qE '^feat(\([^)]+\))?:'; then
+            TITLE="Promote dev → main — feature release"
+          else
+            TITLE="Promote dev → main — patch release"
+          fi
+          echo "Computed title (drives the version bump): $TITLE"
+
           gh pr create --base main --head dev \
-            --title "Promote dev → main" \
-            --body "$(printf 'Automated promotion of **dev** to **main**.\n\n- Reviewed by the latest coderev (see the *coderev scan* check + inline annotations on the diff)\n- Auto-merges (rebase) once required checks pass\n- On merge: auto-tagged and released\n\n**Version bump** is parsed from this PR title by auto-tag.yml — edit the title to control it:\n- **major** → a conventional `type!:` prefix (e.g. `feat!:`), `BREAKING CHANGE`, or the word `major`\n- **minor** → a feature word: add / new rule / feature / support / introduce / implement\n- **patch** → anything else (fixes, chores, docs)')"
+            --title "$TITLE" \
+            --body "$(printf 'Automated promotion of **dev** to **main**.\n\n- Reviewed by the latest coderev (see the *coderev scan* check + inline annotations on the diff)\n- Auto-merges (rebase) once required checks pass\n- On merge: auto-tagged and released\n\n**Version bump is automatic** — derived from the dev commit history since the last tag:\n- **major** → a `type!:` commit (e.g. `feat!:`) or `BREAKING CHANGE`\n- **minor** → any `feat:` / `feat(scope):` commit\n- **patch** → everything else (fix / chore / docs / ci)\n\nThe title above is generated to match; no need to edit it.')"

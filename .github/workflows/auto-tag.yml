@@ -32,21 +32,28 @@ jobs:
           MINOR=$(echo "$LATEST" | cut -d. -f2)
           PATCH=$(echo "$LATEST" | cut -d. -f3)
 
-          MSG="$PR_TITLE"
-          echo "PR title: $MSG"
+          # Version signal = the commit messages merged since the last tag, PLUS the
+          # PR title. Conventional-commit prefixes drive the bump, so versioning is
+          # automatic and does not depend on a hand-typed PR title.
+          if git rev-parse "$LATEST" >/dev/null 2>&1; then
+            COMMITS=$(git log "${LATEST}..HEAD" --format='%s%n%b')
+          else
+            COMMITS=$(git log --format='%s%n%b')
+          fi
+          SIGNAL=$(printf '%s\n%s\n' "$PR_TITLE" "$COMMITS")
           echo "Current tag: $LATEST"
+          echo "PR title: $PR_TITLE"
 
-          # MAJOR — explicit breaking-change signal only (deliberately distinct from
-          # the broad minor keywords): a conventional `type!:` / `type(scope)!:`
-          # prefix, "BREAKING CHANGE", or the word "major". Checked first so it
-          # wins over a feature keyword in the same title.
-          if echo "$MSG" | grep -qE '^[a-z]+(\([^)]+\))?!:' \
-             || echo "$MSG" | grep -qiE 'breaking[ -]?change|\bmajor\b'; then
+          # MAJOR — a conventional `type!:` / `type(scope)!:` prefix, or an uppercase
+          # "BREAKING CHANGE" footer. Case-sensitive and anchored so a prose mention
+          # (e.g. "add major bump" in a ci commit) does NOT trigger a major release.
+          if echo "$SIGNAL" | grep -qE '^[a-z]+(\([^)]+\))?!:' \
+             || echo "$SIGNAL" | grep -qE '^BREAKING[ -]CHANGE:'; then
             NEXT="v$((MAJOR + 1)).0.0"
-          # MINOR — a feature / addition.
-          elif echo "$MSG" | grep -qiE '\b(add|new rule|feature|support|introduce|implement)\b'; then
+          # MINOR — any `feat:` / `feat(scope):` commit.
+          elif echo "$SIGNAL" | grep -qE '^feat(\([^)]+\))?:'; then
             NEXT="v${MAJOR}.$((MINOR + 1)).0"
-          # PATCH — everything else (fixes, chores, docs).
+          # PATCH — everything else (fix / chore / docs / ci).
           else
             NEXT="v${MAJOR}.${MINOR}.$((PATCH + 1))"
           fi
