@@ -28,6 +28,11 @@ rules = [
 # ── Native (pure-Go) adapters — the zero-dependency defaults ──────────────────
 # These replace gitleaks/madge/semgrep with no external binary required.
 
+[adapters.depcve]
+enabled      = true
+snapshot_url = ""
+rules        = ["security.dependencies"]
+
 [adapters.secrets]
 enabled = true
 # Native secret scanner (regex rules + Shannon entropy). No binary.
