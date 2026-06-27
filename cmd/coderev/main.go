@@ -62,7 +62,7 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 	root.Flags().StringVar(&flagGate, "gate", "", "path to .coderev-gate.toml for quality gate check")
 	root.Flags().StringVar(&flagPluginDir, "plugin-dir", "", "custom plugin directory (default: ~/.config/coderev/plugins)")
 
-	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps, cmdPlugin)
+	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps, cmdPlugin, cmdGraph)
 
 	if err := root.Execute(); err != nil {
 		os.Exit(1)
