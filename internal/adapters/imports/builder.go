@@ -1,6 +1,10 @@
 package imports
 
-import "github.com/srivastava-ami/coderev/internal/analysis"
+import (
+	"os"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
+)
 
 // fileData is the lightweight per-file record kept by Builder after Add
 // extracts import specifiers from the file's content. Content is NOT retained.
@@ -26,12 +30,21 @@ func NewBuilder(target string) *Builder {
 
 // Add extracts import specifiers from f and stores only the lightweight
 // metadata needed for Build. f.Content is referenced during Add and NOT
-// retained after this method returns.
+// retained after this method returns. When f.Content is nil, the file is
+// read from disk via os.ReadFile (errors treated as empty/skip).
 func (b *Builder) Add(f analysis.FileInfo) {
+	content := f.Content
+	if content == nil {
+		var err error
+		content, err = os.ReadFile(f.Path)
+		if err != nil {
+			content = nil
+		}
+	}
 	b.files = append(b.files, fileData{
 		path:        f.Path,
 		language:    f.Language,
-		importSpecs: extractImports(f),
+		importSpecs: extractImports(analysis.FileInfo{Content: content, Language: f.Language}),
 	})
 }
 
