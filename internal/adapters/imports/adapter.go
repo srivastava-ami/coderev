@@ -38,25 +38,11 @@ func (a *Adapter) Capabilities() []string {
 //
 //	func BuildGraph(req analysis.RunRequest) *Graph
 func BuildGraph(req analysis.RunRequest) *Graph {
-	r := newResolver(req)
-	g := NewGraph()
-
+	b := NewBuilder(req.Target)
 	for _, f := range req.Files {
-		g.AddNode(clean(f.Path), f.Path, f.Language)
+		b.Add(f)
 	}
-	for _, f := range req.Files {
-		from := clean(f.Path)
-		for _, spec := range extractImports(f) {
-			targets, ok := r.resolve(f.Path, spec, f.Language)
-			if !ok {
-				continue
-			}
-			for _, to := range targets {
-				g.AddEdge(from, to)
-			}
-		}
-	}
-	return g
+	return b.Build()
 }
 
 // Run builds the import graph and emits one blocker finding per detected cycle.
