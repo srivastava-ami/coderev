@@ -1,9 +1,8 @@
 package plugin
 
 import (
-	"os"
+	"io/fs"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
@@ -14,28 +13,9 @@ type DiscoveredPlugin struct {
 	ExecPath string
 }
 
-var skipPluginDirs = map[string]bool{".git": true, "node_modules": true, "target": true, "__pycache__": true}
-
 func DiscoverPlugins(dir string) ([]DiscoveredPlugin, error) {
 	var plugins []DiscoveredPlugin
-	err := filepath.WalkDir(dir, walkPluginFn(&plugins, analysis.NewIgnorer(dir)))
-	return plugins, err
-}
-
-func walkPluginFn(plugins *[]DiscoveredPlugin, ig *analysis.Ignorer) func(string, os.DirEntry, error) error {
-	return func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if skipPluginDirs[d.Name()] || ig.SkipDir(path, d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if ig.SkipFile(path) {
-			return nil
-		}
+	err := analysis.WalkIgnoring(dir, func(path string, d fs.DirEntry) error {
 		if !strings.HasSuffix(d.Name(), "-plugin.toml") {
 			return nil
 		}
@@ -47,7 +27,8 @@ func walkPluginFn(plugins *[]DiscoveredPlugin, ig *analysis.Ignorer) func(string
 		if err != nil {
 			return nil
 		}
-		*plugins = append(*plugins, DiscoveredPlugin{Manifest: *m, ExecPath: execPath})
+		plugins = append(plugins, DiscoveredPlugin{Manifest: *m, ExecPath: execPath})
 		return nil
-	}
+	})
+	return plugins, err
 }

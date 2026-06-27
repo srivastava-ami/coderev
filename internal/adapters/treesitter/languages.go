@@ -14,17 +14,30 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+// GrammarFor returns the tree-sitter grammar for a language, or nil if none is
+// registered. It is the single source of grammar wiring so other packages (e.g.
+// the code graph) don't re-import the grammar packages.
+func GrammarFor(lang analysis.Language) *sitter.Language {
+	if d, ok := langDefs[lang]; ok {
+		return d.GetLanguage()
+	}
+	return nil
+}
+
+// TSXGrammar returns the TSX grammar (the TypeScript dialect used for .tsx files).
+func TSXGrammar() *sitter.Language { return tstsx.GetLanguage() }
+
 // LangDef describes the AST shape of a language so the walker can be
 // language-agnostic.
 type LangDef struct {
-	Name           string
-	GetLanguage    func() *sitter.Language
-	FunctionTypes  []string // node types that open a new function scope
-	BranchTypes    []string // node types that add 1 to cyclomatic complexity
-	BlockTypes     []string // node types that deepen nesting
-	ParameterType  string   // node type whose child count = parameter count
-	ClassTypes     []string // node types that represent classes/structs
-	CommentTypes   []string
+	Name          string
+	GetLanguage   func() *sitter.Language
+	FunctionTypes []string // node types that open a new function scope
+	BranchTypes   []string // node types that add 1 to cyclomatic complexity
+	BlockTypes    []string // node types that deepen nesting
+	ParameterType string   // node type whose child count = parameter count
+	ClassTypes    []string // node types that represent classes/structs
+	CommentTypes  []string
 }
 
 var langDefs = map[analysis.Language]*LangDef{

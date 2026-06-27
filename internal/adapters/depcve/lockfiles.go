@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
@@ -102,24 +102,11 @@ func parseRequirementsTXT(path string) ([]Dependency, error) {
 }
 
 func parseLockfiles(target string) ([]Dependency, error) {
-	ig := analysis.NewIgnorer(target)
 	var deps []Dependency
-	walkFn := func(path string, d os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if ig.SkipDir(path, d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if ig.SkipFile(path) {
-			return nil
-		}
-		base := d.Name()
+	_ = analysis.WalkIgnoring(target, func(path string, d fs.DirEntry) error {
 		var parsed []Dependency
-		switch base {
+		var err error
+		switch d.Name() {
 		case "package-lock.json":
 			parsed, err = parsePackageLockJSON(path)
 		case "go.sum":
@@ -131,8 +118,7 @@ func parseLockfiles(target string) ([]Dependency, error) {
 			deps = append(deps, parsed...)
 		}
 		return nil
-	}
-	filepath.Walk(target, walkFn)
+	})
 	return deps, nil
 }
 

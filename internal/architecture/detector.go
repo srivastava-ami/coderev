@@ -2,6 +2,7 @@ package architecture
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -81,10 +82,6 @@ func readNXProject(path string) (nxProject, bool) {
 	return proj, true
 }
 
-func isProjectJSON(path string, info os.FileInfo) bool {
-	return !info.IsDir() && info.Name() == "project.json" && !strings.Contains(path, "node_modules")
-}
-
 func nxNodeType(proj nxProject) string {
 	if proj.ProjectType == "application" {
 		return "app"
@@ -101,18 +98,8 @@ func fromNXWorkspace(root string) (Summary, bool) {
 	var nodes []Node
 	var edges []Edge
 
-	ig := analysis.NewIgnorer(root)
-	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if info.IsDir() {
-			if ig.SkipDir(path, info.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if ig.SkipFile(path) || !isProjectJSON(path, info) {
+	_ = analysis.WalkIgnoring(root, func(path string, d fs.DirEntry) error {
+		if d.Name() != "project.json" {
 			return nil
 		}
 		proj, ok := readNXProject(path)
