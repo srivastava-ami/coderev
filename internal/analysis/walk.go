@@ -71,6 +71,32 @@ func StreamSourceFiles(target string, batchSize int, yield func([]FileInfo) erro
 	return nil
 }
 
+// ListSourceFiles returns every recognised source file under target as a
+// FileInfo, honouring .gitignore via WalkIgnoring. Unlike CollectSourceFiles,
+// each FileInfo has Content == nil — file bytes are read only to count lines
+// and then discarded.
+func ListSourceFiles(target string) ([]FileInfo, error) {
+	var files []FileInfo
+	err := WalkIgnoring(target, func(path string, _ fs.DirEntry) error {
+		lang, ok := ExtToLanguage[filepath.Ext(path)]
+		if !ok {
+			return nil
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		files = append(files, FileInfo{
+			Path:     path,
+			Language: lang,
+			Lines:    strings.Count(string(content), "\n") + 1,
+			Content:  nil,
+		})
+		return nil
+	})
+	return files, err
+}
+
 // CollectSourceFiles returns every recognised source file under target as a
 // FileInfo, honouring .gitignore via WalkIgnoring. Shared by the scanner and the
 // code graph.
