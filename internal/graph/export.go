@@ -81,41 +81,10 @@ func ExportJSON(g *Graph, dir string) error {
 	return os.WriteFile(filepath.Join(dir, "graph.json"), data, 0o644)
 }
 
-// ExportGraphHTML writes a fully self-contained HTML page into dir/graph.html.
-// It has NO external dependencies — no CDN, no third-party library, no web fonts,
-// no network at all. Node positions are computed deterministically in Go
-// (ComputeLayout) and embedded; the page is a static SVG rendered by a few lines
-// of vanilla JS that add pan, zoom and node drag. The same graph always produces
-// byte-identical HTML.
-func ExportGraphHTML(g *Graph, dir string) error {
-	pos := ComputeLayout(g)
-	snodes, sedges := sortedGraph(g)
-
-	type jsNode struct {
-		ID    string  `json:"id"`
-		Label string  `json:"label"`
-		Group string  `json:"group"` // file / function / type
-		X     float64 `json:"x"`
-		Y     float64 `json:"y"`
-	}
-	type jsEdge struct {
-		Source string `json:"source"`
-		Target string `json:"target"`
-	}
-	nodes := make([]jsNode, 0, len(snodes))
-	for _, n := range snodes {
-		p := pos[n.ID]
-		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind), X: p.X, Y: p.Y})
-	}
-	edges := make([]jsEdge, 0, len(sedges))
-	for _, e := range sedges {
-		edges = append(edges, jsEdge{Source: e.Source, Target: e.Target})
-	}
-
-	nodesJSON, _ := json.Marshal(nodes)
-	edgesJSON, _ := json.Marshal(edges)
-
-	html := fmt.Sprintf(`<!DOCTYPE html>
+// graphHTMLTemplate is the fully offline HTML/JS page template for graph.html.
+// Placeholders: %.0f (viewBox w), %.0f (viewBox h), %s (nodes JSON),
+// %s (edges JSON), %.0f (viewport w), %.0f (viewport h).
+const graphHTMLTemplate = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -234,7 +203,44 @@ window.addEventListener("mousemove", e => {
 window.addEventListener("mouseup", () => { drag = null; svg.classList.remove("panning"); });
 </script>
 </body>
-</html>`, layoutWidth, layoutHeight, nodesJSON, edgesJSON, layoutWidth, layoutHeight)
+</html>`
+
+// buildHTMLPayload serialises sorted graph nodes and edges into JSON byte slices.
+func buildHTMLPayload(g *Graph, pos map[string]Position) ([]byte, []byte) {
+	snodes, sedges := sortedGraph(g)
+
+	type jsNode struct {
+		ID    string  `json:"id"`
+		Label string  `json:"label"`
+		Group string  `json:"group"`
+		X     float64 `json:"x"`
+		Y     float64 `json:"y"`
+	}
+	type jsEdge struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+	}
+	nodes := make([]jsNode, 0, len(snodes))
+	for _, n := range snodes {
+		p := pos[n.ID]
+		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind), X: p.X, Y: p.Y})
+	}
+	edges := make([]jsEdge, 0, len(sedges))
+	for _, e := range sedges {
+		edges = append(edges, jsEdge{Source: e.Source, Target: e.Target})
+	}
+
+	nodesJSON, _ := json.Marshal(nodes)
+	edgesJSON, _ := json.Marshal(edges)
+	return nodesJSON, edgesJSON
+}
+
+// ExportGraphHTML writes a fully self-contained HTML page into dir/graph.html.
+func ExportGraphHTML(g *Graph, dir string) error {
+	pos := ComputeLayout(g)
+	nodesJSON, edgesJSON := buildHTMLPayload(g, pos)
+
+	html := fmt.Sprintf(graphHTMLTemplate, layoutWidth, layoutHeight, nodesJSON, edgesJSON, layoutWidth, layoutHeight)
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
