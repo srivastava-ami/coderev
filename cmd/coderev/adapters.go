@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	coverage "github.com/srivastava-ami/coderev/internal/adapters/coverage"
+	depcve "github.com/srivastava-ami/coderev/internal/adapters/depcve"
 	gitleaks "github.com/srivastava-ami/coderev/internal/adapters/gitleaks"
 	importsadapter "github.com/srivastava-ami/coderev/internal/adapters/imports"
 	madge "github.com/srivastava-ami/coderev/internal/adapters/madge"
@@ -27,6 +28,9 @@ func buildAdapters(stds analysis.Standards, tc analysis.ToolConfig) []analysis.T
 	// Native (pure-Go) adapters — the zero-dependency defaults. They run first so
 	// their findings take precedence; any enabled external tool below is additive
 	// enrichment, deduped by the runner.
+	if tc.Adapters.DepCve.Enabled {
+		ads = append(ads, depcve.New(tc.Adapters.DepCve.SnapshotURL))
+	}
 	if tc.Adapters.Secrets.Enabled {
 		ads = append(ads, secrets.New())
 	}
