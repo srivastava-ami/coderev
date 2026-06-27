@@ -5,7 +5,30 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
+
+// sortedGraph returns copies of the graph's nodes and edges in a canonical order
+// (nodes by ID; edges by source, then target, then relation). Exports use this so
+// output is byte-for-byte deterministic regardless of the builder's internal map
+// iteration order.
+func sortedGraph(g *Graph) ([]Node, []Edge) {
+	ns := make([]Node, len(g.Nodes))
+	copy(ns, g.Nodes)
+	sort.Slice(ns, func(i, j int) bool { return ns[i].ID < ns[j].ID })
+	es := make([]Edge, len(g.Edges))
+	copy(es, g.Edges)
+	sort.Slice(es, func(i, j int) bool {
+		if es[i].Source != es[j].Source {
+			return es[i].Source < es[j].Source
+		}
+		if es[i].Target != es[j].Target {
+			return es[i].Target < es[j].Target
+		}
+		return es[i].Relation < es[j].Relation
+	})
+	return ns, es
+}
 
 // jsonGraph is coderev's native code-graph JSON structure.
 type jsonGraph struct {
@@ -29,8 +52,9 @@ type jsonLink struct {
 
 // ExportJSON writes coderev's native graph.json to dir.
 func ExportJSON(g *Graph, dir string) error {
+	snodes, sedges := sortedGraph(g)
 	gf := jsonGraph{Directed: true}
-	for _, n := range g.Nodes {
+	for _, n := range snodes {
 		ft := string(n.Kind)
 		gf.Nodes = append(gf.Nodes, jsonNode{
 			ID:         n.ID,
@@ -39,7 +63,7 @@ func ExportJSON(g *Graph, dir string) error {
 			SourceFile: n.SourceFile,
 		})
 	}
-	for _, e := range g.Edges {
+	for _, e := range sedges {
 		gf.Links = append(gf.Links, jsonLink{
 			Source:   e.Source,
 			Target:   e.Target,
@@ -57,27 +81,35 @@ func ExportJSON(g *Graph, dir string) error {
 	return os.WriteFile(filepath.Join(dir, "graph.json"), data, 0o644)
 }
 
-// ExportGraphHTML writes a self-contained HTML page with a force-directed
-// graph visualisation into dir/graph.html.
+// ExportGraphHTML writes a fully self-contained HTML page into dir/graph.html.
+// It has NO external dependencies — no CDN, no third-party library, no web fonts,
+// no network at all. Node positions are computed deterministically in Go
+// (ComputeLayout) and embedded; the page is a static SVG rendered by a few lines
+// of vanilla JS that add pan, zoom and node drag. The same graph always produces
+// byte-identical HTML.
 func ExportGraphHTML(g *Graph, dir string) error {
-	// Build a minimal node/edge payload for the JS side.
+	pos := ComputeLayout(g)
+	snodes, sedges := sortedGraph(g)
+
 	type jsNode struct {
-		ID    string `json:"id"`
-		Label string `json:"label"`
-		Group string `json:"group"` // file / function / type
+		ID    string  `json:"id"`
+		Label string  `json:"label"`
+		Group string  `json:"group"` // file / function / type
+		X     float64 `json:"x"`
+		Y     float64 `json:"y"`
 	}
 	type jsEdge struct {
 		Source string `json:"source"`
 		Target string `json:"target"`
-		Label  string `json:"label"`
 	}
-	var nodes []jsNode
-	for _, n := range g.Nodes {
-		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind)})
+	nodes := make([]jsNode, 0, len(snodes))
+	for _, n := range snodes {
+		p := pos[n.ID]
+		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind), X: p.X, Y: p.Y})
 	}
-	var edges []jsEdge
-	for _, e := range g.Edges {
-		edges = append(edges, jsEdge{Source: e.Source, Target: e.Target, Label: e.Relation})
+	edges := make([]jsEdge, 0, len(sedges))
+	for _, e := range sedges {
+		edges = append(edges, jsEdge{Source: e.Source, Target: e.Target})
 	}
 
 	nodesJSON, _ := json.Marshal(nodes)
@@ -88,163 +120,121 @@ func ExportGraphHTML(g *Graph, dir string) error {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Code Graph</title>
+<title>coderev · code graph</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%%;height:100%%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-#graph{width:100%%;height:100%%}
-.controls{position:absolute;top:12px;right:12px;background:#fff;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);padding:12px;font-size:13px;z-index:10}
-.controls label{margin-right:8px;font-weight:600}
-.controls select{padding:4px 8px;border:1px solid #ccc;border-radius:4px}
+html,body{width:100%%;height:100%%;overflow:hidden;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+#svg{width:100%%;height:100%%;cursor:grab}
+#svg.panning{cursor:grabbing}
+.legend{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.95);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%%;margin-right:6px;vertical-align:middle}
+.hint{position:absolute;bottom:10px;left:12px;color:#888;font-size:11px}
+text{pointer-events:none;fill:#cfcfd6;font-size:9px}
+line{stroke:#555;stroke-opacity:.6;stroke-width:1}
+circle{stroke:#0a0a0f;stroke-width:1.5;cursor:pointer}
 </style>
 </head>
 <body>
-<div class="controls">
-<label>Layout</label>
-<select id="layoutSelect" onchange="applyLayout(this.value)">
-<option value="force">Force</option>
-<option value="radial">Radial</option>
-</select>
+<div class="legend">
+<div><i style="background:#4A90D9"></i>file</div>
+<div><i style="background:#7B68EE"></i>function</div>
+<div><i style="background:#E6A817"></i>type</div>
 </div>
-<div id="graph"></div>
-<script src="https://d3js.org/d3.v7.min.js"></script>
+<div class="hint">scroll to zoom · drag background to pan · drag a node to move it</div>
+<svg id="svg" viewBox="0 0 %.0f %.0f" preserveAspectRatio="xMidYMid meet">
+<defs>
+<marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-5L10,0L0,5" fill="#555"></path></marker>
+</defs>
+<g id="view"></g>
+</svg>
 <script>
-const nodes = %s;
-const links = %s;
+const NODES = %s;
+const LINKS = %s;
+const COLOR = {file:"#4A90D9",function:"#7B68EE",type:"#E6A817"};
+const svg = document.getElementById("svg");
+const view = document.getElementById("view");
+const NS = svg.namespaceURI;
+const byId = {};
+NODES.forEach(n => { byId[n.id] = n; });
 
-const width = window.innerWidth;
-const height = window.innerHeight;
+const lineEls = [];
+LINKS.forEach(l => {
+  const s = byId[l.source], t = byId[l.target];
+  if (!s || !t) return;
+  const ln = document.createElementNS(NS, "line");
+  ln.setAttribute("marker-end", "url(#arrow)");
+  ln.s = s; ln.t = t;
+  view.appendChild(ln);
+  lineEls.push(ln);
+});
 
-const color = d3.scaleOrdinal()
-  .domain(["file","function","type"])
-  .range(["#4A90D9","#7B68EE","#E6A817"]);
+NODES.forEach(n => {
+  const c = document.createElementNS(NS, "circle");
+  c.setAttribute("r", n.group === "file" ? 7 : 4.5);
+  c.setAttribute("fill", COLOR[n.group] || "#aaa");
+  c.node = n;
+  view.appendChild(c);
+  n.c = c;
+  const tx = document.createElementNS(NS, "text");
+  tx.textContent = n.label;
+  tx.setAttribute("dx", n.group === "file" ? 9 : 6);
+  tx.setAttribute("dy", 3);
+  view.appendChild(tx);
+  n.tx = tx;
+});
 
-const svg = d3.select("#graph").append("svg")
-  .attr("width", width)
-  .attr("height", height);
-
-let simulation, link, node, label;
-
-function initForce() {
-  svg.selectAll("*").remove();
-  const g = svg.append("g");
-
-  // Arrow marker
-  svg.append("defs").selectAll("marker")
-    .data(["end"])
-    .join("marker")
-    .attr("id","arrow")
-    .attr("viewBox","0 -5 10 10")
-    .attr("refX",20)
-    .attr("refY",0)
-    .attr("markerWidth",6)
-    .attr("markerHeight",6)
-    .attr("orient","auto")
-    .append("path")
-    .attr("d","M0,-5L10,0L0,5")
-    .attr("fill","#999");
-
-  link = g.append("g")
-    .selectAll("line")
-    .data(links)
-    .join("line")
-    .attr("stroke","#999")
-    .attr("stroke-opacity",0.6)
-    .attr("stroke-width",1.5)
-    .attr("marker-end","url(#arrow)");
-
-  node = g.append("g")
-    .selectAll("circle")
-    .data(nodes)
-    .join("circle")
-    .attr("r", d => d.group === "file" ? 8 : 5)
-    .attr("fill", d => color(d.group))
-    .attr("stroke","#fff")
-    .attr("stroke-width",1.5)
-    .call(drag(simulation));
-
-  label = g.append("g")
-    .selectAll("text")
-    .data(nodes)
-    .join("text")
-    .text(d => d.label)
-    .attr("font-size", d => d.group === "file" ? 11 : 9)
-    .attr("dx", d => d.group === "file" ? 12 : 8)
-    .attr("dy", 4)
-    .attr("fill","#333");
-
-  simulation = d3.forceSimulation(nodes)
-    .force("link", d3.forceLink(links).id(d => d.id).distance(80))
-    .force("charge", d3.forceManyBody().strength(-200))
-    .force("center", d3.forceCenter(width/2, height/2))
-    .force("collision", d3.forceCollide().radius(30))
-    .on("tick", () => {
-      link.attr("x1", d => d.source.x).attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
-      node.attr("cx", d => d.x).attr("cy", d => d.y);
-      label.attr("x", d => d.x).attr("y", d => d.y);
-    });
-}
-
-function initRadial() {
-  svg.selectAll("*").remove();
-  const g = svg.append("g").attr("transform","translate("+width/2+","+height/2+")");
-
-  const root = d3.hierarchy({children: nodes}, d => {
-    if (!d.children) {
-      const kids = links.filter(l => l.source.id === d.id || l.source === d.id).map(l => {
-        const t = nodes.find(n => n.id === (l.target.id || l.target));
-        return t ? {id: t.id, label: t.label, group: t.group} : null;
-      }).filter(Boolean);
-      return kids.length ? kids : undefined;
-    }
-  });
-  const layout = d3.cluster().size([2*Math.PI, Math.min(width,height)/2-50]);
-  layout(root);
-
-  link = g.append("g")
-    .selectAll("line")
-    .data(root.links())
-    .join("line")
-    .attr("stroke","#999")
-    .attr("stroke-opacity",0.6)
-    .attr("stroke-width",1.5);
-
-  node = g.append("g")
-    .selectAll("circle")
-    .data(root.descendants())
-    .join("circle")
-    .attr("transform", d => "rotate("+(d.x*180/Math.PI-90)+") translate("+d.y+",0)")
-    .attr("r", d => d.data.group === "file" ? 8 : 5)
-    .attr("fill", d => color(d.data.group))
-    .attr("stroke","#fff")
-    .attr("stroke-width",1.5);
-}
-
-function applyLayout(name) {
-  if (name === "radial") initRadial();
-  else initForce();
-}
-
-function drag(sim) {
-  function dragstarted(event,d) {
-    if (!event.active) sim.alphaTarget(0.3).restart();
-    d.fx = d.x; d.fy = d.y;
+function render() {
+  for (const ln of lineEls) {
+    ln.setAttribute("x1", ln.s.x); ln.setAttribute("y1", ln.s.y);
+    ln.setAttribute("x2", ln.t.x); ln.setAttribute("y2", ln.t.y);
   }
-  function dragged(event,d) {
-    d.fx = event.x; d.fy = event.y;
+  for (const n of NODES) {
+    n.c.setAttribute("cx", n.x); n.c.setAttribute("cy", n.y);
+    n.tx.setAttribute("x", n.x); n.tx.setAttribute("y", n.y);
   }
-  function dragended(event,d) {
-    if (!event.active) sim.alphaTarget(0);
-    d.fx = null; d.fy = null;
-  }
-  return d3.drag().on("start",dragstarted).on("drag",dragged).on("end",dragended);
 }
+render();
 
-initForce();
+let vb = {x:0, y:0, w:%.0f, h:%.0f};
+function applyVB() { svg.setAttribute("viewBox", vb.x+" "+vb.y+" "+vb.w+" "+vb.h); }
+function toSvg(e) {
+  const r = svg.getBoundingClientRect();
+  return { x: vb.x + (e.clientX - r.left)/r.width*vb.w,
+           y: vb.y + (e.clientY - r.top)/r.height*vb.h };
+}
+svg.addEventListener("wheel", e => {
+  e.preventDefault();
+  const scale = e.deltaY < 0 ? 0.9 : 1.1;
+  const p = toSvg(e);
+  vb.x = p.x - (p.x - vb.x)*scale;
+  vb.y = p.y - (p.y - vb.y)*scale;
+  vb.w *= scale; vb.h *= scale;
+  applyVB();
+}, {passive:false});
+
+let drag = null;
+svg.addEventListener("mousedown", e => {
+  if (e.target.tagName === "circle") { drag = {node: e.target.node}; }
+  else { drag = {pan:true, lx:e.clientX, ly:e.clientY}; svg.classList.add("panning"); }
+});
+window.addEventListener("mousemove", e => {
+  if (!drag) return;
+  if (drag.node) {
+    const p = toSvg(e);
+    drag.node.x = +p.x.toFixed(1); drag.node.y = +p.y.toFixed(1);
+    render();
+  } else {
+    const r = svg.getBoundingClientRect();
+    vb.x -= (e.clientX - drag.lx)/r.width*vb.w;
+    vb.y -= (e.clientY - drag.ly)/r.height*vb.h;
+    drag.lx = e.clientX; drag.ly = e.clientY;
+    applyVB();
+  }
+});
+window.addEventListener("mouseup", () => { drag = null; svg.classList.remove("panning"); });
 </script>
 </body>
-</html>`, nodesJSON, edgesJSON)
+</html>`, layoutWidth, layoutHeight, nodesJSON, edgesJSON, layoutWidth, layoutHeight)
 
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
