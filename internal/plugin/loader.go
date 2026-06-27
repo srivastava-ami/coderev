@@ -5,6 +5,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
 type DiscoveredPlugin struct {
@@ -16,16 +18,22 @@ var skipPluginDirs = map[string]bool{".git": true, "node_modules": true, "target
 
 func DiscoverPlugins(dir string) ([]DiscoveredPlugin, error) {
 	var plugins []DiscoveredPlugin
-	err := filepath.WalkDir(dir, walkPluginFn(&plugins))
+	err := filepath.WalkDir(dir, walkPluginFn(&plugins, analysis.NewIgnorer(dir)))
 	return plugins, err
 }
 
-func walkPluginFn(plugins *[]DiscoveredPlugin) func(string, os.DirEntry, error) error {
+func walkPluginFn(plugins *[]DiscoveredPlugin, ig *analysis.Ignorer) func(string, os.DirEntry, error) error {
 	return func(path string, d os.DirEntry, err error) error {
-		if err != nil || (d.IsDir() && skipPluginDirs[d.Name()]) {
-			return filepath.SkipDir
+		if err != nil {
+			return nil
 		}
 		if d.IsDir() {
+			if skipPluginDirs[d.Name()] || ig.SkipDir(path, d.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if ig.SkipFile(path) {
 			return nil
 		}
 		if !strings.HasSuffix(d.Name(), "-plugin.toml") {

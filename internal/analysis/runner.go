@@ -108,11 +108,7 @@ func (r *Runner) dispatchAdapter(ctx context.Context, ad ToolAdapter, sess *runS
 
 // walkFiles collects all source files under target, skipping well-known noise dirs.
 func walkFiles(target string) ([]FileInfo, error) {
-	skipDirs := map[string]bool{
-		"node_modules": true, ".git": true, "dist": true, "build": true,
-		".nx": true, "coverage": true, ".cache": true, "vendor": true,
-		"__pycache__": true, "target": true, ".cargo": true,
-	}
+	ig := NewIgnorer(target)
 
 	var files []FileInfo
 	err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
@@ -120,9 +116,12 @@ func walkFiles(target string) ([]FileInfo, error) {
 			return nil
 		}
 		if d.IsDir() {
-			if skipDirs[d.Name()] {
+			if ig.SkipDir(path, d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if ig.SkipFile(path) {
 			return nil
 		}
 		lang, ok := langForExt(filepath.Ext(path))

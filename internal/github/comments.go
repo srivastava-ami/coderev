@@ -18,24 +18,32 @@ type issueComment struct {
 	Body string `json:"body"`
 }
 
+// PRTarget identifies a pull request on GitHub by its "owner/name" slug and
+// number. Using a struct keeps parameter counts ≤3 while avoiding positional
+// confusion between repo, pr, and body.
+type PRTarget struct {
+	Repo string // "owner/name" slug
+	PR   int    // pull request number
+}
+
 // UpsertComment posts coderev's review summary to the pull request as a single,
 // stable comment. On the first call it creates the comment; on later calls it
 // finds the existing marked comment and PATCHes it, so a PR never accumulates
-// duplicate coderev comments. repo is "owner/name" and pr is the PR number.
-func (c *Client) UpsertComment(repo string, pr int, body string) error {
-	return c.UpsertCommentContext(context.Background(), repo, pr, body)
+// duplicate coderev comments.
+func (c *Client) UpsertComment(target PRTarget, body string) error {
+	return c.UpsertCommentContext(context.Background(), target, body)
 }
 
 // UpsertCommentContext is UpsertComment with an explicit context for
 // cancellation and timeouts.
-func (c *Client) UpsertCommentContext(ctx context.Context, repo string, pr int, body string) error {
-	owner, name, err := splitRepo(repo)
+func (c *Client) UpsertCommentContext(ctx context.Context, target PRTarget, body string) error {
+	owner, name, err := splitRepo(target.Repo)
 	if err != nil {
 		return err
 	}
 	marked := ensureMarker(body)
 
-	existing, err := c.findMarkedComment(ctx, owner, name, pr)
+	existing, err := c.findMarkedComment(ctx, owner, name, target.PR)
 	if err != nil {
 		return err
 	}
@@ -45,7 +53,7 @@ func (c *Client) UpsertCommentContext(ctx context.Context, repo string, pr int, 
 		path := fmt.Sprintf("/repos/%s/%s/issues/comments/%d", owner, name, existing.ID)
 		return c.patch(ctx, path, payload, nil)
 	}
-	path := fmt.Sprintf("/repos/%s/%s/issues/%d/comments", owner, name, pr)
+	path := fmt.Sprintf("/repos/%s/%s/issues/%d/comments", owner, name, target.PR)
 	return c.post(ctx, path, payload, nil)
 }
 

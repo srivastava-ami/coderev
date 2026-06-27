@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
 type Dependency struct {
@@ -100,16 +102,19 @@ func parseRequirementsTXT(path string) ([]Dependency, error) {
 }
 
 func parseLockfiles(target string) ([]Dependency, error) {
+	ig := analysis.NewIgnorer(target)
 	var deps []Dependency
 	walkFn := func(path string, d os.FileInfo, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
-			base := d.Name()
-			if base == "node_modules" || base == ".git" || base == ".cache" || base == "vendor" || base == "__pycache__" {
+			if ig.SkipDir(path, d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if ig.SkipFile(path) {
 			return nil
 		}
 		base := d.Name()

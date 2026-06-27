@@ -56,19 +56,19 @@ func mdEscape(s string) string {
 	return strings.ReplaceAll(s, "|", "\\|")
 }
 
-// ratingBadge returns a short Markdown badge for the A-E rating.
+// ratingBadge returns a short plain-Markdown rating for the A-E grade.
 func ratingBadge(r string) string {
 	switch r {
 	case "A":
-		return "![A](https://img.shields.io/badge/reliability-A-brightgreen)"
+		return "🟢 **A**"
 	case "B":
-		return "![B](https://img.shields.io/badge/reliability-B-green)"
+		return "🟢 **B**"
 	case "C":
-		return "![C](https://img.shields.io/badge/reliability-C-yellow)"
+		return "🟡 **C**"
 	case "D":
-		return "![D](https://img.shields.io/badge/reliability-D-orange)"
+		return "🟠 **D**"
 	case "E":
-		return "![E](https://img.shields.io/badge/reliability-E-red)"
+		return "🔴 **E**"
 	default:
 		return ""
 	}
