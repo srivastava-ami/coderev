@@ -44,6 +44,23 @@ echo "coderev · pre-push full scan…"
 "$CODEREV" "$(git rev-parse --show-toplevel)"
 `
 
+// postCommitHook refreshes the native code graph after each commit. It runs in
+// the background so it never slows the commit, and skips silently if coderev is
+// unavailable. Mirrors the convenience of an auto-rebuild without coupling to
+// the separate graphify tool.
+const postCommitHook = `#!/usr/bin/env bash
+# installed by: coderev install-hooks
+set -euo pipefail
+CODEREV=$(command -v coderev 2>/dev/null || true)
+if [[ -z "$CODEREV" ]]; then
+  CODEREV="$(git rev-parse --show-toplevel)/bin/coderev"
+  [[ -x "$CODEREV" ]] || exit 0
+fi
+ROOT="$(git rev-parse --show-toplevel)"
+echo "coderev · post-commit graph rebuild (background)…"
+( "$CODEREV" graph "$ROOT" >/dev/null 2>&1 & )
+`
+
 // ── commands ──────────────────────────────────────────────────────────────────
 
 var cmdSetup = &cobra.Command{
@@ -91,6 +108,9 @@ func runInstallHooks(_ *cobra.Command, _ []string) error {
 		return err
 	}
 	if err := writeHook(filepath.Join(hooksDir, "pre-push"), prePushHook); err != nil {
+		return err
+	}
+	if err := writeHook(filepath.Join(hooksDir, "post-commit"), postCommitHook); err != nil {
 		return err
 	}
 	fmt.Println("\ndone — hooks fire automatically on every commit and push.")

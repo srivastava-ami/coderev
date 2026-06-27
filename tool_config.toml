@@ -6,6 +6,12 @@
 # Add your own tools under [[adapters.custom]].
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Native code graph (`coderev graph`) ───────────────────────────────────────
+# Output dir for graph.json + graph.html. A coderev-owned dotdir, NOT
+# graphify-out/ (that belongs to the separate graphify tool).
+[graph]
+output_dir = ".coderev/graph"
+
 [adapters.treesitter]
 enabled = true
 # Tree-sitter is the primary engine — pure Go, no external binary.
