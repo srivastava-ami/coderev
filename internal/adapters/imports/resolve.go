@@ -35,20 +35,20 @@ var (
 // the analysis target so package and alias imports resolve correctly.
 type resolver struct {
 	target    string
-	index     map[string]*analysis.FileInfo // canonical path to file
-	goModule  string                        // module path from go.mod (may be "")
-	tsBaseURL string                        // absolute baseUrl from tsconfig
-	tsPaths   map[string][]string           // tsconfig compilerOptions.paths
+	index     map[string]*fileData // canonical path to file
+	goModule  string               // module path from go.mod (may be "")
+	tsBaseURL string               // absolute baseUrl from tsconfig
+	tsPaths   map[string][]string  // tsconfig compilerOptions.paths
 }
 
-func newResolver(req analysis.RunRequest) *resolver {
+func newResolver(target string, files []fileData) *resolver {
 	r := &resolver{
-		target: req.Target,
-		index:  make(map[string]*analysis.FileInfo, len(req.Files)),
+		target: target,
+		index:  make(map[string]*fileData, len(files)),
 	}
-	for i := range req.Files {
-		f := &req.Files[i]
-		r.index[clean(f.Path)] = f
+	for i := range files {
+		f := &files[i]
+		r.index[clean(f.path)] = f
 	}
 	r.loadGoModule()
 	r.loadTSConfig()
@@ -194,7 +194,7 @@ func (r *resolver) resolveGo(spec string) ([]string, bool) {
 
 	var ids []string
 	for id, f := range r.index {
-		if f.Language == analysis.LangGo && clean(filepath.Dir(id)) == dir {
+		if f.language == analysis.LangGo && clean(filepath.Dir(id)) == dir {
 			ids = append(ids, id)
 		}
 	}
