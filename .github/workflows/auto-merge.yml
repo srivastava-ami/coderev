@@ -19,7 +19,10 @@ jobs:
       # workflows — so auto-tag.yml (pull_request_target: closed) never fires and
       # no release is cut. Using the PAT attributes the merge to a real identity,
       # so the merge event triggers auto-tag and the release flows automatically.
-      - name: Enable auto-merge (rebase) when CI passes
+      # Use a MERGE commit, not --rebase: rebase rewrites history so dev stops
+      # descending from main and every subsequent promotion PR conflicts. A merge
+      # commit keeps dev an ancestor of main.
+      - name: Enable auto-merge (merge commit) when CI passes
         env:
           GH_TOKEN: ${{ secrets.AUTO_PR_TOKEN }}
-        run: gh pr merge --rebase --auto "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
+        run: gh pr merge --merge --auto "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
