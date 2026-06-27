@@ -23,3 +23,6 @@ plan.md
 
 # OS
 .DS_Store
+
+# coderev local generated artifacts (native code graph, etc.)
+.coderev/
