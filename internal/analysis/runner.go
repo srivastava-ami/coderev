@@ -69,8 +69,33 @@ func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
 	}
 
 	sess := &runSession{target: target, files: files}
-	var wg sync.WaitGroup
+
+	var contentAds, targetAds []ToolAdapter
 	for _, ad := range r.adapters {
+		if isContentAdapter(ad.Name()) {
+			contentAds = append(contentAds, ad)
+		} else {
+			targetAds = append(targetAds, ad)
+		}
+	}
+
+	r.runContentAdapters(ctx, sess, contentAds)
+	r.runTargetAdapters(ctx, sess, targetAds)
+	filtered := applyExceptions(dedup(sess.findings), r.stds.Exceptions)
+	return RunResult{Files: files, Findings: filtered, Warnings: sess.warnings}, nil
+}
+
+func isContentAdapter(name string) bool {
+	switch name {
+	case "treesitter", "secrets", "imports":
+		return true
+	}
+	return false
+}
+
+func (r *Runner) runContentAdapters(ctx context.Context, sess *runSession, ads []ToolAdapter) {
+	var wg sync.WaitGroup
+	for _, ad := range ads {
 		ad := ad
 		wg.Add(1)
 		go func() {
@@ -79,8 +104,19 @@ func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
 		}()
 	}
 	wg.Wait()
-	filtered := applyExceptions(dedup(sess.findings), r.stds.Exceptions)
-	return RunResult{Files: files, Findings: filtered, Warnings: sess.warnings}, nil
+}
+
+func (r *Runner) runTargetAdapters(ctx context.Context, sess *runSession, ads []ToolAdapter) {
+	var wg sync.WaitGroup
+	for _, ad := range ads {
+		ad := ad
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			r.dispatchAdapter(ctx, ad, sess)
+		}()
+	}
+	wg.Wait()
 }
 
 func (r *Runner) dispatchAdapter(ctx context.Context, ad ToolAdapter, sess *runSession) {
