@@ -16,10 +16,6 @@ import (
 	"time"
 )
 
-// DefaultBaseURL is the public GitHub REST API root. Tests override it to point
-// at an httptest server.
-const DefaultBaseURL = "https://api.github.com"
-
 // Client is a minimal authenticated REST client. The zero value is not usable;
 // construct one with New or NewWithToken.
 type Client struct {
@@ -31,19 +27,19 @@ type Client struct {
 // New returns a Client reading its bearer token from the GITHUB_TOKEN
 // environment variable. It errors when the variable is unset so callers fail
 // loudly rather than posting unauthenticated requests.
-func New() (*Client, error) {
+func New(baseURL string) (*Client, error) {
 	token := strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
 	if token == "" {
 		return nil, fmt.Errorf("github: GITHUB_TOKEN is not set")
 	}
-	return NewWithToken(token), nil
+	return NewWithToken(baseURL, token), nil
 }
 
 // NewWithToken returns a Client using the given token. Useful in tests and when
 // the token comes from somewhere other than the environment.
-func NewWithToken(token string) *Client {
+func NewWithToken(baseURL, token string) *Client {
 	return &Client{
-		baseURL: DefaultBaseURL,
+		baseURL: baseURL,
 		token:   token,
 		http:    &http.Client{Timeout: 30 * time.Second},
 	}

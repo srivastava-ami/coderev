@@ -52,13 +52,12 @@ func TestUpsertCommentUpdatesInPlace(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	client := NewWithToken("test-token")
-	client.baseURL = srv.URL
+	client := NewWithToken(srv.URL, "test-token")
 
-	if err := client.UpsertComment("octo/repo", 7, "first body"); err != nil {
+	if err := client.UpsertComment(PRTarget{Repo: "octo/repo", PR: 7}, "first body"); err != nil {
 		t.Fatalf("first upsert: %v", err)
 	}
-	if err := client.UpsertComment("octo/repo", 7, "second body"); err != nil {
+	if err := client.UpsertComment(PRTarget{Repo: "octo/repo", PR: 7}, "second body"); err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
 
@@ -80,8 +79,8 @@ func TestUpsertCommentUpdatesInPlace(t *testing.T) {
 }
 
 func TestUpsertCommentRejectsBadRepo(t *testing.T) {
-	client := NewWithToken("test-token")
-	if err := client.UpsertComment("not-a-slug", 1, "body"); err == nil {
+	client := NewWithToken("", "test-token") // URL unused — splitRepo fails first
+	if err := client.UpsertComment(PRTarget{Repo: "not-a-slug", PR: 1}, "body"); err == nil {
 		t.Fatal("expected error for malformed repo, got nil")
 	}
 }

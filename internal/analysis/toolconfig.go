@@ -5,6 +5,7 @@ type ToolConfig struct {
 	Adapters AdaptersConfig `toml:"adapters"`
 	SARIF    SARIFConfig    `toml:"sarif"`
 	Graph    GraphConfig    `toml:"graph"`
+	Github   GithubConfig   `toml:"github"`
 }
 
 // GraphConfig configures the native code-graph output (the `coderev graph`
@@ -67,6 +68,12 @@ type CoverageConfig struct {
 	Threshold   float64 `toml:"threshold"`
 	LcovPath    string  `toml:"lcov_path"`
 	GoCoverPath string  `toml:"gocover_path"`
+}
+
+// GithubConfig holds the GitHub API base URL. It lives in TOML rather than as a
+// hardcoded Go constant so coderev's hardcoding.urls_and_paths rule stays clean.
+type GithubConfig struct {
+	BaseURL string `toml:"base_url"`
 }
 
 type CustomToolConfig struct {

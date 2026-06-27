@@ -79,6 +79,11 @@ binary  = "npm"         # built into Node.js
 rules   = ["security.dependencies"]
 args    = []
 
+# ── GitHub API ──────────────────────────────────────────────────────────────────
+# Base URL for the GitHub REST API. Override for GHES or local testing.
+[github]
+base_url = "https://api.github.com"
+
 # ── SARIF output URLs (configuration, not hardcoded constants) ────────────────
 [sarif]
 schema_url      = "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json"
