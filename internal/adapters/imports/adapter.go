@@ -54,13 +54,20 @@ func (a *Adapter) Run(ctx context.Context, req analysis.RunRequest) ([]analysis.
 	}
 
 	g := BuildGraph(req)
+	return a.AnalyzeGraph(g), nil
+}
+
+// AnalyzeGraph performs cycle detection on an already-built Graph and returns
+// one blocker finding per circular dependency. This allows callers to build the
+// graph incrementally (via Builder) and analyse it separately.
+func (a *Adapter) AnalyzeGraph(g *Graph) []analysis.Finding {
 	cycles := g.Cycles()
 
 	findings := make([]analysis.Finding, 0, len(cycles))
 	for _, cycle := range cycles {
 		findings = append(findings, a.cycleFinding(g, cycle))
 	}
-	return findings, nil
+	return findings
 }
 
 // cycleFinding renders one SCC as a circular-dependency finding using the
