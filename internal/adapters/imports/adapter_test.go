@@ -180,6 +180,60 @@ func TestBuildGraph_Reusable(t *testing.T) {
 	}
 }
 
+func TestBuildGraph_ContentNil(t *testing.T) {
+	// Build() must produce the same graph whether FileInfo carries Content
+	// or is content-free (Content==nil, paths only).
+	files := []fileSpec{
+		{"a.ts", analysis.LangTypeScript, `import { b } from './b';\nexport const a = () => b();`},
+		{"b.ts", analysis.LangTypeScript, `import { c } from './c';\nexport const b = () => c();`},
+		{"c.ts", analysis.LangTypeScript, `export const c = () => 42;`},
+	}
+	req := buildReq(t, files, nil)
+
+	// Graph with content populated.
+	g1 := BuildGraph(req)
+
+	// Graph with Content == nil (paths only) — files are already on disk.
+	contentFree := make([]analysis.FileInfo, len(req.Files))
+	for i, f := range req.Files {
+		contentFree[i] = analysis.FileInfo{Path: f.Path, Language: f.Language}
+	}
+	g2 := BuildGraph(analysis.RunRequest{Target: req.Target, Files: contentFree})
+
+	// Compare nodes.
+	if len(g1.Nodes) != len(g2.Nodes) {
+		t.Fatalf("node count mismatch: content=%d, content-free=%d", len(g1.Nodes), len(g2.Nodes))
+	}
+	for id, n1 := range g1.Nodes {
+		n2, ok := g2.Nodes[id]
+		if !ok {
+			t.Fatalf("content-free graph missing node %q", id)
+		}
+		if n1.Path != n2.Path || n1.Language != n2.Language {
+			t.Errorf("node %q mismatch: content=%+v, content-free=%+v", id, n1, n2)
+		}
+	}
+
+	// Compare edges.
+	if len(g1.Edges) != len(g2.Edges) {
+		t.Fatalf("edge count mismatch: content=%d, content-free=%d", len(g1.Edges), len(g2.Edges))
+	}
+	for from, succ1 := range g1.Edges {
+		succ2, ok := g2.Edges[from]
+		if !ok {
+			t.Fatalf("content-free graph missing edge source %q", from)
+		}
+		if len(succ1) != len(succ2) {
+			t.Fatalf("successor count mismatch for %q: content=%d, content-free=%d", from, len(succ1), len(succ2))
+		}
+		for to := range succ1 {
+			if !succ2[to] {
+				t.Fatalf("content-free graph missing edge %q -> %q", from, to)
+			}
+		}
+	}
+}
+
 func assertOneCycle(t *testing.T, findings []analysis.Finding) {
 	t.Helper()
 	if len(findings) != 1 {

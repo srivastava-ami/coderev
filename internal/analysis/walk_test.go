@@ -61,6 +61,55 @@ func TestStreamSourceFiles(t *testing.T) {
 	}
 }
 
+func TestListSourceFiles(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"main.go":      "package main\nfunc main() {}\n",
+		"util.go":      "package util\nfunc Help() {}\n",
+		"app.ts":       "const x: number = 1;\n",
+		"ignored.txt":  "not a recognised source\n",
+		"sub/main.go":  "package sub\n",
+		"sub/helper.rs": "fn helper() {}\n",
+	}
+	for name, content := range files {
+		p := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(p), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte(content), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	list, err := ListSourceFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collected, err := CollectSourceFiles(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(list) != len(collected) {
+		t.Fatalf("ListSourceFiles returned %d files, CollectSourceFiles returned %d", len(list), len(collected))
+	}
+
+	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
+	sort.Slice(collected, func(i, j int) bool { return collected[i].Path < collected[j].Path })
+
+	for i := range list {
+		if list[i].Path != collected[i].Path {
+			t.Errorf("file %d: ListSourceFiles.Path=%q, CollectSourceFiles.Path=%q", i, list[i].Path, collected[i].Path)
+		}
+		if list[i].Content != nil {
+			t.Errorf("file %d: ListSourceFiles.Content is not nil (len=%d)", i, len(list[i].Content))
+		}
+		if collected[i].Content == nil {
+			t.Errorf("file %d: CollectSourceFiles.Content is nil (should have bytes)", i)
+		}
+	}
+}
+
 func collectBatches(target string, batchSize int) ([][]FileInfo, error) {
 	var batches [][]FileInfo
 	err := StreamSourceFiles(target, batchSize, func(batch []FileInfo) error {
