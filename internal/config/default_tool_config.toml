@@ -13,6 +13,11 @@ rules = [
 ]
 
 # ── Native (pure-Go) adapters — zero-dependency defaults ──────────────────────
+[adapters.depcve]
+enabled      = true
+snapshot_url = ""
+rules        = ["security.dependencies"]
+
 [adapters.secrets]
 enabled = true
 rules = ["security.secrets"]

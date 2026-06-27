@@ -16,6 +16,7 @@ type SARIFConfig struct {
 
 type AdaptersConfig struct {
 	TreeSitter TreeSitterConfig   `toml:"treesitter"`
+	DepCve     DepCveConfig       `toml:"depcve"`
 	Secrets    NativeToolConfig   `toml:"secrets"`
 	Imports    NativeToolConfig   `toml:"imports"`
 	Semgrep    ExternalToolConfig `toml:"semgrep"`
@@ -45,6 +46,12 @@ type ExternalToolConfig struct {
 	Rules       []string `toml:"rules"`
 	Args        []string `toml:"args"`
 	DownloadURL string   `toml:"download_url"` // release URL template (toolmgr); printf %s slots
+}
+
+type DepCveConfig struct {
+	Enabled     bool     `toml:"enabled"`
+	SnapshotURL string   `toml:"snapshot_url"`
+	Rules       []string `toml:"rules"`
 }
 
 type CoverageConfig struct {
