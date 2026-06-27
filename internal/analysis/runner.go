@@ -56,7 +56,11 @@ type runSession struct {
 
 // Run walks target, dispatches to each adapter, and merges all findings.
 func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
-	files, err := CollectSourceFiles(target)
+	// Content-free file list: paths/metadata only, no file bytes. Target adapters
+	// and imports work from this directly; the content-consuming adapters
+	// (treesitter/secrets) get bytes streamed in bounded batches below — so peak
+	// memory is one batch, not the whole tree.
+	files, err := ListSourceFiles(target)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("walking target: %w", err)
 	}
@@ -85,30 +89,51 @@ func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
 	return RunResult{Files: files, Findings: filtered, Warnings: sess.warnings}, nil
 }
 
+// isContentAdapter reports adapters that need per-file Content fed to them.
+// imports is NOT here: it reads file bytes by path itself, so it works from the
+// content-free list like the target adapters.
 func isContentAdapter(name string) bool {
 	switch name {
-	case "treesitter", "secrets", "imports":
+	case "treesitter", "secrets":
 		return true
 	}
 	return false
 }
 
+// runContentAdapters streams file content in bounded batches and runs the
+// content adapters per batch, so only one batch of bytes is resident at a time.
+// Batches are filtered to sess.files so diff-mode (and .gitignore) filtering is
+// honoured.
 func (r *Runner) runContentAdapters(ctx context.Context, sess *runSession, ads []ToolAdapter) {
-	var wg sync.WaitGroup
-	for _, ad := range ads {
-		ad := ad
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			r.dispatchAdapter(ctx, ad, sess)
-		}()
+	avail := r.availableAdapters(sess, ads)
+	if len(avail) == 0 {
+		return
 	}
-	wg.Wait()
+	allowed := make(map[string]bool, len(sess.files))
+	for _, f := range sess.files {
+		allowed[f.Path] = true
+	}
+	_ = StreamSourceFiles(sess.target, r.tc.Scan.BatchSize, func(batch []FileInfo) error {
+		kept := batch[:0]
+		for _, f := range batch {
+			if allowed[f.Path] {
+				kept = append(kept, f)
+			}
+		}
+		if len(kept) > 0 {
+			for _, ad := range avail {
+				got, err := ad.Run(ctx, RunRequest{Target: sess.target, Files: kept, RuleIDs: ad.Capabilities()})
+				sess.addResult(ad, got, err)
+			}
+		}
+		return nil
+	})
 }
 
 func (r *Runner) runTargetAdapters(ctx context.Context, sess *runSession, ads []ToolAdapter) {
+	avail := r.availableAdapters(sess, ads)
 	var wg sync.WaitGroup
-	for _, ad := range ads {
+	for _, ad := range avail {
 		ad := ad
 		wg.Add(1)
 		go func() {
@@ -119,25 +144,39 @@ func (r *Runner) runTargetAdapters(ctx context.Context, sess *runSession, ads []
 	wg.Wait()
 }
 
-func (r *Runner) dispatchAdapter(ctx context.Context, ad ToolAdapter, sess *runSession) {
-	if !ad.IsAvailable() {
+// availableAdapters returns the available adapters, recording one warning per
+// unavailable adapter (so warnings match the non-streamed behaviour).
+func (r *Runner) availableAdapters(sess *runSession, ads []ToolAdapter) []ToolAdapter {
+	out := make([]ToolAdapter, 0, len(ads))
+	for _, ad := range ads {
+		if ad.IsAvailable() {
+			out = append(out, ad)
+			continue
+		}
 		sess.mu.Lock()
 		sess.warnings = append(sess.warnings, AdapterWarning{
 			Adapter: ad.Name(),
 			Reason:  "binary not found or prerequisites not met — skipped",
 		})
 		sess.mu.Unlock()
-		return
 	}
+	return out
+}
 
-	req := RunRequest{Target: sess.target, Files: sess.files, RuleIDs: ad.Capabilities()}
-	got, err := ad.Run(ctx, req)
-	sess.mu.Lock()
-	defer sess.mu.Unlock()
+// addResult records an adapter's findings (and a warning on error) under lock.
+func (s *runSession) addResult(ad ToolAdapter, got []Finding, err error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if err != nil {
-		sess.warnings = append(sess.warnings, AdapterWarning{Adapter: ad.Name(), Reason: err.Error()})
+		s.warnings = append(s.warnings, AdapterWarning{Adapter: ad.Name(), Reason: err.Error()})
 	}
-	sess.findings = append(sess.findings, got...)
+	s.findings = append(s.findings, got...)
+}
+
+// dispatchAdapter runs a target adapter over the (content-free) session files.
+func (r *Runner) dispatchAdapter(ctx context.Context, ad ToolAdapter, sess *runSession) {
+	got, err := ad.Run(ctx, RunRequest{Target: sess.target, Files: sess.files, RuleIDs: ad.Capabilities()})
+	sess.addResult(ad, got, err)
 }
 
 func dedupKey(f Finding) string {
