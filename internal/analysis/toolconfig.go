@@ -6,6 +6,7 @@ type ToolConfig struct {
 	SARIF    SARIFConfig    `toml:"sarif"`
 	Graph    GraphConfig    `toml:"graph"`
 	Github   GithubConfig   `toml:"github"`
+	Scan     ScanConfig     `toml:"scan"`
 }
 
 // GraphConfig configures the native code-graph output (the `coderev graph`
@@ -68,6 +69,11 @@ type CoverageConfig struct {
 	Threshold   float64 `toml:"threshold"`
 	LcovPath    string  `toml:"lcov_path"`
 	GoCoverPath string  `toml:"gocover_path"`
+}
+
+// ScanConfig controls the memory-bounded file walk behaviour.
+type ScanConfig struct {
+	BatchSize int `toml:"batch_size"`
 }
 
 // GithubConfig holds the GitHub API base URL. It lives in TOML rather than as a
