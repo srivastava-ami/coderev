@@ -13,7 +13,13 @@ jobs:
   enable-auto-merge:
     runs-on: ubuntu-latest
     steps:
+      # Enable auto-merge with a PAT (AUTO_PR_TOKEN), NOT the default GITHUB_TOKEN.
+      # A merge performed under GITHUB_TOKEN is attributed to the github-actions
+      # bot, and GitHub deliberately does NOT let bot-token events trigger further
+      # workflows — so auto-tag.yml (pull_request_target: closed) never fires and
+      # no release is cut. Using the PAT attributes the merge to a real identity,
+      # so the merge event triggers auto-tag and the release flows automatically.
       - name: Enable auto-merge (rebase) when CI passes
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.AUTO_PR_TOKEN }}
         run: gh pr merge --rebase --auto "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}"
