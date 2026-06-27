@@ -20,37 +20,33 @@ import (
 	"github.com/srivastava-ami/coderev/internal/toolmgr"
 )
 
+// adapterEntry pairs an enabled flag with a lazy constructor so buildAdapters
+// can stay a simple table + loop instead of a long if-chain.
+type adapterEntry struct {
+	enabled bool
+	make    func() analysis.ToolAdapter
+}
+
 func buildAdapters(stds analysis.Standards, tc analysis.ToolConfig) []analysis.ToolAdapter {
+	// Order matters: native (pure-Go, zero-dependency) adapters run first so their
+	// findings take precedence; any enabled external tool is additive enrichment,
+	// deduped by the runner.
+	entries := []adapterEntry{
+		{tc.Adapters.TreeSitter.Enabled, func() analysis.ToolAdapter { return tsadapter.New(stds) }},
+		{tc.Adapters.DepCve.Enabled, func() analysis.ToolAdapter { return depcve.New(tc.Adapters.DepCve.SnapshotURL) }},
+		{tc.Adapters.Secrets.Enabled, func() analysis.ToolAdapter { return secrets.New() }},
+		{tc.Adapters.Imports.Enabled, func() analysis.ToolAdapter { return importsadapter.New() }},
+		{tc.Adapters.Semgrep.Enabled, func() analysis.ToolAdapter { return semgrep.New(resolveTool("semgrep", tc.Adapters.Semgrep.Binary)) }},
+		{tc.Adapters.Gitleaks.Enabled, func() analysis.ToolAdapter { return gitleaks.New(resolveTool("gitleaks", tc.Adapters.Gitleaks.Binary)) }},
+		{tc.Adapters.Madge.Enabled, func() analysis.ToolAdapter { return madge.New(resolveTool("madge", tc.Adapters.Madge.Binary)) }},
+		{tc.Adapters.NpmAudit.Enabled, func() analysis.ToolAdapter { return npmaudit.New(resolveTool("npm", tc.Adapters.NpmAudit.Binary)) }},
+		{tc.Adapters.Coverage.Enabled, func() analysis.ToolAdapter { return coverage.New(tc.Adapters.Coverage) }},
+	}
 	var ads []analysis.ToolAdapter
-	if tc.Adapters.TreeSitter.Enabled {
-		ads = append(ads, tsadapter.New(stds))
-	}
-	// Native (pure-Go) adapters — the zero-dependency defaults. They run first so
-	// their findings take precedence; any enabled external tool below is additive
-	// enrichment, deduped by the runner.
-	if tc.Adapters.DepCve.Enabled {
-		ads = append(ads, depcve.New(tc.Adapters.DepCve.SnapshotURL))
-	}
-	if tc.Adapters.Secrets.Enabled {
-		ads = append(ads, secrets.New())
-	}
-	if tc.Adapters.Imports.Enabled {
-		ads = append(ads, importsadapter.New())
-	}
-	if tc.Adapters.Semgrep.Enabled {
-		ads = append(ads, semgrep.New(resolveTool("semgrep", tc.Adapters.Semgrep.Binary)))
-	}
-	if tc.Adapters.Gitleaks.Enabled {
-		ads = append(ads, gitleaks.New(resolveTool("gitleaks", tc.Adapters.Gitleaks.Binary)))
-	}
-	if tc.Adapters.Madge.Enabled {
-		ads = append(ads, madge.New(resolveTool("madge", tc.Adapters.Madge.Binary)))
-	}
-	if tc.Adapters.NpmAudit.Enabled {
-		ads = append(ads, npmaudit.New(resolveTool("npm", tc.Adapters.NpmAudit.Binary)))
-	}
-	if tc.Adapters.Coverage.Enabled {
-		ads = append(ads, coverage.New(tc.Adapters.Coverage))
+	for _, e := range entries {
+		if e.enabled {
+			ads = append(ads, e.make())
+		}
 	}
 	for _, c := range tc.Adapters.Custom {
 		ads = appendCustomAdapter(ads, c)
