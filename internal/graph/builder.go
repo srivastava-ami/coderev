@@ -62,12 +62,6 @@ func isSourceExt(ext string) bool {
 	return ok
 }
 
-func isIgnoredDir(base string) bool {
-	return base == "node_modules" || base == ".git" || base == "dist" || base == "build" ||
-		base == ".nx" || base == "coverage" || base == ".cache" || base == "vendor" ||
-		base == "__pycache__" || base == "target" || base == ".cargo"
-}
-
 // Build walks target, builds the code graph from source files.
 func Build(target string) (*Graph, error) {
 	fis, err := walkSourceFiles(target)
@@ -93,15 +87,19 @@ func addNodeUnique(g *Graph, n Node) {
 }
 
 func walkSourceFiles(target string) ([]analysis.FileInfo, error) {
+	ig := analysis.NewIgnorer(target)
 	var fis []analysis.FileInfo
 	if err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
 		if d.IsDir() {
-			if isIgnoredDir(d.Name()) {
+			if ig.SkipDir(path, d.Name()) {
 				return filepath.SkipDir
 			}
+			return nil
+		}
+		if ig.SkipFile(path) {
 			return nil
 		}
 		ext := filepath.Ext(path)

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
 // Summary is the architecture overview fed to the HTML report.
@@ -99,8 +101,18 @@ func fromNXWorkspace(root string) (Summary, bool) {
 	var nodes []Node
 	var edges []Edge
 
+	ig := analysis.NewIgnorer(root)
 	_ = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil || !isProjectJSON(path, info) {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			if ig.SkipDir(path, info.Name()) {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if ig.SkipFile(path) || !isProjectJSON(path, info) {
 			return nil
 		}
 		proj, ok := readNXProject(path)
