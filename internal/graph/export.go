@@ -7,32 +7,32 @@ import (
 	"path/filepath"
 )
 
-// graphifyGraph is the JSON structure that graphify expects.
-type graphifyGraph struct {
-	Directed bool            `json:"directed"`
-	Nodes    []graphifyNode  `json:"nodes"`
-	Links    []graphifyLink  `json:"links"`
+// jsonGraph is coderev's native code-graph JSON structure.
+type jsonGraph struct {
+	Directed bool       `json:"directed"`
+	Nodes    []jsonNode `json:"nodes"`
+	Links    []jsonLink `json:"links"`
 }
 
-type graphifyNode struct {
+type jsonNode struct {
 	ID         string `json:"id"`
 	Label      string `json:"label"`
 	FileType   string `json:"file_type"`
 	SourceFile string `json:"source_file"`
 }
 
-type graphifyLink struct {
+type jsonLink struct {
 	Source   string `json:"source"`
 	Target   string `json:"target"`
 	Relation string `json:"relation"`
 }
 
-// ExportGraphifyJSON writes a graphify-compatible graph.json to dir.
-func ExportGraphifyJSON(g *Graph, dir string) error {
-	gf := graphifyGraph{Directed: true}
+// ExportJSON writes coderev's native graph.json to dir.
+func ExportJSON(g *Graph, dir string) error {
+	gf := jsonGraph{Directed: true}
 	for _, n := range g.Nodes {
 		ft := string(n.Kind)
-		gf.Nodes = append(gf.Nodes, graphifyNode{
+		gf.Nodes = append(gf.Nodes, jsonNode{
 			ID:         n.ID,
 			Label:      n.Label,
 			FileType:   ft,
@@ -40,7 +40,7 @@ func ExportGraphifyJSON(g *Graph, dir string) error {
 		})
 	}
 	for _, e := range g.Edges {
-		gf.Links = append(gf.Links, graphifyLink{
+		gf.Links = append(gf.Links, jsonLink{
 			Source:   e.Source,
 			Target:   e.Target,
 			Relation: e.Relation,
@@ -254,7 +254,7 @@ initForce();
 
 // ExportAll writes both graph.json and graph.html into dir.
 func ExportAll(g *Graph, dir string) error {
-	if err := ExportGraphifyJSON(g, dir); err != nil {
+	if err := ExportJSON(g, dir); err != nil {
 		return err
 	}
 	return ExportGraphHTML(g, dir)

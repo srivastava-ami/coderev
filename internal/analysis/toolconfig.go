@@ -4,6 +4,14 @@ package analysis
 type ToolConfig struct {
 	Adapters AdaptersConfig `toml:"adapters"`
 	SARIF    SARIFConfig    `toml:"sarif"`
+	Graph    GraphConfig    `toml:"graph"`
+}
+
+// GraphConfig configures the native code-graph output (the `coderev graph`
+// command). OutputDir is where graph.json + graph.html are written; relative
+// paths are resolved against the scanned target. Defaults to ".coderev/graph".
+type GraphConfig struct {
+	OutputDir string `toml:"output_dir"`
 }
 
 // SARIFConfig holds the URLs emitted in SARIF output. They are configuration —
