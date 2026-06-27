@@ -6,6 +6,10 @@
 # Add your own tools under [[adapters.custom]].
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── File walk / scan ──────────────────────────────────────────────────────────
+[scan]
+batch_size = 1000
+
 # ── Native code graph (`coderev graph`) ───────────────────────────────────────
 # Output dir for graph.json + graph.html. A coderev-owned dotdir, NOT
 # graphify-out/ (that belongs to the separate graphify tool).

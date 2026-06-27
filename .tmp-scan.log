@@ -1,0 +1,18 @@
+coderev™ v0.3.1 — by Amit Srivastava · https://github.com/srivastava-ami/coderev
+
+coderev · target: /Users/amitsrivastava/nex-ovia.com/coderev/.tmp/dispatch/wt/stream-files
+          standards: built-in defaults
+          adapters: treesitter ✓, depcve ✓, secrets ✓, imports ✓, npmaudit ✓
+          scanning…
+
+  files scanned : 98
+  total findings: 33
+    blockers    : 0
+    major       : 0
+    advisory    : 33
+
+  status: ✓ PASS
+  report: /Users/amitsrivastava/nex-ovia.com/coderev/.tmp/dispatch/wt/stream-files/coderev-report.md
+
+  ⭐ useful? star coderev: https://github.com/srivastava-ami/coderev
+
