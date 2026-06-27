@@ -1,19 +1,12 @@
 package graph
 
 import (
-	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
-	"strings"
 
 	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/golang"
-	"github.com/smacker/go-tree-sitter/javascript"
-	tstsx "github.com/smacker/go-tree-sitter/typescript/tsx"
-	tsts "github.com/smacker/go-tree-sitter/typescript/typescript"
 
 	"github.com/srivastava-ami/coderev/internal/adapters/imports"
+	"github.com/srivastava-ami/coderev/internal/adapters/treesitter"
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
@@ -25,17 +18,17 @@ type langCfg struct {
 
 var langConfigs = map[analysis.Language]*langCfg{
 	analysis.LangGo: {
-		grammar:   golang.GetLanguage(),
+		grammar:   treesitter.GrammarFor(analysis.LangGo),
 		funcTypes: []string{"function_declaration", "method_declaration"},
 		typeTypes: []string{"type_declaration"},
 	},
 	analysis.LangTypeScript: {
-		grammar:   tsts.GetLanguage(),
+		grammar:   treesitter.GrammarFor(analysis.LangTypeScript),
 		funcTypes: []string{"function_declaration", "method_definition", "arrow_function"},
 		typeTypes: []string{"class_declaration", "interface_declaration"},
 	},
 	analysis.LangJavaScript: {
-		grammar:   javascript.GetLanguage(),
+		grammar:   treesitter.GrammarFor(analysis.LangJavaScript),
 		funcTypes: []string{"function_declaration", "method_definition", "arrow_function"},
 		typeTypes: []string{"class_declaration"},
 	},
@@ -43,7 +36,7 @@ var langConfigs = map[analysis.Language]*langCfg{
 
 // tsx is identical to TypeScript but uses the TSX grammar.
 var tsxCfg = &langCfg{
-	grammar:   tstsx.GetLanguage(),
+	grammar:   treesitter.TSXGrammar(),
 	funcTypes: []string{"function_declaration", "method_definition", "arrow_function"},
 	typeTypes: []string{"class_declaration", "interface_declaration"},
 }
@@ -64,7 +57,7 @@ func isSourceExt(ext string) bool {
 
 // Build walks target, builds the code graph from source files.
 func Build(target string) (*Graph, error) {
-	fis, err := walkSourceFiles(target)
+	fis, err := analysis.CollectSourceFiles(target)
 	if err != nil {
 		return nil, err
 	}
@@ -84,44 +77,6 @@ func addNodeUnique(g *Graph, n Node) {
 		}
 	}
 	g.Nodes = append(g.Nodes, n)
-}
-
-func walkSourceFiles(target string) ([]analysis.FileInfo, error) {
-	ig := analysis.NewIgnorer(target)
-	var fis []analysis.FileInfo
-	if err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if ig.SkipDir(path, d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if ig.SkipFile(path) {
-			return nil
-		}
-		ext := filepath.Ext(path)
-		lang, ok := analysis.ExtToLanguage[ext]
-		if !ok {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		fis = append(fis, analysis.FileInfo{
-			Path:     path,
-			Language: lang,
-			Lines:    strings.Count(string(content), "\n") + 1,
-			Content:  content,
-		})
-		return nil
-	}); err != nil {
-		return nil, fmt.Errorf("walking target: %w", err)
-	}
-	return fis, nil
 }
 
 func emptyGraph() *Graph {

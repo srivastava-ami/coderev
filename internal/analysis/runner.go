@@ -3,8 +3,6 @@ package analysis
 import (
 	"context"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -58,7 +56,7 @@ type runSession struct {
 
 // Run walks target, dispatches to each adapter, and merges all findings.
 func (r *Runner) Run(ctx context.Context, target string) (RunResult, error) {
-	files, err := walkFiles(target)
+	files, err := CollectSourceFiles(target)
 	if err != nil {
 		return RunResult{}, fmt.Errorf("walking target: %w", err)
 	}
@@ -104,48 +102,6 @@ func (r *Runner) dispatchAdapter(ctx context.Context, ad ToolAdapter, sess *runS
 		sess.warnings = append(sess.warnings, AdapterWarning{Adapter: ad.Name(), Reason: err.Error()})
 	}
 	sess.findings = append(sess.findings, got...)
-}
-
-// walkFiles collects all source files under target, skipping well-known noise dirs.
-func walkFiles(target string) ([]FileInfo, error) {
-	ig := NewIgnorer(target)
-
-	var files []FileInfo
-	err := filepath.WalkDir(target, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			if ig.SkipDir(path, d.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if ig.SkipFile(path) {
-			return nil
-		}
-		lang, ok := langForExt(filepath.Ext(path))
-		if !ok {
-			return nil
-		}
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		files = append(files, FileInfo{
-			Path:     path,
-			Language: lang,
-			Lines:    strings.Count(string(content), "\n") + 1,
-			Content:  content,
-		})
-		return nil
-	})
-	return files, err
-}
-
-func langForExt(ext string) (Language, bool) {
-	lang, ok := ExtToLanguage[ext]
-	return lang, ok
 }
 
 func dedupKey(f Finding) string {
