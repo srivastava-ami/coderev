@@ -9,6 +9,7 @@ import (
 	coverage "github.com/srivastava-ami/coderev/internal/adapters/coverage"
 	depcve "github.com/srivastava-ami/coderev/internal/adapters/depcve"
 	gitleaks "github.com/srivastava-ami/coderev/internal/adapters/gitleaks"
+	graphanalyze "github.com/srivastava-ami/coderev/internal/adapters/graphanalyze"
 	importsadapter "github.com/srivastava-ami/coderev/internal/adapters/imports"
 	madge "github.com/srivastava-ami/coderev/internal/adapters/madge"
 	npmaudit "github.com/srivastava-ami/coderev/internal/adapters/npmaudit"
@@ -41,6 +42,7 @@ func buildAdapters(stds analysis.Standards, tc analysis.ToolConfig) []analysis.T
 		{tc.Adapters.Madge.Enabled, func() analysis.ToolAdapter { return madge.New(resolveTool("madge", tc.Adapters.Madge.Binary)) }},
 		{tc.Adapters.NpmAudit.Enabled, func() analysis.ToolAdapter { return npmaudit.New(resolveTool("npm", tc.Adapters.NpmAudit.Binary)) }},
 		{tc.Adapters.Coverage.Enabled, func() analysis.ToolAdapter { return coverage.New(tc.Adapters.Coverage) }},
+		{tc.Adapters.GraphAnalyze.Enabled, func() analysis.ToolAdapter { return graphanalyze.New(tc.Adapters.GraphAnalyze) }},
 	}
 	var ads []analysis.ToolAdapter
 	for _, e := range entries {
