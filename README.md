@@ -28,9 +28,7 @@ All findings are produced by deterministic static analysis — zero LLM calls, z
 
 ```bash
 # Homebrew (macOS / Linux) — recommended
-brew tap srivastava-ami/tools
-brew trust srivastava-ami/tools   # one-time: Homebrew 4.x requires trusting third-party taps
-brew install coderev
+brew install srivastava-ami/tools/coderev
 
 # curl installer
 curl -fsSL https://raw.githubusercontent.com/srivastava-ami/coderev/main/scripts/install.sh | bash
@@ -98,8 +96,14 @@ coderev [directory] [flags]
   --plugin-dir <path>  custom plugin directory (default: ~/.config/coderev/plugins)
 
 Subcommands:
-  plugin install <manifest>   install a plugin from its coderev-plugin.toml manifest
-  plugin list                 list installed plugins
+  graph [directory]            build and export native code graph (graph.json + self-contained graph.html)
+  setup                        install scanner dependencies + git hooks (full onboarding)
+  install-hooks                install pre-commit, pre-push, post-commit git hooks
+  install-deps                 download optional external tools (gitleaks, semgrep, madge) to ~/.coderev/tools/
+  plugin install <manifest>    install a plugin from its coderev-plugin.toml manifest
+  plugin list                  list installed plugins
+
+`graph` also accepts `--output <dir>` to set the output directory (default: `<target>/.coderev/graph`).
 ```
 
 Quality gate TOML (`--gate`):
@@ -139,7 +143,7 @@ Full workflow: `.github/workflows/code-quality.yml`
 
 ## Rules catalog
 
-All 55 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
+All 56 built-in rules, grouped by pillar, with full TOML configuration and severity defaults:
 → **[docs/rules-reference.md](docs/rules-reference.md)**
 
 ## Standards
@@ -159,18 +163,17 @@ coderev --standards /path/to/custom.toml .
 | Adapter | Checks | Type | Default |
 |---|---|---|---|
 | `treesitter` | complexity, type safety, hardcoding, security patterns, documentation, structure, duplication — **all 5 languages** | native (pure Go) | ✅ on |
+| `depcve` | dependency CVE via offline OSV snapshot (npm, Go, PyPI) — shipped snapshot in repo, cached from remote | native (pure Go) | ✅ on |
 | `secrets` | secrets & credentials (regex + Shannon entropy) | native (pure Go) | ✅ on |
 | `imports` | circular deps, NX boundaries (Tarjan SCC) | native (pure Go) | ✅ on |
-| `npmaudit` | vulnerable npm packages | external (npm) | ✅ on \* |
+| `npmaudit` | vulnerable npm packages (legacy fallback — depcve replaces for non-npm ecosystems) | external (npm) | ✅ on |
 | `coverage` | line coverage threshold (lcov, cobertura) | reads existing report | ✅ on |
 | `gitleaks` | extra secret rules | external | ⚪ optional |
 | `semgrep` | wider OWASP / injection / crypto | external | ⚪ optional |
 | `madge` | circular-deps cross-check | external | ⚪ optional |
 | `custom` | any tool via NDJSON | external | ⚪ optional |
 
-\* `npmaudit` is the one remaining external check (dependency-CVE); a native embedded-OSV replacement lands in v1.2.0.
-
-Native Go adapters cover **TypeScript, JavaScript, Go, Python, and Rust** with **no external tools**: tree-sitter walkers for structure/complexity/security patterns, plus native secret scanning and native circular-dependency detection. gitleaks/semgrep/madge are optional enrichment — the native adapters already cover their rules.
+Native Go adapters cover **TypeScript, JavaScript, Go, Python, and Rust** with **no external tools**: tree-sitter walkers for structure/complexity/security patterns, plus native secret scanning, native circular-dependency detection, and native offline OSV dependency-CVE scanning. gitleaks/semgrep/madge are optional enrichment — the native adapters already cover their rules.
 
 The optional external scanners auto-install only when you enable them in `tool_config.toml`. To pre-install them explicitly:
 
@@ -212,6 +215,19 @@ coderev plugin list                             # list installed
 ```
 
 On every scan, coderev discovers and loads all plugins from the plugin directory. Plugin binaries must be on `$PATH`.
+
+---
+
+## Code graph
+
+```bash
+coderev graph .                # writes .coderev/graph/graph.json + graph.html
+coderev graph --output ./out   # custom output directory
+```
+
+Produces a fully **offline, deterministic** code graph from source files — nodes are files, functions, and types; edges are imports, calls, and containment. The output is a reusable `graph.json` (deterministic byte-for-byte) and a self-contained `graph.html` (interactive SVG, zero CDN dependencies) — view it in any browser with no server.
+
+Uses the same file discovery as the scanner (honours `.gitignore`). The output directory is configurable via `--output`, `[graph] output_dir` in `tool_config.toml`, or the default `.coderev/graph/`.
 
 ---
 
