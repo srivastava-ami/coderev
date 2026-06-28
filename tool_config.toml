@@ -89,6 +89,17 @@ fan_in_max   = 20
 fan_out_max  = 20
 rules        = ["architecture.coupling", "architecture.hotspot"]
 
+# ── LLM enrichment (optional, off by default) ─────────────────────────────────
+# Coderev is LLM-free by default. Enable only if you want optional enrichment
+# such as AI-generated remediation suggestions.
+[llm]
+enabled      = false
+provider     = "cli"
+cli_command  = "claude -p {prompt}"
+api_base_url = "https://api.anthropic.com/v1/messages"
+api_key_env  = "ANTHROPIC_API_KEY"
+model        = ""
+
 # ── GitHub API ──────────────────────────────────────────────────────────────────
 # Base URL for the GitHub REST API. Override for GHES or local testing.
 [github]
