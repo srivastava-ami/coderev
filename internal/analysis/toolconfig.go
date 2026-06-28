@@ -24,17 +24,25 @@ type SARIFConfig struct {
 	InformationURI string `toml:"information_uri"`
 }
 
+type GraphAnalyzeConfig struct {
+	Enabled   bool     `toml:"enabled"`
+	FanInMax  int      `toml:"fan_in_max"`
+	FanOutMax int      `toml:"fan_out_max"`
+	Rules     []string `toml:"rules"`
+}
+
 type AdaptersConfig struct {
-	TreeSitter TreeSitterConfig   `toml:"treesitter"`
-	DepCve     DepCveConfig       `toml:"depcve"`
-	Secrets    NativeToolConfig   `toml:"secrets"`
-	Imports    NativeToolConfig   `toml:"imports"`
-	Semgrep    ExternalToolConfig `toml:"semgrep"`
-	Gitleaks   ExternalToolConfig `toml:"gitleaks"`
-	Madge      ExternalToolConfig `toml:"madge"`
-	NpmAudit   ExternalToolConfig `toml:"npmaudit"`
-	Coverage   CoverageConfig     `toml:"coverage"`
-	Custom     []CustomToolConfig `toml:"custom"`
+	TreeSitter  TreeSitterConfig   `toml:"treesitter"`
+	DepCve      DepCveConfig       `toml:"depcve"`
+	Secrets     NativeToolConfig   `toml:"secrets"`
+	Imports     NativeToolConfig   `toml:"imports"`
+	Semgrep     ExternalToolConfig `toml:"semgrep"`
+	Gitleaks    ExternalToolConfig `toml:"gitleaks"`
+	Madge       ExternalToolConfig `toml:"madge"`
+	NpmAudit    ExternalToolConfig `toml:"npmaudit"`
+	Coverage    CoverageConfig     `toml:"coverage"`
+	GraphAnalyze GraphAnalyzeConfig `toml:"graphanalyze"`
+	Custom      []CustomToolConfig `toml:"custom"`
 }
 
 type TreeSitterConfig struct {

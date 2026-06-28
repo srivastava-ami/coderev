@@ -60,6 +60,12 @@ enabled = true
 binary  = "npm"
 rules   = ["security.dependencies"]
 
+[adapters.graphanalyze]
+enabled      = false
+fan_in_max   = 20
+fan_out_max  = 20
+rules        = ["architecture.coupling", "architecture.hotspot"]
+
 [adapters.coverage]
 enabled   = true
 threshold = 80.0

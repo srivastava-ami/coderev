@@ -83,6 +83,12 @@ binary  = "npm"         # built into Node.js
 rules   = ["security.dependencies"]
 args    = []
 
+[adapters.graphanalyze]
+enabled      = false
+fan_in_max   = 20
+fan_out_max  = 20
+rules        = ["architecture.coupling", "architecture.hotspot"]
+
 # ── GitHub API ──────────────────────────────────────────────────────────────────
 # Base URL for the GitHub REST API. Override for GHES or local testing.
 [github]
