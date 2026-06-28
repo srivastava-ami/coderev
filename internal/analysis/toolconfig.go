@@ -7,6 +7,18 @@ type ToolConfig struct {
 	Graph    GraphConfig    `toml:"graph"`
 	Github   GithubConfig   `toml:"github"`
 	Scan     ScanConfig     `toml:"scan"`
+	LLM      LLMConfig      `toml:"llm"`
+}
+
+// LLMConfig controls the optional LLM enrichment client. It is opt-in:
+// enabled=false means the scanner never invokes any LLM provider.
+type LLMConfig struct {
+	Enabled    bool   `toml:"enabled"`
+	Provider   string `toml:"provider"`
+	CLICommand string `toml:"cli_command"`
+	APIBaseURL string `toml:"api_base_url"`
+	APIKeyEnv  string `toml:"api_key_env"`
+	Model      string `toml:"model"`
 }
 
 // GraphConfig configures the native code-graph output (the `coderev graph`
