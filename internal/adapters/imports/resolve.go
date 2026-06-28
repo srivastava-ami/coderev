@@ -194,7 +194,7 @@ func (r *resolver) resolveGo(spec string) ([]string, bool) {
 
 	var ids []string
 	for id, f := range r.index {
-		if f.language == analysis.LangGo && clean(filepath.Dir(id)) == dir {
+		if f.language == analysis.LangGo && clean(filepath.Dir(id)) == dir && !strings.HasSuffix(id, "_test.go") {
 			ids = append(ids, id)
 		}
 	}
