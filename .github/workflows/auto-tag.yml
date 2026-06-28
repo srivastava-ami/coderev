@@ -51,6 +51,11 @@ jobs:
           echo "$SIGNAL" | grep -qE '^[a-z]+(\([^)]+\))?!:' && BREAKING=true
           echo "$SIGNAL" | grep -qE '^BREAKING[ -]CHANGE:'       && BREAKING=true
           echo "$SIGNAL" | grep -qE '^feat(\([^)]+\))?:'         && FEATURE=true
+          # Safety net: honour the classification auto-pr.yml already computed into
+          # the PR title prose, so the two workflows never disagree even when the
+          # commit-scan misses (this is what made a feat release bump patch).
+          echo "$PR_TITLE" | grep -qi 'breaking change' && BREAKING=true
+          echo "$PR_TITLE" | grep -qi 'feature release' && FEATURE=true
 
           if [ "$MAJOR" -eq 0 ]; then
             # Pre-1.0 (0.x): per SemVer anything may change. A feature OR a breaking
