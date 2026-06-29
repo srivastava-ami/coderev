@@ -866,7 +866,6 @@ const GV = {
     GV.pkgMap = pm;
     // Build flow-file index: source_file → [flow names]
     GV.flowFiles = {};
-    const repoPath = (R.Meta.RepoPath || '').replace(/\/+$/, '');
     (R.Architecture.Flows || []).forEach(f => {
       (f.Steps || []).forEach(s => {
         const absPath = s.File ? (s.File.startsWith('/') ? s.File : repoPath + '/' + s.File) : '';
