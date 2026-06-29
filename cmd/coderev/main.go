@@ -54,7 +54,7 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 	root.Flags().MarkHidden("standards")
 	root.Flags().StringVar(&flagOutput, "output", "", "output file path (default depends on --format)")
 	root.Flags().StringVar(&flagConfig, "config", "", "path to tool_config.toml (auto-discovered if omitted)")
-	root.Flags().StringVar(&flagFormat, "format", "markdown", "output format: markdown (default), html, sarif")
+	root.Flags().StringVar(&flagFormat, "format", "", "output format: markdown (default), html, sarif")
 	root.Flags().StringVar(&flagRepo, "repo", "", "owner/repo slug — auto-detected from git remote (e.g. acme/my-repo)")
 	root.Flags().IntVar(&flagPR, "pr", 0, "PR number — auto-detected from gh CLI if omitted")
 	root.Flags().BoolVar(&flagAnnotatePR, "annotate-pr", false, "post findings as inline GitHub PR comments (requires gh CLI)")
