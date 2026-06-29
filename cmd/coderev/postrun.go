@@ -129,6 +129,9 @@ type llmReviewReq struct {
 
 func maybeSendToLLM(ctx context.Context, req llmReviewReq) error {
 	target, tc, rc := req.target, req.tc, req.rc
+	if len(rc.Hunks) == 0 {
+		fmt.Fprintln(os.Stderr, "  review: ⚠  no diff context — pass --diff <base-ref> for code-anchored review (higher hallucination risk without it)")
+	}
 	if !tc.LLM.Enabled {
 		fmt.Fprintln(os.Stderr, "  review: LLM not configured — run: coderev config llm --enable --provider cli --command \"claude -p {prompt}\"")
 		return nil

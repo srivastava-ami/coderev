@@ -31,17 +31,19 @@ type ReviewContext struct {
 	Neighbors []GraphNeighbor
 }
 
-const reviewSystemInstruction = `You are a senior software engineer reviewing a pull request.
-Identify logical issues, missing edge cases, incorrect assumptions, and correctness
-concerns that static analysis cannot catch. Be specific: reference file paths and
-line numbers. Do NOT repeat findings already listed in <findings>. Do NOT suggest
-cosmetic or style changes. Do NOT suggest fixes — describe each issue so the author
-can reason about it.
+const reviewSystemInstruction = `You are a gap detector for a deterministic code analysis tool.
+The <findings> below were produced by static analysis rules and are authoritative — 90% of
+the review is already done. Your sole job: given only the code context shown in this prompt,
+identify patterns or issues the rules did not catch. Do not repeat or rephrase any finding
+already listed. Do not reason about code not shown here. Do not suggest cosmetic or style
+changes. Do not suggest fixes — describe each gap so the author can reason about it.
+If you see nothing the rules missed, say so explicitly rather than inventing concerns.
 `
 
 const reviewOutputInstruction = `
-Write the review grouped by file. For each issue state: file:line, the concern,
-and why it matters. If no logical issues are found, say so explicitly.
+Write the review grouped by file. For each gap state: file:line, the concern, and why
+it matters. If the rules already cover everything visible, say "No gaps found." — do not
+pad the response.
 `
 
 type graphNode struct {
