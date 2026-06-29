@@ -147,7 +147,8 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	if err != nil {
 		return err
 	}
-	r, outputPath, err := buildAndWrite(s, result)
+	graphDir := buildGraphInline(s.target, s.tc)
+	r, outputPath, err := buildAndWrite(s, result, graphDir)
 	if err != nil {
 		return err
 	}
@@ -158,7 +159,6 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	if err := postAnnotate(r, s.target); err != nil {
 		return err
 	}
-	graphDir := buildGraphInline(s.target, s.tc)
 	rc := buildReviewContext(s.target, result.Findings, graphDir)
 	if err := writePromptFile(s.target, rc); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
