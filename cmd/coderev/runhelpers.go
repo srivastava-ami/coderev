@@ -19,6 +19,17 @@ import (
 
 var gitDiff gitDiffService
 
+func graphJSONPath(target string, tc analysis.ToolConfig) string {
+	dir := tc.Graph.OutputDir
+	if dir == "" {
+		dir = defaultGraphDir
+	}
+	if !filepath.IsAbs(dir) {
+		dir = filepath.Join(target, dir)
+	}
+	return filepath.Join(dir, "graph.json")
+}
+
 func discoverAndPrintPlugins() {
 	pluginDir := flagPluginDir
 	if pluginDir == "" {
@@ -98,7 +109,7 @@ func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string
 		Files:     result.Files,
 		Findings:  result.Findings,
 		Warnings:  result.Warnings,
-		Arch:      architecture.Detect(target),
+		Arch:      architecture.DetectWithGraph(target, graphJSONPath(target, s.tc)),
 		Delta:     &delta,
 	})
 	if flagUpdateBaseline {

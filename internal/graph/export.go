@@ -142,14 +142,21 @@ NODES.forEach(n => {
   c.setAttribute("r", n.group === "file" ? 7 : 4.5);
   c.setAttribute("fill", COLOR[n.group] || "#aaa");
   c.node = n;
+  const tip = document.createElementNS(NS, "title");
+  tip.textContent = n.label + " (" + n.group + ")";
+  c.appendChild(tip);
   view.appendChild(c);
   n.c = c;
-  const tx = document.createElementNS(NS, "text");
-  tx.textContent = n.label;
-  tx.setAttribute("dx", n.group === "file" ? 9 : 6);
-  tx.setAttribute("dy", 3);
-  view.appendChild(tx);
-  n.tx = tx;
+  n.tx = null;
+  if (n.group === "file") {
+    const tx = document.createElementNS(NS, "text");
+    const lbl = n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label;
+    tx.textContent = lbl;
+    tx.setAttribute("dx", 9);
+    tx.setAttribute("dy", 3);
+    view.appendChild(tx);
+    n.tx = tx;
+  }
 });
 
 function render() {
@@ -159,7 +166,7 @@ function render() {
   }
   for (const n of NODES) {
     n.c.setAttribute("cx", n.x); n.c.setAttribute("cy", n.y);
-    n.tx.setAttribute("x", n.x); n.tx.setAttribute("y", n.y);
+    if (n.tx) { n.tx.setAttribute("x", n.x); n.tx.setAttribute("y", n.y); }
   }
 }
 render();
