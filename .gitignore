@@ -24,5 +24,11 @@ plan.md
 # OS
 .DS_Store
 
-# coderev local generated artifacts (native code graph, etc.)
-.coderev/
+# coderev generated artifacts — tool_config.toml is NOT listed so teams can commit it
+.coderev/graph/
+.coderev/report.md
+.coderev/report.html
+.coderev/report.sarif
+.coderev/prompt.md
+.coderev/review.md
+.coderev/baseline.json

@@ -195,16 +195,18 @@ func resolveOutputPath(flag, format string) string {
 	if f == "" {
 		switch format {
 		case "html":
-			f = "coderev-report.html"
+			f = filepath.Join(".coderev", "report.html")
 		case "sarif":
-			f = "coderev-report.sarif"
+			f = filepath.Join(".coderev", "report.sarif")
 		default:
-			f = "coderev-report.md"
+			f = filepath.Join(".coderev", "report.md")
 		}
 	}
 	if filepath.IsAbs(f) {
 		return f
 	}
 	cwd, _ := os.Getwd()
-	return filepath.Join(cwd, f)
+	p := filepath.Join(cwd, f)
+	_ = os.MkdirAll(filepath.Dir(p), 0o755)
+	return p
 }
