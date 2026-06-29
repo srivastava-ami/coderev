@@ -186,7 +186,10 @@ func resolveToolConfigFile(target string) string {
 	if flagConfig != "" {
 		return flagConfig
 	}
-	p, _ := config.DiscoverToolConfig(target)
+	p, found := config.DiscoverToolConfig(target)
+	if !found {
+		return ""
+	}
 	return p
 }
 
