@@ -40,8 +40,7 @@ func buildGraphInline(target string, tc analysis.ToolConfig) string {
 	return dir
 }
 
-// writePromptFile assembles the LLM review prompt and writes it to .coderev/prompt.md.
-func writePromptFile(target string, findings []analysis.Finding, graphDir string) error {
+func buildReviewContext(target string, findings []analysis.Finding, graphDir string) llm.ReviewContext {
 	rc := llm.ReviewContext{BaseRef: flagDiff, Findings: findings}
 	if flagDiff != "" {
 		hunks, err := gitDiffHunks(context.Background(), flagDiff, target)
@@ -57,6 +56,10 @@ func writePromptFile(target string, findings []analysis.Finding, graphDir string
 			rc.Neighbors, _ = llm.AllGraphNodes(data)
 		}
 	}
+	return rc
+}
+
+func writePromptFile(target string, rc llm.ReviewContext) error {
 	prompt := llm.AssemblePrompt(rc)
 	outPath := filepath.Join(target, promptFile)
 	if err := os.MkdirAll(filepath.Dir(outPath), coderevDirPerms); err != nil {
@@ -69,16 +72,16 @@ func writePromptFile(target string, findings []analysis.Finding, graphDir string
 	return nil
 }
 
-// maybeSendToLLM sends the assembled prompt to the configured LLM provider and
-// writes the review to .coderev/review.md. LLM failures are warnings only.
-func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) error {
+type llmReviewReq struct {
+	target string
+	tc     analysis.ToolConfig
+	rc     llm.ReviewContext
+}
+
+func maybeSendToLLM(ctx context.Context, req llmReviewReq) error {
+	target, tc, rc := req.target, req.tc, req.rc
 	if !tc.LLM.Enabled {
 		fmt.Fprintln(os.Stderr, "  review: LLM not configured — run: coderev config llm --enable --provider cli --command \"claude -p {prompt}\"")
-		return nil
-	}
-	data, err := os.ReadFile(filepath.Join(target, promptFile))
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: reading prompt file: %v\n", err)
 		return nil
 	}
 	provider, err := llm.New(tc.LLM)
@@ -86,10 +89,22 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 		fmt.Fprintf(os.Stderr, "warning: LLM provider: %v\n", err)
 		return nil
 	}
-	estTokens := len(data) / 4
-	stop := startSpinner(fmt.Sprintf("  review: asking AI (~%s input tokens)", fmtTokens(estTokens)))
-	review, usage, err := provider.Complete(ctx, string(data))
-	stop()
+	chunks := llm.ChunkByFile(rc)
+	var review string
+	var totalUsage llm.TokenUsage
+	if len(chunks) <= 1 {
+		prompt := llm.AssemblePrompt(rc)
+		estTokens := len(prompt) / 4
+		stop := startSpinner(fmt.Sprintf("  review: asking AI (~%s input tokens)", fmtTokens(estTokens)))
+		review, totalUsage, err = provider.Complete(ctx, prompt)
+		stop()
+	} else {
+		review, totalUsage, err = llm.ReviewChunked(ctx, provider, chunks, func(p llm.ChunkProgress) {
+			fmt.Fprintf(os.Stderr, "\r  review: chunk %d/%d — %s (~%s tokens)%-10s",
+				p.N, p.Total, p.File, fmtTokens(p.Est), "")
+		})
+		fmt.Fprintf(os.Stderr, "\r%-70s\r", "")
+	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: LLM completion: %v\n", err)
 		return nil
@@ -100,7 +115,7 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 		return nil
 	}
 	fmt.Fprintf(os.Stderr, "  review: %s  (in: %s · out: %s tokens)\n",
-		reviewFile, fmtTokens(usage.InputTokens), fmtTokens(usage.OutputTokens))
+		reviewFile, fmtTokens(totalUsage.InputTokens), fmtTokens(totalUsage.OutputTokens))
 	return nil
 }
 
