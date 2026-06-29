@@ -17,7 +17,7 @@ func TestCLIProvider_Echo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := p.Complete(context.Background(), "hello world")
+	result, _, err := p.Complete(context.Background(), "hello world")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestCLIProvider_SpecialChars(t *testing.T) {
 		t.Fatal(err)
 	}
 	prompt := "hello $(whoami) && rm -rf /"
-	result, err := p.Complete(context.Background(), prompt)
+	result, _, err := p.Complete(context.Background(), prompt)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,7 +56,7 @@ func TestCLIProvider_EmptyCommand(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = p.Complete(context.Background(), "test")
+	_, _, err = p.Complete(context.Background(), "test")
 	if err == nil {
 		t.Fatal("expected error for empty cli_command")
 	}

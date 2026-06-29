@@ -86,8 +86,9 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 		fmt.Fprintf(os.Stderr, "warning: LLM provider: %v\n", err)
 		return nil
 	}
-	stop := startSpinner("  review: asking AI")
-	review, err := provider.Complete(ctx, string(data))
+	estTokens := len(data) / 4
+	stop := startSpinner(fmt.Sprintf("  review: asking AI (~%s input tokens)", fmtTokens(estTokens)))
+	review, usage, err := provider.Complete(ctx, string(data))
 	stop()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: LLM completion: %v\n", err)
@@ -98,8 +99,16 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 		fmt.Fprintf(os.Stderr, "warning: writing review file: %v\n", err)
 		return nil
 	}
-	fmt.Fprintf(os.Stderr, "  review: %s\n", reviewFile)
+	fmt.Fprintf(os.Stderr, "  review: %s  (in: %s · out: %s tokens)\n",
+		reviewFile, fmtTokens(usage.InputTokens), fmtTokens(usage.OutputTokens))
 	return nil
+}
+
+func fmtTokens(n int) string {
+	if n >= 1000 {
+		return fmt.Sprintf("%d,%03d", n/1000, n%1000)
+	}
+	return fmt.Sprintf("%d", n)
 }
 
 func startSpinner(label string) func() {

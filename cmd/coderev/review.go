@@ -109,7 +109,7 @@ func buildReview(ctx context.Context, tc analysis.ToolConfig, diffRef, target st
 	if err != nil {
 		return "", fmt.Errorf("creating LLM provider: %w", err)
 	}
-	review, err := provider.Complete(ctx, prompt)
+	review, _, err := provider.Complete(ctx, prompt)
 	if err != nil {
 		return "", fmt.Errorf("LLM completion: %w", err)
 	}
