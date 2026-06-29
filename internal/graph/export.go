@@ -1,12 +1,17 @@
 package graph
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 )
+
+//go:embed graph_template.html
+var graphHTMLTemplate string
 
 // sortedGraph returns copies of the graph's nodes and edges in a canonical order
 // (nodes by ID; edges by source, then target, then relation). Exports use this so
@@ -40,7 +45,7 @@ type jsonGraph struct {
 type jsonNode struct {
 	ID         string `json:"id"`
 	Label      string `json:"label"`
-	FileType   string `json:"file_type"`
+	Kind       string `json:"kind"`
 	SourceFile string `json:"source_file"`
 }
 
@@ -55,11 +60,10 @@ func ExportJSON(g *Graph, dir string) error {
 	snodes, sedges := sortedGraph(g)
 	gf := jsonGraph{Directed: true}
 	for _, n := range snodes {
-		ft := string(n.Kind)
 		gf.Nodes = append(gf.Nodes, jsonNode{
 			ID:         n.ID,
 			Label:      n.Label,
-			FileType:   ft,
+			Kind:       string(n.Kind),
 			SourceFile: n.SourceFile,
 		})
 	}
@@ -81,147 +85,16 @@ func ExportJSON(g *Graph, dir string) error {
 	return os.WriteFile(filepath.Join(dir, "graph.json"), data, 0o644)
 }
 
-// graphHTMLTemplate is the fully offline HTML/JS page template for graph.html.
-// Placeholders: %.0f (viewBox w), %.0f (viewBox h), %s (nodes JSON),
-// %s (edges JSON), %.0f (viewport w), %.0f (viewport h).
-const graphHTMLTemplate = `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>coderev · code graph</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:100%%;height:100%%;overflow:hidden;background:#0a0a0f;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-#svg{width:100%%;height:100%%;cursor:grab}
-#svg.panning{cursor:grabbing}
-.legend{position:absolute;top:12px;left:12px;background:rgba(255,255,255,.95);border-radius:8px;padding:10px 12px;font-size:12px;line-height:1.7;box-shadow:0 2px 8px rgba(0,0,0,.3)}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:50%%;margin-right:6px;vertical-align:middle}
-.hint{position:absolute;bottom:10px;left:12px;color:#888;font-size:11px}
-text{pointer-events:none;fill:#cfcfd6;font-size:9px}
-line{stroke:#555;stroke-opacity:.6;stroke-width:1}
-circle{stroke:#0a0a0f;stroke-width:1.5;cursor:pointer}
-</style>
-</head>
-<body>
-<div class="legend">
-<div><i style="background:#4A90D9"></i>file</div>
-<div><i style="background:#7B68EE"></i>function</div>
-<div><i style="background:#E6A817"></i>type</div>
-</div>
-<div class="hint">scroll to zoom · drag background to pan · drag a node to move it</div>
-<svg id="svg" viewBox="0 0 %.0f %.0f" preserveAspectRatio="xMidYMid meet">
-<defs>
-<marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,-5L10,0L0,5" fill="#555"></path></marker>
-</defs>
-<g id="view"></g>
-</svg>
-<script>
-const NODES = %s;
-const LINKS = %s;
-const COLOR = {file:"#4A90D9",function:"#7B68EE",type:"#E6A817"};
-const svg = document.getElementById("svg");
-const view = document.getElementById("view");
-const NS = svg.namespaceURI;
-const byId = {};
-NODES.forEach(n => { byId[n.id] = n; });
-
-const lineEls = [];
-LINKS.forEach(l => {
-  const s = byId[l.source], t = byId[l.target];
-  if (!s || !t) return;
-  const ln = document.createElementNS(NS, "line");
-  ln.setAttribute("marker-end", "url(#arrow)");
-  ln.s = s; ln.t = t;
-  view.appendChild(ln);
-  lineEls.push(ln);
-});
-
-NODES.forEach(n => {
-  const c = document.createElementNS(NS, "circle");
-  c.setAttribute("r", n.group === "file" ? 7 : 4.5);
-  c.setAttribute("fill", COLOR[n.group] || "#aaa");
-  c.node = n;
-  const tip = document.createElementNS(NS, "title");
-  tip.textContent = n.label + " (" + n.group + ")";
-  c.appendChild(tip);
-  view.appendChild(c);
-  n.c = c;
-  n.tx = null;
-  if (n.group === "file") {
-    const tx = document.createElementNS(NS, "text");
-    const lbl = n.label.length > 22 ? n.label.slice(0, 20) + "…" : n.label;
-    tx.textContent = lbl;
-    tx.setAttribute("dx", 9);
-    tx.setAttribute("dy", 3);
-    view.appendChild(tx);
-    n.tx = tx;
-  }
-});
-
-function render() {
-  for (const ln of lineEls) {
-    ln.setAttribute("x1", ln.s.x); ln.setAttribute("y1", ln.s.y);
-    ln.setAttribute("x2", ln.t.x); ln.setAttribute("y2", ln.t.y);
-  }
-  for (const n of NODES) {
-    n.c.setAttribute("cx", n.x); n.c.setAttribute("cy", n.y);
-    if (n.tx) { n.tx.setAttribute("x", n.x); n.tx.setAttribute("y", n.y); }
-  }
-}
-render();
-
-let vb = {x:0, y:0, w:%.0f, h:%.0f};
-function applyVB() { svg.setAttribute("viewBox", vb.x+" "+vb.y+" "+vb.w+" "+vb.h); }
-function toSvg(e) {
-  const r = svg.getBoundingClientRect();
-  return { x: vb.x + (e.clientX - r.left)/r.width*vb.w,
-           y: vb.y + (e.clientY - r.top)/r.height*vb.h };
-}
-svg.addEventListener("wheel", e => {
-  e.preventDefault();
-  const scale = e.deltaY < 0 ? 0.9 : 1.1;
-  const p = toSvg(e);
-  vb.x = p.x - (p.x - vb.x)*scale;
-  vb.y = p.y - (p.y - vb.y)*scale;
-  vb.w *= scale; vb.h *= scale;
-  applyVB();
-}, {passive:false});
-
-let drag = null;
-svg.addEventListener("mousedown", e => {
-  if (e.target.tagName === "circle") { drag = {node: e.target.node}; }
-  else { drag = {pan:true, lx:e.clientX, ly:e.clientY}; svg.classList.add("panning"); }
-});
-window.addEventListener("mousemove", e => {
-  if (!drag) return;
-  if (drag.node) {
-    const p = toSvg(e);
-    drag.node.x = +p.x.toFixed(1); drag.node.y = +p.y.toFixed(1);
-    render();
-  } else {
-    const r = svg.getBoundingClientRect();
-    vb.x -= (e.clientX - drag.lx)/r.width*vb.w;
-    vb.y -= (e.clientY - drag.ly)/r.height*vb.h;
-    drag.lx = e.clientX; drag.ly = e.clientY;
-    applyVB();
-  }
-});
-window.addEventListener("mouseup", () => { drag = null; svg.classList.remove("panning"); });
-</script>
-</body>
-</html>`
-
-// buildHTMLPayload serialises sorted graph nodes and edges into JSON byte slices.
+// buildHTMLPayload serialises sorted function/type nodes and edges into JSON.
 func buildHTMLPayload(g *Graph, pos map[string]Position) ([]byte, []byte) {
 	snodes, sedges := sortedGraph(g)
-
 	type jsNode struct {
-		ID    string  `json:"id"`
-		Label string  `json:"label"`
-		Group string  `json:"group"`
-		X     float64 `json:"x"`
-		Y     float64 `json:"y"`
+		ID         string  `json:"id"`
+		Label      string  `json:"label"`
+		Group      string  `json:"group"`
+		SourceFile string  `json:"source_file"`
+		X          float64 `json:"x"`
+		Y          float64 `json:"y"`
 	}
 	type jsEdge struct {
 		Source string `json:"source"`
@@ -230,25 +103,87 @@ func buildHTMLPayload(g *Graph, pos map[string]Position) ([]byte, []byte) {
 	nodes := make([]jsNode, 0, len(snodes))
 	for _, n := range snodes {
 		p := pos[n.ID]
-		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind), X: p.X, Y: p.Y})
+		nodes = append(nodes, jsNode{ID: n.ID, Label: n.Label, Group: string(n.Kind), SourceFile: n.SourceFile, X: p.X, Y: p.Y})
 	}
 	edges := make([]jsEdge, 0, len(sedges))
 	for _, e := range sedges {
 		edges = append(edges, jsEdge{Source: e.Source, Target: e.Target})
 	}
-
 	nodesJSON, _ := json.Marshal(nodes)
 	edgesJSON, _ := json.Marshal(edges)
 	return nodesJSON, edgesJSON
+}
+
+// buildFilePayload aggregates function nodes into file-level nodes and edges.
+func buildFilePayload(g *Graph, pos map[string]Position) ([]byte, []byte) {
+	snodes, sedges := sortedGraph(g)
+	type fileMeta struct{ sumX, sumY float64; count, fnCount int }
+	meta := map[string]*fileMeta{}
+	fnToFile := map[string]string{}
+	for _, n := range snodes {
+		p := pos[n.ID]
+		m := meta[n.SourceFile]
+		if m == nil {
+			m = &fileMeta{}
+			meta[n.SourceFile] = m
+		}
+		m.sumX += p.X; m.sumY += p.Y; m.count++
+		if n.Kind == KindFunction || n.Kind == KindType {
+			m.fnCount++
+		}
+		fnToFile[n.ID] = n.SourceFile
+	}
+	files := make([]string, 0, len(meta))
+	for f := range meta {
+		files = append(files, f)
+	}
+	sort.Strings(files)
+	type fileNode struct {
+		ID      string  `json:"id"`
+		Label   string  `json:"label"`
+		Kind    string  `json:"kind"`
+		X       float64 `json:"x"`
+		Y       float64 `json:"y"`
+		FnCount int     `json:"fn_count"`
+	}
+	fnodes := make([]fileNode, 0, len(files))
+	for _, f := range files {
+		m := meta[f]
+		n := float64(m.count)
+		fnodes = append(fnodes, fileNode{ID: f, Label: filepath.Base(f),
+			Kind: "file", X: m.sumX / n, Y: m.sumY / n, FnCount: m.fnCount})
+	}
+	type fileEdge struct {
+		Source string `json:"source"`
+		Target string `json:"target"`
+	}
+	seen := map[string]bool{}
+	var fedges []fileEdge
+	for _, e := range sedges {
+		sf, tf := fnToFile[e.Source], fnToFile[e.Target]
+		if sf == "" || tf == "" || sf == tf {
+			continue
+		}
+		if key := sf + "|" + tf; !seen[key] {
+			seen[key] = true
+			fedges = append(fedges, fileEdge{Source: sf, Target: tf})
+		}
+	}
+	fnodesJSON, _ := json.Marshal(fnodes)
+	fedgesJSON, _ := json.Marshal(fedges)
+	return fnodesJSON, fedgesJSON
 }
 
 // ExportGraphHTML writes a fully self-contained HTML page into dir/graph.html.
 func ExportGraphHTML(g *Graph, dir string) error {
 	pos := ComputeLayout(g)
 	nodesJSON, edgesJSON := buildHTMLPayload(g, pos)
-
-	html := fmt.Sprintf(graphHTMLTemplate, layoutWidth, layoutHeight, nodesJSON, edgesJSON, layoutWidth, layoutHeight)
-
+	filesJSON, fileLinksJSON := buildFilePayload(g, pos)
+	html := graphHTMLTemplate
+	html = strings.ReplaceAll(html, "__NODES_JSON__", string(nodesJSON))
+	html = strings.ReplaceAll(html, "__LINKS_JSON__", string(edgesJSON))
+	html = strings.ReplaceAll(html, "__FILES_JSON__", string(filesJSON))
+	html = strings.ReplaceAll(html, "__FILE_LINKS_JSON__", string(fileLinksJSON))
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return fmt.Errorf("mkdir %s: %w", dir, err)
 	}
