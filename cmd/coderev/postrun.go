@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/graph"
@@ -72,6 +73,7 @@ func writePromptFile(target string, findings []analysis.Finding, graphDir string
 // writes the review to .coderev/review.md. LLM failures are warnings only.
 func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) error {
 	if !tc.LLM.Enabled {
+		fmt.Fprintln(os.Stderr, "  review: LLM not configured — run: coderev config llm --enable --provider cli --command \"claude -p {prompt}\"")
 		return nil
 	}
 	data, err := os.ReadFile(filepath.Join(target, promptFile))
@@ -84,7 +86,9 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 		fmt.Fprintf(os.Stderr, "warning: LLM provider: %v\n", err)
 		return nil
 	}
+	stop := startSpinner("  review: asking AI")
 	review, err := provider.Complete(ctx, string(data))
+	stop()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: LLM completion: %v\n", err)
 		return nil
@@ -96,4 +100,23 @@ func maybeSendToLLM(ctx context.Context, target string, tc analysis.ToolConfig) 
 	}
 	fmt.Fprintf(os.Stderr, "  review: %s\n", reviewFile)
 	return nil
+}
+
+func startSpinner(label string) func() {
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	done := make(chan struct{})
+	go func() {
+		i := 0
+		for {
+			select {
+			case <-done:
+				fmt.Fprintf(os.Stderr, "\r%-60s\r", "")
+				return
+			case <-time.After(100 * time.Millisecond):
+				fmt.Fprintf(os.Stderr, "\r%s %s", label, frames[i%len(frames)])
+				i++
+			}
+		}
+	}()
+	return func() { close(done) }
 }

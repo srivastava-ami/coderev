@@ -28,6 +28,7 @@ var (
 	flagJSON           bool
 	flagGate           string
 	flagPluginDir      string
+	flagReview         bool
 )
 
 func main() {
@@ -62,6 +63,7 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 	root.Flags().BoolVar(&flagJSON, "json", false, "output findings as JSON instead of markdown")
 	root.Flags().StringVar(&flagGate, "gate", "", "path to .coderev-gate.toml for quality gate check")
 	root.Flags().StringVar(&flagPluginDir, "plugin-dir", "", "custom plugin directory (default: ~/.config/coderev/plugins)")
+	root.Flags().BoolVar(&flagReview, "review", false, "send assembled prompt to configured LLM and write .coderev/review.md")
 
 	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps, cmdPlugin, cmdGraph, cmdConfig, cmdAsk, newReviewCmd())
 
@@ -156,6 +158,9 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	graphDir := buildGraphInline(s.target, s.tc)
 	if err := writePromptFile(s.target, result.Findings, graphDir); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
+	}
+	if !flagReview {
+		return nil
 	}
 	return maybeSendToLLM(context.Background(), s.target, s.tc)
 }
