@@ -9,6 +9,7 @@ import (
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/config"
+	"github.com/srivastava-ami/coderev/internal/llm"
 	"github.com/srivastava-ami/coderev/internal/toolmgr"
 )
 
@@ -29,6 +30,7 @@ var (
 	flagGate           string
 	flagPluginDir      string
 	flagReview         bool
+	flagFullReview     bool
 )
 
 func main() {
@@ -64,6 +66,7 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 	root.Flags().StringVar(&flagGate, "gate", "", "path to .coderev-gate.toml for quality gate check")
 	root.Flags().StringVar(&flagPluginDir, "plugin-dir", "", "custom plugin directory (default: ~/.config/coderev/plugins)")
 	root.Flags().BoolVar(&flagReview, "review", false, "send assembled prompt to configured LLM and write .coderev/review.md")
+	root.Flags().BoolVar(&flagFullReview, "full-review", false, "review every file in the code graph via LLM (graph context only, no diff required)")
 
 	root.AddCommand(cmdSetup, cmdInstallHooks, cmdInstallDeps, cmdPlugin, cmdGraph, cmdConfig, cmdAsk, newReviewCmd())
 
@@ -159,6 +162,9 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	rc := buildReviewContext(s.target, result.Findings, graphDir)
 	if err := writePromptFile(s.target, rc); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
+	}
+	if flagFullReview {
+		return runFullGraphReview(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: llm.ReviewContext{Findings: result.Findings}}, graphDir)
 	}
 	if !flagReview {
 		return nil

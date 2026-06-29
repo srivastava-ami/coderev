@@ -111,6 +111,34 @@ func GraphNeighborhood(graphJSON []byte, changedFiles []string, hops int) ([]Gra
 	return buildNeighborList(gd.Links, nodeByID, visited), nil
 }
 
+// GraphNodesByFile parses graph.json and returns all nodes grouped by source file,
+// without the 60-node cap — used for full-graph review where each file is a chunk.
+func GraphNodesByFile(graphJSON []byte) (map[string][]GraphNeighbor, error) {
+	var gd graphData
+	if err := json.Unmarshal(graphJSON, &gd); err != nil {
+		return nil, err
+	}
+	nodeByID := make(map[string]graphNode, len(gd.Nodes))
+	for _, n := range gd.Nodes {
+		nodeByID[n.ID] = n
+	}
+	byFile := make(map[string]map[string]bool)
+	for _, n := range gd.Nodes {
+		if n.SourceFile == "" {
+			continue
+		}
+		if byFile[n.SourceFile] == nil {
+			byFile[n.SourceFile] = make(map[string]bool)
+		}
+		byFile[n.SourceFile][n.ID] = true
+	}
+	result := make(map[string][]GraphNeighbor, len(byFile))
+	for file, ids := range byFile {
+		result[file] = buildNeighborList(gd.Links, nodeByID, ids)
+	}
+	return result, nil
+}
+
 // AllGraphNodes returns up to 60 nodes from the graph — used when there is no
 // diff to seed BFS from, so the LLM still has full structural context.
 func AllGraphNodes(graphJSON []byte) ([]GraphNeighbor, error) {

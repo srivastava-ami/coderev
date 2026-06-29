@@ -200,3 +200,28 @@ func filter(nodes []Node, t string) []Node {
 	}
 	return out
 }
+
+// DetectWithGraph is like Detect but uses graph.json (from graphJSONPath) to derive
+// file-level architecture nodes and call edges when no architecture doc is found.
+func DetectWithGraph(target, graphJSONPath string) Summary {
+	for _, candidate := range archDocCandidates {
+		path := filepath.Join(target, candidate)
+		data, err := os.ReadFile(path)
+		if err == nil {
+			return Summary{Source: "doc", DocFile: path, Text: string(data), Nodes: []Node{}, Edges: []Edge{}}
+		}
+	}
+	if s, ok := fromNXWorkspace(target); ok {
+		return s
+	}
+	if graphJSONPath != "" {
+		data, err := os.ReadFile(graphJSONPath)
+		if err == nil {
+			if s, ok := fromGraphJSON(data); ok {
+				return s
+			}
+		}
+	}
+	return synthesiseFromDirs(target)
+}
+
