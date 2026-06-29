@@ -1,0 +1,24 @@
+# coderev LLM context filter — patterns here exclude paths from AI review context
+# (findings still appear in reports; only the prompt sent to the LLM is filtered)
+# gitignore-style globs: *.md matches any basename, docs/ matches any path component
+*.md
+*.markdown
+*.txt
+*.rst
+*.adoc
+*.asciidoc
+docs/
+doc/
+documentation/
+CHANGELOG*
+LICENSE*
+NOTICE*
+AUTHORS*
+README*
+*.svg
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.pdf
