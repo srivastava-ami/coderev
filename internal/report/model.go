@@ -20,6 +20,7 @@ type Report struct {
 	Findings     []analysis.Finding
 	Warnings     []analysis.AdapterWarning
 	Exceptions   []analysis.Exception
+	AIReview     string
 	Generated    time.Time
 }
 
@@ -66,6 +67,7 @@ type BuildRequest struct {
 	Warnings  []analysis.AdapterWarning
 	Arch      architecture.Summary
 	Delta     *baseline.Delta // optional: trend vs saved baseline
+	AIReview  string          // optional: content of .coderev/review.md
 }
 
 // Build constructs a Report from raw analysis output.
@@ -79,6 +81,7 @@ func Build(req BuildRequest) Report {
 		Findings:     req.Findings,
 		Warnings:     req.Warnings,
 		Exceptions:   req.Standards.Exceptions,
+		AIReview:     req.AIReview,
 		Generated:    time.Now(),
 	}
 }
