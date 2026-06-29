@@ -207,6 +207,23 @@ tr:hover td{background:var(--surface2)}
 .gd-dep-group .dd-label{color:var(--muted);margin-right:3px}
 .gd-dep-group .dd-count{font-weight:600;color:var(--text)}
 
+/* Tooltip */
+#gtip{position:absolute;pointer-events:none;font-size:10.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);z-index:50;white-space:nowrap;opacity:0;transition:opacity .12s;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+#gtip.show{opacity:.95}
+/* Layer bands */
+.lay-band{pointer-events:none}
+.lay-band .lbl{font-size:10px;font-weight:700;fill:var(--muted);letter-spacing:2px;text-transform:uppercase}
+/* Edge flow highlight */
+.lnk.flow{stroke:var(--warn);opacity:.9;stroke-width:2.5}
+.lnk.flow-light{stroke:var(--warn);opacity:.4;stroke-width:1.8}
+.lnk.flow-dim{opacity:.08}
+/* Entrypoint star */
+.ep-star{fill:var(--pass);opacity:.95}
+.ep-glow{animation:epulse 2s ease-in-out infinite;transform-origin:center}
+@keyframes epulse{0%,100%{opacity:.35}50%{opacity:.85}}
+/* Function expanded */
+.fn-band{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
+
 /* Responsive */
 @media(max-width:900px){
   .grid-4{grid-template-columns:repeat(2,1fr)}
@@ -288,7 +305,8 @@ tr:hover td{background:var(--surface2)}
           <div class="glegend" id="glegend"></div>
         </div>
         <div id="graph-host">
-          <svg id="gsvg"><g id="gview"></g></svg>
+          <svg id="gsvg"><defs><marker id="arrow-calls" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--muted)" opacity=".6"/></marker><marker id="arrow-calls-hot" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--info)" opacity="1"/></marker><marker id="arrow-import" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--muted)" opacity=".4"/></marker><marker id="arrow-flow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--warn)" opacity="1"/></marker></defs><g id="gview"></g></svg>
+          <div id="gtip"></div>
           <div class="ghint">drag a node · scroll = zoom · drag canvas = pan · double-click file = expand functions</div>
         </div>
         <div class="gdetail" id="gdetail"></div>
