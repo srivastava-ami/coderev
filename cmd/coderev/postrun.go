@@ -51,6 +51,11 @@ func writePromptFile(target string, findings []analysis.Finding, graphDir string
 			rc.Neighbors = loadGraphNeighbors(fakeCfg, target, changedFileSet(hunks))
 		}
 	}
+	if len(rc.Neighbors) == 0 && graphDir != "" {
+		if data, err := os.ReadFile(filepath.Join(graphDir, "graph.json")); err == nil {
+			rc.Neighbors, _ = llm.AllGraphNodes(data)
+		}
+	}
 	prompt := llm.AssemblePrompt(rc)
 	outPath := filepath.Join(target, promptFile)
 	if err := os.MkdirAll(filepath.Dir(outPath), coderevDirPerms); err != nil {
