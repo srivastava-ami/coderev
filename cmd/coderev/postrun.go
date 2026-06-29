@@ -11,6 +11,7 @@ import (
 	"github.com/srivastava-ami/coderev/internal/config"
 	"github.com/srivastava-ami/coderev/internal/graph"
 	"github.com/srivastava-ami/coderev/internal/llm"
+	"github.com/srivastava-ami/coderev/internal/report"
 )
 
 const coderevIgnoreFile = ".coderev/.coderevignore"
@@ -244,6 +245,21 @@ func filterFindingsByFile(findings []analysis.Finding, file string) []analysis.F
 		}
 	}
 	return out
+}
+
+func refreshHTMLWithReview(r report.Report, target string) error {
+	data, err := os.ReadFile(filepath.Join(target, reviewFile))
+	if err != nil {
+		return nil
+	}
+	r.AIReview = string(data)
+	htmlPath := filepath.Join(target, ".coderev", "report.html")
+	if err := report.Generate(r, htmlPath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: refreshing HTML report: %v\n", err)
+		return nil
+	}
+	fmt.Fprintf(os.Stderr, "  report: %s updated with AI review\n", ".coderev/report.html")
+	return nil
 }
 
 func fmtTokens(n int) string {

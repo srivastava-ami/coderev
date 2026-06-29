@@ -144,6 +144,7 @@ tr:hover td{background:var(--surface2)}
   <button class="tab" onclick="showTab('violations',this)">Violations</button>
   <button class="tab" onclick="showTab('files',this)">Files</button>
   <button class="tab" onclick="showTab('exceptions',this)">Exceptions</button>
+  <button class="tab" onclick="showTab('aireview',this)">AI Review</button>
 </nav>
 
 <div class="container">
@@ -215,6 +216,11 @@ tr:hover td{background:var(--surface2)}
     <div id="exceptions-content"></div>
   </div>
 
+  <!-- ── AI REVIEW ─────────────────────────────────────────────────── -->
+  <div id="panel-aireview" class="panel">
+    <div id="aireview-content"></div>
+  </div>
+
 </div>
 
 <footer style="text-align:center;padding:24px 16px;margin-top:24px;color:var(--muted);font-size:.8rem">
@@ -233,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderFiles();
   renderArchitecture();
   renderExceptions();
+  renderAIReview();
 });
 
 // ── Header ───────────────────────────────────────────────────────────────────
@@ -560,6 +567,25 @@ function renderExceptions() {
 function isExpired(dateStr) {
   if (!dateStr) return false;
   return new Date(dateStr) < new Date();
+}
+
+// ── AI Review ─────────────────────────────────────────────────────────────────
+function renderAIReview() {
+  const el = document.getElementById('aireview-content');
+  const review = R.AIReview || '';
+  if (!review.trim()) {
+    el.innerHTML = `<div style="color:var(--muted);font-size:.88rem;padding:32px 0;text-align:center">
+      <div style="font-size:1.5rem;margin-bottom:12px">🤖</div>
+      <div>No AI review yet.</div>
+      <div style="margin-top:8px;font-size:.8rem">Run <code style="background:var(--surface2);padding:2px 6px;border-radius:4px">coderev . --review --diff &lt;base-ref&gt;</code> to generate one.</div>
+    </div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.15);border-radius:8px;padding:8px 14px;font-size:.78rem;margin-bottom:16px;color:var(--muted)">
+      🤖 Gap-detector output — deterministic scan covers 90%; this highlights what rules may have missed.
+    </div>
+    <div class="arch-text">${markdownToHtml(review)}</div>`;
 }
 
 // ── Tab navigation ────────────────────────────────────────────────────────────

@@ -102,6 +102,7 @@ func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string
 	target := s.target
 	base, _ := baseline.Load(target)
 	delta := baseline.Compute(base, result.Findings)
+	existingReview, _ := os.ReadFile(filepath.Join(target, ".coderev", "review.md"))
 	r := report.Build(report.BuildRequest{
 		Target:    target,
 		Standards: s.stds,
@@ -111,6 +112,7 @@ func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string
 		Warnings:  result.Warnings,
 		Arch:      architecture.DetectWithGraph(target, graphJSONPath(target, s.tc)),
 		Delta:     &delta,
+		AIReview:  string(existingReview),
 	})
 	if flagUpdateBaseline {
 		if err := baseline.Save(target, result.Findings); err != nil {

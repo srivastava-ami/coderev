@@ -164,12 +164,17 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
 	}
 	if flagFullReview {
-		return runFullGraphReview(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: llm.ReviewContext{Findings: result.Findings}}, graphDir)
-	}
-	if !flagReview {
+		if err := runFullGraphReview(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: llm.ReviewContext{Findings: result.Findings}}, graphDir); err != nil {
+			return err
+		}
+	} else if flagReview {
+		if err := maybeSendToLLM(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: rc}); err != nil {
+			return err
+		}
+	} else {
 		return nil
 	}
-	return maybeSendToLLM(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: rc})
+	return refreshHTMLWithReview(r, s.target)
 }
 
 
