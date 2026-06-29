@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -149,7 +150,14 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	if err := printGateResult(gateResult); err != nil {
 		return err
 	}
-	return postAnnotate(r, s.target)
+	if err := postAnnotate(r, s.target); err != nil {
+		return err
+	}
+	graphDir := buildGraphInline(s.target, s.tc)
+	if err := writePromptFile(s.target, result.Findings, graphDir); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
+	}
+	return maybeSendToLLM(context.Background(), s.target, s.tc)
 }
 
 
