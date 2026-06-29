@@ -592,14 +592,15 @@ function renderDocs() {
   }
   if (tab) tab.style.display = '';
   el.innerHTML = docs.map((d, i) => {
-    const isPrimary = i === 0 || (arch.ArchDocHTML && d.html === arch.ArchDocHTML);
+    const isPrimary = i === 0;
+    const rendered = d.content ? markdownToHtml(d.content) : (d.html || '');
     return `<div class="adoc-panel" style="margin-bottom:8px">
       <div class="adoc-header" onclick="toggleDocPanel(this)">
         <span style="font-size:.85rem;font-weight:600">${escHtml(d.name || d.path)}</span>
         <span style="font-size:.72rem;color:var(--muted)">${escHtml(d.path)}</span>
         <span class="adoc-chev" style="margin-left:auto">${isPrimary ? '▲' : '▼'}</span>
       </div>
-      <div class="adoc-body arch-text ${isPrimary ? 'open' : ''}">${d.html}</div>
+      <div class="adoc-body arch-text ${isPrimary ? 'open' : ''}">${rendered}</div>
     </div>`;
   }).join('');
 }
@@ -1099,17 +1100,102 @@ function escHtml(s) {
 }
 
 function markdownToHtml(md) {
-  return md
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, s => '<ul>' + s + '</ul>')
-    .replace(/\n\n/g, '</p><p>')
-    .replace(/^(?!<[hupb])/gm, '')
-    .trim();
+  if (!md) return '';
+  const lines = md.split('\n');
+  let html = '', i = 0, inCode = false, inList = false, inBlockquote = false, inTable = false, tableHead = false;
+  const closeList = () => { if (inList) { html += '</ul>\n'; inList = false; } };
+  const closeBq = () => { if (inBlockquote) { html += '</blockquote>\n'; inBlockquote = false; } };
+  const closeTable = () => { if (inTable) { html += '</tbody></table>\n'; inTable = false; tableHead = false; } };
+  const flush = () => { closeTable(); closeList(); closeBq(); };
+  const esc = (s) => escHtml(s);
+  const inline = (s) => {
+    // Escape HTML first, then apply markdown inline formatting
+    s = esc(s);
+    // Images: ![alt](url)
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width:100%">');
+    // Links: [text](url)
+    s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+    // Bold+italic: ***text***
+    s = s.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    // Bold: **text** or __text__
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic: *text* or _text_
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    s = s.replace(/_(.+?)_/g, '<em>$1</em>');
+    // Strikethrough: ~~text~~
+    s = s.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // Inline code: `code`
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    return s;
+  };
+  while (i < lines.length) {
+    let raw = lines[i];
+    const trimmed = raw.trimEnd();
+    // Fenced code block start/end
+    if (/^```/.test(raw)) {
+      flush();
+      if (inCode) { html += '</code></pre>\n'; inCode = false; i++; continue; }
+      const lang = raw.slice(3).trim();
+      html += `<pre><code${lang?' class="lang-'+esc(lang)+'"':''}>`;
+      inCode = true; i++; continue;
+    }
+    if (inCode) { html += esc(raw) + '\n'; i++; continue; }
+    // Horizontal rule
+    if (/^[-*_]{3,}\s*$/.test(raw)) { flush(); html += '<hr>\n'; i++; continue; }
+    // ATX headers
+    const hm = raw.match(/^(#{1,6})\s+(.+)$/);
+    if (hm) { flush(); html += `<h${hm[1].length}>${inline(hm[2])}</h${hm[1].length}>\n`; i++; continue; }
+    // Blockquote
+    const bqm = raw.match(/^>\s*(.*)$/);
+    if (bqm) {
+      if (!inBlockquote) { flush(); html += '<blockquote>\n'; inBlockquote = true; }
+      html += (bqm[1] ? inline(bqm[1]) + '<br>\n' : '');
+      i++; continue;
+    }
+    if (inBlockquote) { closeBq(); }
+    // Table
+    if (raw.includes('|') && /^\|.+\|$/.test(raw.trim())) {
+      const cells = raw.split('|').filter(c => c !== undefined).slice(1, -1);
+      // Check if it's a separator row
+      if (cells.length > 0 && /^[-:| ]+$/.test(cells.join(''))) { i++; continue; }
+      if (!inTable) { flush(); html += '<table><thead>\n'; inTable = true; tableHead = true; }
+      const tag = tableHead ? 'th' : 'td';
+      html += '<tr>';
+      cells.forEach(c => { html += `<${tag}>${inline(c.trim())}</${tag}>`; });
+      html += '</tr>\n';
+      if (tableHead) { html += '</thead>\n<tbody>\n'; tableHead = false; }
+      i++; continue;
+    }
+    if (inTable && !raw.includes('|')) { closeTable(); }
+    // Unordered list
+    const ulm = raw.match(/^[-*+]\s+(.+)$/);
+    if (ulm) {
+      if (!inList) { flush(); html += '<ul>\n'; inList = true; }
+      html += `<li>${inline(ulm[1])}</li>\n`;
+      i++; continue;
+    }
+    // Ordered list
+    const olm = raw.match(/^\d+\.\s+(.+)$/);
+    if (olm) {
+      if (inList) { html += '</ul>\n'; inList = false; }
+      html += `<li>${inline(olm[1])}</li>\n`;
+      i++; continue;
+    } else if (inList) { closeList(); }
+    // Empty line
+    if (raw.trim() === '') { html += '\n'; i++; continue; }
+    // Paragraph
+    let para = '';
+    while (i < lines.length && lines[i].trim() !== '' && !/^```/.test(lines[i]) && !/^#{1,6}\s/.test(lines[i]) && !/^>/.test(lines[i]) && !/^\|/.test(lines[i]) && !/^[-*+]\s/.test(lines[i]) && !/^\d+\.\s/.test(lines[i]) && !/^[-*_]{3,}\s*$/.test(lines[i])) {
+      para += (para ? ' ' : '') + lines[i].trim();
+      i++;
+    }
+    if (para) { html += `<p>${inline(para)}</p>\n`; }
+    else { i++; }
+  }
+  if (inCode) html += '</code></pre>\n';
+  closeTable(); closeList(); closeBq();
+  return html;
 }
 </script>
 </body>
