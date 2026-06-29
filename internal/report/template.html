@@ -818,7 +818,7 @@ const GV = {
     const place=(id,depth)=>{
       const n=GV.map[id]; if(!n) return; n.depth=depth;
       const kids=GV.links.filter(l=>l.s===id).map(l=>l.t);
-      if(kids.length){ kids.forEach(k=>place(k,depth+1)); n.x=(GV.map[kids[0]]?.x||0)+(kids.length>1?(GV.map[kids[kids.length-1]]?.x||0)- (GV.map[kids[0]]?.x||0))/2:0); }
+      if(kids.length){ kids.forEach(k=>place(k,depth+1)); n.x=(GV.map[kids[0]]?.x||0)+(kids.length>1?((GV.map[kids[kids.length-1]]?.x||0)-(GV.map[kids[0]]?.x||0))/2:0); }
       else { n.x=leaf*hGap; leaf++; }
       n.y=depth*vGap+40;
     };
