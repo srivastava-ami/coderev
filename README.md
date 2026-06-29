@@ -75,6 +75,23 @@ coderev --annotate-pr --repo owner/repo --pr 42 --diff main .
 
 Exit code `1` when blockers are found — blocks the merge. Full workflow: `.github/workflows/code-quality.yml`.
 
+## LLM review (context-aware, advisory)
+
+```bash
+# Enable once — uses your existing Claude subscription via the CLI
+coderev config llm --enable --provider cli
+
+# Review only changed files, with full code-graph context
+coderev review --diff main .
+
+# Post as an inline PR comment (no duplicates — upserts in place)
+coderev review --diff main --post-pr .
+```
+
+`coderev review` assembles a compact, context-aware prompt — git diff hunks, the graph neighborhood of changed functions (callers + callees, 2 hops), and static findings — and sends it to the configured LLM. The LLM identifies logical issues, edge cases, and correctness concerns that static analysis can't catch.
+
+**Advisory only:** the review never affects the scan gate (`coderev .` owns pass/fail). Works with any provider: `cli` (Claude/Ollama via the CLI), `api` (Anthropic API key), or any OpenAI-compatible endpoint.
+
 ## Adapters
 
 coderev's native Go adapters cover **TypeScript, JavaScript, Go, Python, and Rust with no external tools** — on by default:
