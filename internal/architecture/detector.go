@@ -15,9 +15,11 @@ type Summary struct {
 	Source      string // "doc" | "synthesised"
 	DocFile     string // path to the arch doc if found
 	Text        string // human-readable summary
+	ArchDocHTML string // Text pre-rendered as HTML (non-empty when Source=="doc")
 	ProjectName string
 	Nodes       []Node
 	Edges       []Edge
+	Packages    []PackageInfo // Go package-level structure (populated for Go repos)
 }
 
 type Node struct {
@@ -203,25 +205,40 @@ func filter(nodes []Node, t string) []Node {
 
 // DetectWithGraph is like Detect but uses graph.json (from graphJSONPath) to derive
 // file-level architecture nodes and call edges when no architecture doc is found.
+// It always populates Packages for Go repos regardless of source.
 func DetectWithGraph(target, graphJSONPath string) Summary {
+	pkgs := ScanGoPackages(target)
 	for _, candidate := range archDocCandidates {
 		path := filepath.Join(target, candidate)
 		data, err := os.ReadFile(path)
 		if err == nil {
-			return Summary{Source: "doc", DocFile: path, Text: string(data), Nodes: []Node{}, Edges: []Edge{}}
+			text := string(data)
+			return Summary{
+				Source:      "doc",
+				DocFile:     path,
+				Text:        text,
+				ArchDocHTML: MarkdownToHTML(text),
+				Nodes:       []Node{},
+				Edges:       []Edge{},
+				Packages:    pkgs,
+			}
 		}
 	}
 	if s, ok := fromNXWorkspace(target); ok {
+		s.Packages = pkgs
 		return s
 	}
 	if graphJSONPath != "" {
 		data, err := os.ReadFile(graphJSONPath)
 		if err == nil {
 			if s, ok := fromGraphJSON(data); ok {
+				s.Packages = pkgs
 				return s
 			}
 		}
 	}
-	return synthesiseFromDirs(target)
+	s := synthesiseFromDirs(target)
+	s.Packages = pkgs
+	return s
 }
 
