@@ -539,27 +539,42 @@ function toggleArchDoc() {
   chev.textContent = body.classList.contains('open') ? '▲' : '▼';
 }
 
+const NXS_LAYERS = [
+  {id:'governance',   label:'Governance',   role:'Config, standards, quality gates.'},
+  {id:'orchestration',label:'Orchestration', role:'CLI entrypoints and run wiring.'},
+  {id:'execution',    label:'Execution',     role:'Core domain logic — pure, no I/O.'},
+  {id:'persistence',  label:'Persistence',   role:'Driven adapters: file I/O, external tools.'},
+  {id:'surface',      label:'Surface',       role:'Output: reports, annotations, rendered artifacts.'},
+];
+
 function renderPackageMap(pkgs) {
   const container = document.getElementById('arch-pkg-map');
-  const layers = {};
-  pkgs.forEach(p => { (layers[p.Layer] = layers[p.Layer] || []).push(p); });
-  const layerOrder = ['cmd', 'internal', 'pkg', 'root'];
-  const layerLabel = {cmd:'Commands',internal:'Internal packages',pkg:'Public packages',root:'Root'};
-  let html = '';
-  layerOrder.forEach(layer => {
-    const items = layers[layer];
+  const byLayer = {};
+  pkgs.forEach(p => { (byLayer[p.Layer] = byLayer[p.Layer] || []).push(p); });
+  let html = `<div style="font-size:.72rem;color:var(--muted);margin-bottom:10px">
+    Architecture manifest generated at <code>.coderev/architecture.toml</code> — schema: nexovia/2 · NXS pattern.
+    Click a package to see dependencies. Edit the TOML to add context.
+  </div>`;
+  NXS_LAYERS.forEach(l => {
+    const items = byLayer[l.id];
     if (!items || !items.length) return;
-    html += buildLayerSection(layer, layerLabel[layer] || layer, items);
+    html += buildLayerSection(l, items);
+  });
+  // catch-all for any layer not in NXS_LAYERS
+  const known = new Set(NXS_LAYERS.map(l=>l.id));
+  Object.keys(byLayer).filter(k=>!known.has(k)).forEach(k => {
+    html += buildLayerSection({id:k, label:k, role:''}, byLayer[k]);
   });
   container.innerHTML = html || '<div style="color:var(--muted);font-size:.85rem;padding:20px">No packages found.</div>';
 }
 
-function buildLayerSection(layer, label, items) {
+function buildLayerSection(l, items) {
+  const roleHtml = l.role ? `<span style="font-size:.67rem;color:var(--muted);margin-left:8px;font-weight:400">${escHtml(l.role)}</span>` : '';
   const cards = items.map(p => buildPkgCard(p)).join('');
   return `<div class="pkg-layer" style="margin-bottom:8px">
     <div class="pkg-layer-hdr" onclick="toggleLayer(this)">
-      <span class="pkg-layer-title">${escHtml(label)}</span>
-      <span class="pkg-layer-count">${items.length} package${items.length > 1 ? 's' : ''}</span>
+      <span class="pkg-layer-title">${escHtml(l.label)}</span>${roleHtml}
+      <span class="pkg-layer-count">${items.length} pkg${items.length > 1 ? 's' : ''}</span>
       <span class="pkg-layer-chev">▼</span>
     </div>
     <div class="pkg-grid">${cards}</div>
@@ -568,9 +583,14 @@ function buildLayerSection(layer, label, items) {
 
 function buildPkgCard(p) {
   const deps = p.Deps || [];
+  const syms = p.ExportedSymbols || [];
   const depHtml = deps.length
-    ? `<div class="pkg-dep-panel"><div class="pkg-dep-lbl">Depends on (${deps.length})</div>${deps.map(d => `<span class="pkg-dep-tag">${escHtml(d.split('/').pop())}</span>`).join('')}</div>`
-    : '';
+    ? `<div class="pkg-dep-panel">
+        <div class="pkg-dep-lbl">Depends on (${deps.length})</div>
+        ${deps.map(d=>`<span class="pkg-dep-tag">${escHtml(d.split('/').pop())}</span>`).join('')}
+        ${syms.length ? `<div class="pkg-dep-lbl" style="margin-top:6px">Exports (${syms.length})</div>${syms.slice(0,20).map(s=>`<span class="pkg-dep-tag" style="color:var(--info)">${escHtml(s)}</span>`).join('')}${syms.length>20?`<span style="color:var(--muted);font-size:.68rem"> +${syms.length-20}</span>`:''}` : ''}
+       </div>`
+    : (syms.length ? `<div class="pkg-dep-panel"><div class="pkg-dep-lbl">Exports (${syms.length})</div>${syms.slice(0,20).map(s=>`<span class="pkg-dep-tag" style="color:var(--info)">${escHtml(s)}</span>`).join('')}${syms.length>20?`<span style="color:var(--muted);font-size:.68rem"> +${syms.length-20}</span>`:''}</div>` : '');
   const docHtml = p.DocSummary ? `<div class="pkg-doc">${escHtml(p.DocSummary)}</div>` : '';
   return `<div class="pkg-card" onclick="this.classList.toggle('open')">
     <div class="pkg-name">${escHtml(p.Name)}</div>

@@ -205,9 +205,10 @@ func filter(nodes []Node, t string) []Node {
 
 // DetectWithGraph is like Detect but uses graph.json (from graphJSONPath) to derive
 // file-level architecture nodes and call edges when no architecture doc is found.
-// It always populates Packages for Go repos regardless of source.
+// It always populates Packages for Go repos and writes .coderev/architecture.toml.
 func DetectWithGraph(target, graphJSONPath string) Summary {
 	pkgs := ScanGoPackages(target)
+	WriteArchManifest(target, pkgs)
 	for _, candidate := range archDocCandidates {
 		path := filepath.Join(target, candidate)
 		data, err := os.ReadFile(path)
