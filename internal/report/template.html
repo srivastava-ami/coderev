@@ -206,6 +206,23 @@ tr:hover td{background:var(--surface2)}
 .gd-dep-group{font-size:.65rem}
 .gd-dep-group .dd-label{color:var(--muted);margin-right:3px}
 .gd-dep-group .dd-count{font-weight:600;color:var(--text)}
+/* Tooltip */
+#gtip{position:absolute;pointer-events:none;font-size:10.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);z-index:50;white-space:nowrap;opacity:0;transition:opacity .12s;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+#gtip.show{opacity:.95}
+/* Layer band */
+.lay-band{pointer-events:none}
+.lay-band rect{stroke-dasharray:none}
+.lay-band .lbl{font-size:9px;font-weight:700;fill:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
+/* Edge flow highlight */
+.lnk.flow{stroke:var(--warn);opacity:.9;stroke-width:2.5}
+.lnk.flow-light{stroke:var(--warn);opacity:.5;stroke-width:1.5}
+.lnk.flow-dim{opacity:.1}
+/* Entrypoint star */
+.ep-star{fill:var(--pass);opacity:.9}
+.ep-glow{animation:epulse 2s ease-in-out infinite;transform-origin:center}
+@keyframes epulse{0%,100%{opacity:.4}50%{opacity:.85}}
+/* Function expanded */
+.fn-band{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
 
 /* Responsive */
 @media(max-width:900px){
