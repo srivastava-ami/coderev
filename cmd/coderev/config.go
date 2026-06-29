@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -83,6 +84,10 @@ func resolveLLMConfigPath() string {
 		return flagConfig
 	}
 	p, _ := config.DiscoverToolConfig(".")
+	if p == "" {
+		p = filepath.Join(".coderev", "tool_config.toml")
+	}
+	_ = os.MkdirAll(filepath.Dir(p), 0o755)
 	return p
 }
 

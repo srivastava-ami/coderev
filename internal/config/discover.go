@@ -6,34 +6,32 @@ import (
 )
 
 const (
+	coderevDir            = ".coderev"
 	defaultToolConfigFile = "tool_config.toml"
-	defaultOutputFile     = "coderev-report.html"
 	globalConfigDir       = "~/.config/coderev"
 )
 
-// DiscoverToolConfig walks the same search path for the tool adapter config.
+// DiscoverToolConfig looks for tool_config.toml in .coderev/ first (preferred),
+// then the target root (backward compat), then the global config dir.
 func DiscoverToolConfig(target string) (string, bool) {
-	return discoverFile(target, defaultToolConfigFile)
-}
-
-func discoverFile(target, name string) (string, bool) {
 	candidates := []string{
-		filepath.Join(target, name),
+		filepath.Join(target, coderevDir, defaultToolConfigFile),
+		filepath.Join(target, defaultToolConfigFile),
 	}
-
 	if cwd, err := os.Getwd(); err == nil && cwd != target {
-		candidates = append(candidates, filepath.Join(cwd, name))
+		candidates = append(candidates,
+			filepath.Join(cwd, coderevDir, defaultToolConfigFile),
+			filepath.Join(cwd, defaultToolConfigFile),
+		)
 	}
-
-	home, err := os.UserHomeDir()
-	if err == nil {
-		candidates = append(candidates, filepath.Join(home, ".config", "coderev", name))
+	home, _ := os.UserHomeDir()
+	if home != "" {
+		candidates = append(candidates, filepath.Join(home, ".config", "coderev", defaultToolConfigFile))
 	}
-
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
 			return p, true
 		}
 	}
-	return "", false
+	return filepath.Join(target, coderevDir, defaultToolConfigFile), false
 }
