@@ -168,27 +168,45 @@ func collectGenDeclExported(d *ast.GenDecl, seen map[string]bool) {
 func collectFileSymbols(pkg *ast.Package) map[string][]string {
 	files := map[string][]string{}
 	for fname, f := range pkg.Files {
-		var syms []string
-		for _, decl := range f.Decls {
-			switch d := decl.(type) {
-			case *ast.FuncDecl:
-				if d.Name != nil && isExported(d.Name.Name) {
-					syms = append(syms, d.Name.Name)
-				}
-			case *ast.GenDecl:
-				for _, spec := range d.Specs {
-					if ts, ok := spec.(*ast.TypeSpec); ok && isExported(ts.Name.Name) {
-						syms = append(syms, ts.Name.Name)
-					}
-				}
-			}
-		}
+		syms := fileSymsFromDecls(f.Decls)
 		if len(syms) > 0 {
 			sort.Strings(syms)
 			files[fname] = syms
 		}
 	}
 	return files
+}
+
+func fileSymsFromDecls(decls []ast.Decl) []string {
+	var syms []string
+	for _, decl := range decls {
+		switch d := decl.(type) {
+		case *ast.FuncDecl:
+			if s := symFromFunc(d); s != "" {
+				syms = append(syms, s)
+			}
+		case *ast.GenDecl:
+			syms = append(syms, symsFromGenDecl(d)...)
+		}
+	}
+	return syms
+}
+
+func symFromFunc(d *ast.FuncDecl) string {
+	if d.Name != nil && isExported(d.Name.Name) {
+		return d.Name.Name
+	}
+	return ""
+}
+
+func symsFromGenDecl(d *ast.GenDecl) []string {
+	var syms []string
+	for _, spec := range d.Specs {
+		if ts, ok := spec.(*ast.TypeSpec); ok && isExported(ts.Name.Name) {
+			syms = append(syms, ts.Name.Name)
+		}
+	}
+	return syms
 }
 
 func isExported(name string) bool {

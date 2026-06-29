@@ -216,9 +216,19 @@ func filter(nodes []Node, t string) []Node {
 // file-level architecture nodes and call edges when no architecture doc is found.
 // It always populates Packages for Go repos and writes .coderev/architecture.toml.
 func DetectWithGraph(target, graphJSONPath string) Summary {
+	pkgs, flows := loadPackagesAndFlows(target, graphJSONPath)
+	WriteArchManifest(target, pkgs, flows)
+	docResult := scanMarkdownDocs(target)
+	s := summariseFromSources(target, graphJSONPath)
+	applyDocResult(&s, docResult)
+	s.Packages = pkgs
+	s.Flows = flows
+	return s
+}
+
+func loadPackagesAndFlows(target, graphJSONPath string) ([]PackageInfo, []Flow) {
 	var pkgs []PackageInfo
 	var flows []Flow
-
 	if graphJSONPath != "" {
 		data, err := os.ReadFile(graphJSONPath)
 		if err == nil {
@@ -228,90 +238,21 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 	if len(pkgs) == 0 {
 		pkgs = ScanGoPackages(target)
 	}
-	WriteArchManifest(target, pkgs, flows)
+	return pkgs, flows
+}
 
-	// Discover all .md files (respect .gitignore via WalkIgnoring)
-	var docFiles []ArchDocFile
-	var primaryDocPath string
-	var primaryDocHTML string
-	var primaryDocText string
-	_ = analysis.WalkIgnoring(target, func(path string, d fs.DirEntry) error {
-		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		raw := string(data)
-		html := MarkdownToHTML(raw)
-		rel, _ := filepath.Rel(target, path)
-		docFiles = append(docFiles, ArchDocFile{Path: rel, Name: d.Name(), HTML: html, Content: raw})
-		return nil
-	})
-	// Primary doc is the one matching archDocCandidates, or the first .md found
-	for _, candidate := range archDocCandidates {
-		path := filepath.Join(target, candidate)
-		data, err := os.ReadFile(path)
-		if err == nil {
-			primaryDocPath = path
-			primaryDocText = string(data)
-			primaryDocHTML = MarkdownToHTML(primaryDocText)
-			break
-		}
-	}
-	if primaryDocPath == "" && len(docFiles) > 0 {
-		primaryDocPath = filepath.Join(target, docFiles[0].Path)
-		primaryDocText = ""
-		primaryDocHTML = ""
-	}
-	// Build base with doc files found
-	base := Summary{ArchDocFiles: docFiles}
-	if primaryDocPath != "" {
-		base.Source = "doc"
-		base.DocFile = primaryDocPath
-		base.Text = primaryDocText
-		base.ArchDocHTML = primaryDocHTML
-	}
+func summariseFromSources(target, graphJSONPath string) Summary {
 	if s, ok := fromNXWorkspace(target); ok {
-		s.ArchDocFiles = docFiles
-		if base.Source == "doc" {
-			s.Source = "doc"
-			s.DocFile = primaryDocPath
-			s.Text = primaryDocText
-			s.ArchDocHTML = primaryDocHTML
-		}
-		s.Packages = pkgs
-		s.Flows = flows
 		return s
 	}
 	if graphJSONPath != "" {
 		data, err := os.ReadFile(graphJSONPath)
 		if err == nil {
 			if s, ok := fromGraphJSON(data); ok {
-				s.ArchDocFiles = docFiles
-				if base.Source == "doc" {
-					s.Source = "doc"
-					s.DocFile = primaryDocPath
-					s.Text = primaryDocText
-					s.ArchDocHTML = primaryDocHTML
-				}
-				s.Packages = pkgs
-				s.Flows = flows
 				return s
 			}
 		}
 	}
-	s := synthesiseFromDirs(target)
-	s.ArchDocFiles = docFiles
-	if base.Source == "doc" {
-		s.Source = "doc"
-		s.DocFile = primaryDocPath
-		s.Text = primaryDocText
-		s.ArchDocHTML = primaryDocHTML
-	}
-	s.Packages = pkgs
-	s.Flows = flows
-	return s
+	return synthesiseFromDirs(target)
 }
 

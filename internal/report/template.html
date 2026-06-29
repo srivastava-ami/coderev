@@ -1016,35 +1016,80 @@ const GV = {
     const v=document.getElementById('gview');
     if(!v) return;
     v.setAttribute('transform',`translate(${GV.t.x},${GV.t.y}) scale(${GV.t.k})`);
-    const sel=GV.sel, conn=new Set();
+    const sel=GV.sel, conn=new Set(), fh=GV.flowHighlight;
     if(sel){ conn.add(sel); GV.links.forEach(l=>{ if(l.s===sel)conn.add(l.t); if(l.t===sel)conn.add(l.s); }); }
     let h='';
-    GV.links.forEach(l=>{
-      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b)return;
-      const hot=sel&&(l.s===sel||l.t===sel);
-      const mx=(a.x+b.x)/2;
-      const d=GV.mode==='hierarchy'?`M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`:`M${a.x} ${a.y} C${mx} ${a.y},${mx} ${b.y},${b.x} ${b.y}`;
-      h+=`<path class="lnk ${l.kind}${hot?' hot':''}" d="${d}"/>`;
+    // Layer background bands
+    const layerKeys = Object.keys(GV.layerY);
+    layerKeys.forEach(l => {
+      const y = GV.layerY[l], clr = GV.LAYER_COLORS[l] || 'var(--muted)';
+      h+=`<g class="lay-band"><rect x="-2000" y="${y-36}" width="4000" height="72" fill="${clr}08" stroke="${clr}15" stroke-width="1"/>
+        <text class="lbl" x="12" y="${y-12}">${l}</text></g>`;
     });
+    // Function expanded bands
+    const fileFns = {};
+    GV.nodes.filter(n=>n.type==='fn').forEach(n => { fileFns[n.parentId] = (fileFns[n.parentId]||0) + 1; });
+    Object.keys(fileFns).forEach(fid => {
+      const fn = GV.map[fid]; if(!fn) return;
+      const fns = GV.nodes.filter(n => n.parentId===fid);
+      if(!fns.length) return;
+      const maxY = Math.max(...fns.map(n => n.y));
+      h+=`<rect class="fn-band" x="${fn.x-90}" y="${fn.y+22}" width="180" height="${Math.max(20, maxY-fn.y+22)}" rx="4"/>`;
+    });
+    // Edges with orthogonal routing and arrowheads
+    GV.links.forEach(l=>{
+      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b) return;
+      const hot=sel&&(l.s===sel||l.t===sel);
+      const flow = fh && (fh.nodes.has(l.s) && fh.nodes.has(l.t));
+      const flowLight = fh && !flow && (fh.nodes.has(l.s) || fh.nodes.has(l.t));
+      let cls = 'lnk '+l.kind;
+      if(hot) cls+=' hot';
+      if(flow) cls+=' flow';
+      if(flowLight) cls+=' flow-light';
+      if(fh && !hot && !flow && !flowLight) cls+=' flow-dim';
+      let marker = 'marker-end="url(#arrow-';
+      if(flow) marker+='flow';
+      else if(hot) marker+='calls-hot';
+      else if(l.kind==='import'||l.kind==='tree') marker+='import';
+      else marker+='calls';
+      marker+=')"';
+      let d;
+      if(GV.mode==='hierarchy'){
+        d = `M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`;
+      } else if(a.y === b.y){
+        d = `M${a.x} ${a.y} L${b.x} ${b.y}`;
+      } else {
+        const mx = (a.x + b.x) / 2;
+        // Ensure last segment is horizontal for arrowhead alignment
+        const bx = b.x > a.x ? b.x - 4 : b.x + 4;
+        d = `M${a.x} ${a.y} L${mx} ${a.y} L${mx} ${b.y} L${bx} ${b.y}`;
+      }
+      h+=`<path class="${cls}" d="${d}" ${marker}/>`;
+    });
+    // Nodes
     GV.nodes.forEach(n=>{
-      const clr=GV.nodeColor(n); const dim=sel&&!conn.has(n.id)?' dim':''; const isSel=n.id===sel?' sel':'';
+      const clr=GV.nodeColor(n);
+      const dim = (sel&&!conn.has(n.id)) || (fh&&!fh.nodes.has(n.id)&&!sel) ?' dim':'';
+      const isSel=n.id===sel?' sel':'';
+      const flowGlow = fh && fh.nodes.has(n.id) && !sel;
       if(n.type==='fn'){
         const w=Math.max(30,n.label.length*5.5+12);
-        h+=`<g class="gn fn${dim}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${clr}18" stroke="${clr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        const fnClr = GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
+        h+=`<g class="gn fn${dim}${isSel}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${fnClr}18" stroke="${fnClr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else if(n.type==='layer'){
         const w=Math.max(70,n.label.length*7+20);
-        h+=`<g class="gn layer" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        h+=`<g class="gn layer${dim}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else if(n.type==='root'){
         const w=Math.max(60,n.label.length*8+20);
-        h+=`<g class="gn root" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        h+=`<g class="gn root${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else {
-        const w=140,hh=38;
-        const isEp = !!(R.Architecture.Flows || []).some(f => f.Entry && n.source_file && f.Entry.includes(n.source_file));
+        const w=150,hh=40;
+        const isEp = GV.isEntrypoint(n);
         h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})">
-          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}18" stroke="${clr}"/>
-          <text class="t" x="${-w/2+10}" y="-2">${escHtml(n.label)}</text>
-          <text class="s" x="${-w/2+10}" y="13">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
-          ${isEp?`<circle cx="${w/2-10}" cy="${-hh/2+10}" r="5" fill="#3fb950" stroke="#3fb95088"/>`:''}
+          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}22" stroke="${clr}"${flowGlow?' stroke-width="3" stroke="var(--warn)"':''}/>
+          <text class="t" x="${-w/2+12}" y="-2">${escHtml(n.label)}</text>
+          <text class="s" x="${-w/2+12}" y="14">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
+          ${isEp?`<polygon class="ep-star ep-glow" points="${w/2-12},${-hh/2+5} ${w/2-8},${-hh/2+13} ${w/2-16},${-hh/2+9} ${w/2-4},${-hh/2+9} ${w/2-12},${-hh/2+13}" fill="var(--pass)" stroke="var(--pass)88" stroke-width="1"/>`:''}
         </g>`;
       }
     });
@@ -1052,8 +1097,7 @@ const GV = {
   },
   nodeColor(n){
     if(n.type==='fn') return GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
-    const LAYER_COLORS={'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
-    return LAYER_COLORS[n.layer] || '#8892a4';
+    return GV.LAYER_COLORS[n.layer] || '#8892a4';
   },
   nodeRole(n){
     const layers = {governance:'governance',orchestration:'orchestration',execution:'core',persistence:'adapter',surface:'surface'};
