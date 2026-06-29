@@ -28,6 +28,7 @@ type ArchDocFile struct {
 	Path    string `json:"path"`
 	Name    string `json:"name"`
 	HTML    string `json:"html"`
+	Content string `json:"content"` // raw markdown content for client-side rendering
 }
 
 type Node struct {
@@ -242,9 +243,10 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 		if err != nil {
 			return nil
 		}
-		html := MarkdownToHTML(string(data))
+		raw := string(data)
+		html := MarkdownToHTML(raw)
 		rel, _ := filepath.Rel(target, path)
-		docFiles = append(docFiles, ArchDocFile{Path: rel, Name: d.Name(), HTML: html})
+		docFiles = append(docFiles, ArchDocFile{Path: rel, Name: d.Name(), HTML: html, Content: raw})
 		return nil
 	})
 	// Primary doc is the one matching archDocCandidates, or the first .md found
