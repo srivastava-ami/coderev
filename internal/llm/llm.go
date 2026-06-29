@@ -8,8 +8,13 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
+type TokenUsage struct {
+	InputTokens  int
+	OutputTokens int
+}
+
 type Provider interface {
-	Complete(ctx context.Context, prompt string) (string, error)
+	Complete(ctx context.Context, prompt string) (string, TokenUsage, error)
 }
 
 func New(cfg analysis.LLMConfig) (Provider, error) {

@@ -13,19 +13,19 @@ type CLIProvider struct {
 	command string
 }
 
-func (p *CLIProvider) Complete(ctx context.Context, prompt string) (string, error) {
+func (p *CLIProvider) Complete(ctx context.Context, prompt string) (string, TokenUsage, error) {
 	fields := strings.Fields(p.command)
 	if len(fields) == 0 {
-		return "", fmt.Errorf("llm: empty cli_command")
+		return "", TokenUsage{}, fmt.Errorf("llm: empty cli_command")
 	}
 	f, err := os.CreateTemp("", "coderev-prompt-*.md")
 	if err != nil {
-		return "", fmt.Errorf("llm: creating temp prompt file: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: creating temp prompt file: %w", err)
 	}
 	defer os.Remove(f.Name())
 	if _, err := f.WriteString(prompt); err != nil {
 		f.Close()
-		return "", fmt.Errorf("llm: writing prompt: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: writing prompt: %w", err)
 	}
 	f.Close()
 
@@ -41,9 +41,14 @@ func (p *CLIProvider) Complete(ctx context.Context, prompt string) (string, erro
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("llm: %q exited with error: %w: %s", fields[0], err, strings.TrimSpace(stderr.String()))
+		return "", TokenUsage{}, fmt.Errorf("llm: %q exited with error: %w: %s", fields[0], err, strings.TrimSpace(stderr.String()))
 	}
-	return strings.TrimSpace(stdout.String()), nil
+	result := strings.TrimSpace(stdout.String())
+	usage := TokenUsage{
+		InputTokens:  len(prompt) / 4,
+		OutputTokens: len(result) / 4,
+	}
+	return result, usage, nil
 }
 
 func buildArgs(fields []string, prompt, promptFile string) []string {

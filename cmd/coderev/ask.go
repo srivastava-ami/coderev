@@ -38,7 +38,7 @@ func runAsk(_ *cobra.Command, args []string) error {
 		return fmt.Errorf("creating LLM provider: %w", err)
 	}
 	prompt := strings.Join(args, " ")
-	result, err := provider.Complete(context.Background(), prompt)
+	result, _, err := provider.Complete(context.Background(), prompt)
 	if err != nil {
 		return fmt.Errorf("LLM request failed: %w", err)
 	}

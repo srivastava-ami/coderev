@@ -30,16 +30,22 @@ type apiRequestMessage struct {
 
 type apiResponseBody struct {
 	Content []apiResponseContent `json:"content"`
+	Usage   apiUsage             `json:"usage"`
 }
 
 type apiResponseContent struct {
 	Text string `json:"text"`
 }
 
-func (p *APIProvider) Complete(ctx context.Context, prompt string) (string, error) {
+type apiUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
+}
+
+func (p *APIProvider) Complete(ctx context.Context, prompt string) (string, TokenUsage, error) {
 	apiKey := os.Getenv(p.apiKeyEnv)
 	if apiKey == "" {
-		return "", fmt.Errorf("llm: env %q is not set", p.apiKeyEnv)
+		return "", TokenUsage{}, fmt.Errorf("llm: env %q is not set", p.apiKeyEnv)
 	}
 
 	body := apiRequestBody{
@@ -51,12 +57,12 @@ func (p *APIProvider) Complete(ctx context.Context, prompt string) (string, erro
 	}
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(body); err != nil {
-		return "", fmt.Errorf("llm: encode request: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: encode request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, p.baseURL, &buf)
 	if err != nil {
-		return "", fmt.Errorf("llm: create request: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: create request: %w", err)
 	}
 	req.Header.Set("content-type", "application/json")
 	req.Header.Set("x-api-key", apiKey)
@@ -64,21 +70,25 @@ func (p *APIProvider) Complete(ctx context.Context, prompt string) (string, erro
 
 	resp, err := p.client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("llm: api request: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: api request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("llm: api returned status %d", resp.StatusCode)
+		return "", TokenUsage{}, fmt.Errorf("llm: api returned status %d", resp.StatusCode)
 	}
 
 	var result apiResponseBody
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("llm: decode response: %w", err)
+		return "", TokenUsage{}, fmt.Errorf("llm: decode response: %w", err)
 	}
 
 	if len(result.Content) == 0 {
-		return "", errors.New("llm: empty response content")
+		return "", TokenUsage{}, errors.New("llm: empty response content")
 	}
-	return result.Content[0].Text, nil
+	usage := TokenUsage{
+		InputTokens:  result.Usage.InputTokens,
+		OutputTokens: result.Usage.OutputTokens,
+	}
+	return result.Content[0].Text, usage, nil
 }

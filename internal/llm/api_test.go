@@ -52,7 +52,7 @@ func TestAPIProvider(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, err := p.Complete(context.Background(), "test prompt")
+	result, _, err := p.Complete(context.Background(), "test prompt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -82,7 +82,7 @@ func TestAPIProvider_MissingKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = p.Complete(context.Background(), "test")
+	_, _, err = p.Complete(context.Background(), "test")
 	if err == nil {
 		t.Fatal("expected error for missing api key")
 	}
@@ -106,7 +106,7 @@ func TestAPIProvider_NonOKStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = p.Complete(context.Background(), "test")
+	_, _, err = p.Complete(context.Background(), "test")
 	if err == nil {
 		t.Fatal("expected error for non-200 status")
 	}
