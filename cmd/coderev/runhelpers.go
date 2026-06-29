@@ -108,11 +108,11 @@ func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string
 			fmt.Println("baseline: saved current findings as new baseline")
 		}
 	}
-	outputPath := resolveOutputPath(flagOutput, flagFormat)
-	if err := generateReport(r, outputPath, flagFormat, flagRepo, s.tc.SARIF); err != nil {
+	primaryPath, err := generateAllReports(r, flagOutput, flagFormat, flagRepo, s.tc.SARIF)
+	if err != nil {
 		return report.Report{}, "", fmt.Errorf("generating report: %w", err)
 	}
-	return r, outputPath, nil
+	return r, primaryPath, nil
 }
 
 func postAnnotate(r report.Report, target string) error {
@@ -142,6 +142,29 @@ func postAnnotate(r report.Report, target string) error {
 		fmt.Printf("warning: PR annotation failed: %v\n", err)
 	}
 	return nil
+}
+
+// generateAllReports writes all three formats (md, html, sarif) into .coderev/.
+// If --output or --format are set, only that format is written.
+// Returns the path of the primary (markdown) report.
+func generateAllReports(r report.Report, outputFlag, formatFlag, repoURI string, sarifCfg analysis.SARIFConfig) (string, error) {
+	if outputFlag != "" || formatFlag != "" {
+		p := resolveOutputPath(outputFlag, formatFlag)
+		return p, generateReport(r, p, formatFlag, repoURI, sarifCfg)
+	}
+	mdPath := resolveOutputPath("", "markdown")
+	if err := report.GenerateMarkdown(r, mdPath); err != nil {
+		return "", err
+	}
+	htmlPath := resolveOutputPath("", "html")
+	if err := report.Generate(r, htmlPath); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: HTML report failed: %v\n", err)
+	}
+	sarifPath := resolveOutputPath("", "sarif")
+	if err := report.GenerateSARIF(r, sarifPath, repoURI, sarifCfg); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: SARIF report failed: %v\n", err)
+	}
+	return mdPath, nil
 }
 
 func generateReport(r report.Report, outputPath, format, repoURI string, sarifCfg analysis.SARIFConfig) error {
