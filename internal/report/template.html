@@ -224,6 +224,23 @@ tr:hover td{background:var(--surface2)}
 /* Function expanded */
 .fn-band{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
 
+/* Tooltip */
+#gtip{position:absolute;pointer-events:none;font-size:10.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);z-index:50;white-space:nowrap;opacity:0;transition:opacity .12s;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+#gtip.show{opacity:.95}
+/* Layer bands */
+.lay-band{pointer-events:none}
+.lay-band .lbl{font-size:10px;font-weight:700;fill:var(--muted);letter-spacing:2px;text-transform:uppercase}
+/* Edge flow highlight */
+.lnk.flow{stroke:var(--warn);opacity:.9;stroke-width:2.5}
+.lnk.flow-light{stroke:var(--warn);opacity:.4;stroke-width:1.8}
+.lnk.flow-dim{opacity:.08}
+/* Entrypoint star */
+.ep-star{fill:var(--pass);opacity:.95}
+.ep-glow{animation:epulse 2s ease-in-out infinite;transform-origin:center}
+@keyframes epulse{0%,100%{opacity:.35}50%{opacity:.85}}
+/* Function expanded */
+.fn-band{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
+
 /* Responsive */
 @media(max-width:900px){
   .grid-4{grid-template-columns:repeat(2,1fr)}
@@ -305,7 +322,8 @@ tr:hover td{background:var(--surface2)}
           <div class="glegend" id="glegend"></div>
         </div>
         <div id="graph-host">
-          <svg id="gsvg"><g id="gview"></g></svg>
+          <svg id="gsvg"><defs><marker id="arrow-calls" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--muted)" opacity=".6"/></marker><marker id="arrow-calls-hot" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--info)" opacity="1"/></marker><marker id="arrow-import" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--muted)" opacity=".4"/></marker><marker id="arrow-flow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="var(--warn)" opacity="1"/></marker></defs><g id="gview"></g></svg>
+          <div id="gtip"></div>
           <div class="ghint">drag a node · scroll = zoom · drag canvas = pan · double-click file = expand functions</div>
         </div>
         <div class="gdetail" id="gdetail"></div>
@@ -860,15 +878,14 @@ function toggleLayer(header) {
 
 /* ====================== INTERACTIVE ARCHITECTURE GRAPH ====================== */
 const GV = {
-  mode:'topology', expand:new Set(), sel:null,
-  t:{x:0,y:0,k:1}, nodes:[], links:[], map:{}, pos:{}, ticks:0, raf:null,
+  mode:'topology', expand:new Set(), sel:null, flowHighlight:null,
+  t:{x:0,y:0,k:1}, nodes:[], links:[], map:{}, layerY:{},
   W:0, H:480, graphData:null, pkgMap:{},
+  LAYER_COLORS:{governance:'var(--info)',orchestration:'var(--advisory)',execution:'var(--pass)',persistence:'#a78bfa',surface:'#f472b6'},
+  LAYER_ORDER:['governance','orchestration','execution','persistence','surface'],
   init(){
     if(!R.GraphJSON) return;
-    try {
-      GV.graphData = JSON.parse(R.GraphJSON);
-    } catch(e){ return; }
-    // Build package lookup: file -> {layer, pkgName, doc, funcs}
+    try { GV.graphData = JSON.parse(R.GraphJSON); } catch(e){ return; }
     const pm = {};
     const repoPath = (R.Meta.RepoPath || '').replace(/\/+$/, '');
     (R.Architecture.Packages||[]).forEach(p => {
@@ -881,7 +898,6 @@ const GV = {
       });
     });
     GV.pkgMap = pm;
-    // Build flow-file index: source_file → [flow names]
     GV.flowFiles = {};
     (R.Architecture.Flows || []).forEach(f => {
       (f.Steps || []).forEach(s => {
@@ -893,13 +909,11 @@ const GV = {
     GV.W = document.getElementById('graph-host').clientWidth;
     GV.build();
     GV.fit();
-    // Default: select first file node
     const firstFile = GV.nodes.find(n => n.type === 'file');
     if (firstFile) GV.showDetail(firstFile.id);
     GV.draw();
     GV.setupUI();
   },
-  // Resolve the layer for a source_file
   getLayer(file){
     const m = GV.pkgMap[file] || GV.pkgMap[file?.replace(/.*\//,'')];
     return m ? m.layer : null;
@@ -909,17 +923,12 @@ const GV = {
   },
   build(){
     const ns=[], ls=[], map={};
-    const add=n=>{ if(GV.pos[n.id]){n.x=GV.pos[n.id].x;n.y=GV.pos[n.id].y;} ns.push(n); map[n.id]=n; return n; };
+    const add=n=>{ ns.push(n); map[n.id]=n; return n; };
     const g=GV.graphData;
     if(!g) return;
     if(GV.mode==='hierarchy'){
-      // Group by layer
       const layers = {};
-      g.nodes.forEach(n => {
-        if(n.kind!=='file') return;
-        const layer = GV.getLayer(n.source_file) || 'other';
-        (layers[layer] = layers[layer] || []).push(n);
-      });
+      g.nodes.forEach(n => { if(n.kind!=='file') return; const layer = GV.getLayer(n.source_file) || 'other'; (layers[layer] = layers[layer] || []).push(n); });
       const layerIds = Object.keys(layers).sort();
       if(!layerIds.length){ GV.nodes=[]; GV.links=[]; GV.map={}; return; }
       const root=add({id:'__root',type:'root',label:R.Meta.RepoName,order:0});
@@ -932,109 +941,91 @@ const GV = {
           if(GV.expand.has(n.id)){
             const info = GV.getPkgInfo(fn.source_file);
             const fns = info ? info.funcs : [];
-            fns.forEach(fname => {
-              const fid = n.id+'#'+fname;
-              add({id:fid,type:'fn',label:fname,parentId:n.id,layer:l});
-              ls.push({s:n.id,t:fid,kind:'fn'});
-            });
+            fns.forEach(fname => { const fid=n.id+'#'+fname; add({id:fid,type:'fn',label:fname,parentId:n.id,layer:l}); ls.push({s:n.id,t:fid,kind:'fn'}); });
           }
         });
       });
     } else {
-      // Topology: file nodes with import/call edges
       const fileNodes = {};
       g.nodes.forEach(n => {
-        if(n.kind==='file'){
-          const layer = GV.getLayer(n.source_file) || 'other';
-          fileNodes[n.id]=1;
-          const node = add({id:n.id,type:'file',label:n.label||n.id,source_file:n.source_file,layer:layer});
-        }
+        if(n.kind==='file'){ const layer=GV.getLayer(n.source_file)||'other'; fileNodes[n.id]=1; add({id:n.id,type:'file',label:n.label||n.id,source_file:n.source_file,layer:layer}); }
       });
-      // Add edges between files
       g.links.forEach(lk => {
         if(!fileNodes[lk.source] || !fileNodes[lk.target]) return;
-        if(lk.relation==='contains' || lk.relation==='imports' || lk.relation==='calls') {
-          ls.push({s:lk.source,t:lk.target,kind:(lk.relation==='calls'?'calls':'import'),relation:lk.relation});
-        }
+        if(lk.relation==='contains' || lk.relation==='imports' || lk.relation==='calls') ls.push({s:lk.source,t:lk.target,kind:(lk.relation==='calls'?'calls':'import'),relation:lk.relation});
       });
-      // Expand functions
       Object.keys(fileNodes).forEach(fid => {
         if(GV.expand.has(fid)){
-          const info = GV.getPkgInfo(g.nodes.find(n=>n.id===fid)?.source_file||'');
+          const src = g.nodes.find(n=>n.id===fid)?.source_file||'';
+          const info = GV.getPkgInfo(src);
           const fns = info ? info.funcs : [];
-          fns.forEach(fname => {
-            const fnid = fid+'#'+fname;
-            add({id:fnid,type:'fn',label:fname,parentId:fid,layer:GV.map[fid]?.layer||'other'});
-            ls.push({s:fid,t:fnid,kind:'fn'});
-          });
+          fns.forEach(fname => { const fnid=fid+'#'+fname; add({id:fnid,type:'fn',label:fname,parentId:fid,layer:GV.map[fid]?.layer||'other'}); ls.push({s:fid,t:fnid,kind:'fn'}); });
         }
       });
     }
     GV.nodes=ns; GV.links=ls; GV.map=map;
-    // Init positions with layer-based x-offset
-    const layerIds = [...new Set(ns.filter(n=>n.type!=='fn'&&n.type!=='root'&&n.type!=='layer').map(n=>n.layer))];
-    ns.forEach(n => {
-      if(n.x!=null) return;
-      const ci = layerIds.indexOf(n.layer);
-      if(n.type==='fn'){ n.x=GV.map[n.parentId]?.x||200+(Math.random()*80-40); n.y=(GV.map[n.parentId]?.y||200)+50+Math.random()*60; }
-      else if(n.type==='layer'){ n.x=200+ci*160; n.y=100; }
-      else if(n.type==='root'){ n.x=200; n.y=40; }
-      else { n.x=200+ci*200+(Math.random()*50-25); n.y=GV.H/2-80+Math.random()*160; }
-      n.vx=n.vx||0; n.vy=n.vy||0;
-    });
-    if(GV.mode==='hierarchy'){ GV.layoutTree(); GV.ticks=0; } else { GV.ticks=200; GV.run(); }
-    GV.savePos();
+    if(GV.mode==='hierarchy'){ GV.layoutTree(); } else { GV.layoutLayered(); }
   },
   layoutTree(){
     let leaf=0; const vGap=110, hGap=180;
-    const place=(id,depth)=>{
-      const n=GV.map[id]; if(!n) return; n.depth=depth;
-      const kids=GV.links.filter(l=>l.s===id).map(l=>l.t);
-      if(kids.length){ kids.forEach(k=>place(k,depth+1)); n.x=(GV.map[kids[0]]?.x||0)+(kids.length>1?((GV.map[kids[kids.length-1]]?.x||0)-(GV.map[kids[0]]?.x||0))/2:0); }
-      else { n.x=leaf*hGap; leaf++; }
-      n.y=depth*vGap+40;
-    };
+    const place=(id,depth)=>{ const n=GV.map[id]; if(!n)return; n.depth=depth; const kids=GV.links.filter(l=>l.s===id).map(l=>l.t); if(kids.length){ kids.forEach(k=>place(k,depth+1)); n.x=(GV.map[kids[0]]?.x||0)+(kids.length>1?((GV.map[kids[kids.length-1]]?.x||0)-(GV.map[kids[0]]?.x||0))/2:0); } else { n.x=leaf*hGap; leaf++; } n.y=depth*vGap+40; };
     place('__root',0);
-    GV.savePos();
   },
-  run(){ cancelAnimationFrame(GV.raf); const loop=()=>{ if(GV.ticks>0){ GV.sim(); GV.draw(); GV.ticks--; GV.raf=requestAnimationFrame(loop);} }; GV.raf=requestAnimationFrame(loop); },
-  sim(){
-    const ns=GV.nodes, CY=GV.H/2;
-    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){
-      const a=ns[i],b=ns[j];
-      let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||0.01,d=Math.sqrt(d2);
-      const rep=(a.type==='fn'||b.type==='fn'?400:1200)/d2;
-      const fx=dx/d*rep,fy=dy/d*rep;
-      a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;
-    }
-    GV.links.forEach(l=>{
-      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b)return;
-      const L=l.kind==='fn'?50:120;
-      let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||0.01,f=(d-L)*0.035;
-      const fx=dx/d*f,fy=dy/d*f;
-      a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;
+  layoutLayered(){
+    // Deterministic layout: fixed Y per layer, X ordered by call influence
+    const fileNodes = GV.nodes.filter(n => n.type==='file');
+    if(!fileNodes.length) return;
+    // Group by layer
+    const layerMap = {};
+    fileNodes.forEach(n => {
+      const l = n.layer || 'other';
+      if(!layerMap[l]) layerMap[l] = [];
+      layerMap[l].push(n);
     });
-    ns.forEach(n=>{
-      if(n.type==='file'||n.type==='layer'){
-        const layerIds=[...new Set(GV.nodes.filter(x=>x.type!=='fn').map(x=>x.layer))];
-        const ci=layerIds.indexOf(n.layer);
-        if(ci>=0&&GV.mode!=='hierarchy'){ n.vx+=(200+ci*200 - n.x)*0.01; }
-      }
-      if(n.type!=='fn') n.vy+=(CY-n.y)*0.003;
-      if(n.pin)return;
-      n.x+=Math.max(-10,Math.min(10,n.vx)); n.y+=Math.max(-10,Math.min(10,n.vy));
-      n.vx*=0.85; n.vy*=0.85;
+    // Compute Y positions (evenly spaced bands)
+    const layerKeys = Object.keys(layerMap).sort((a,b) => GV.LAYER_ORDER.indexOf(a) - GV.LAYER_ORDER.indexOf(b));
+    GV.layerY = {};
+    const padTop = 45, padBottom = 25;
+    const availH = GV.H - padTop - padBottom;
+    const bandH = Math.min(90, availH / Math.max(layerKeys.length, 1));
+    layerKeys.forEach((l,i) => { GV.layerY[l] = padTop + i * bandH + bandH/2; });
+    // Assign Y, compute influence score for X ordering
+    const influence = {};
+    fileNodes.forEach(n => { n.y = GV.layerY[n.layer] || (padTop + 60); n._score = 0; });
+    GV.links.forEach(lk => {
+      if(lk.kind==='fn'||lk.kind==='tree') return;
+      if(!influence[lk.s]) influence[lk.s] = {in:0, out:0};
+      if(!influence[lk.t]) influence[lk.t] = {in:0, out:0};
+      influence[lk.s].out++;
+      influence[lk.t].in++;
     });
-    GV.savePos();
+    fileNodes.forEach(n => {
+      const inf = influence[n.id] || {in:0, out:0};
+      n._score = inf.in - inf.out;  // higher score = more called (provider) → left
+    });
+    // Sort within each layer by influence score, then assign X
+    const padX = 30;
+    Object.keys(layerMap).forEach(l => {
+      const nodes = layerMap[l].sort((a,b) => b._score - a._score);
+      const count = nodes.length;
+      const gap = Math.min(280, Math.max(150, (GV.W - padX*2) / Math.max(count, 1)));
+      const totalW = (count-1)*gap;
+      const startX = (GV.W - totalW)/2;
+      nodes.forEach((n,i) => { n.x = startX + i*gap; });
+    });
+    // Position function nodes below their parents
+    GV.nodes.filter(n=>n.type==='fn').forEach(n => {
+      const p = GV.map[n.parentId];
+      if(p){ n.x = p.x; n.y = p.y + 38; }
+    });
   },
-  savePos(){ GV.nodes.forEach(n=>{ if(n.type!=='fn') GV.pos[n.id]={x:n.x,y:n.y}; }); },
   fit(){
     const ns=GV.nodes.filter(n=>n.type!=='fn');
     if(!ns.length) return;
     const xs=ns.map(n=>n.x),ys=ns.map(n=>n.y);
-    const minx=Math.min(...xs)-80,maxx=Math.max(...xs)+80,miny=Math.min(...ys)-40,maxy=Math.max(...ys)+50;
+    const minx=Math.min(...xs)-60,maxx=Math.max(...xs)+60,miny=Math.min(...ys)-30,maxy=Math.max(...ys)+30;
     const host=document.getElementById('graph-host'),w=host.clientWidth,h=host.clientHeight;
-    const k=Math.min(w/(maxx-minx),h/(maxy-miny),1.4);
+    const k=Math.min(w/(maxx-minx),h/(maxy-miny),1.3);
     GV.t.k=k; GV.t.x=(w-(minx+maxx)*k)/2; GV.t.y=(h-(miny+maxy)*k)/2;
     GV.draw();
   },
@@ -1042,35 +1033,80 @@ const GV = {
     const v=document.getElementById('gview');
     if(!v) return;
     v.setAttribute('transform',`translate(${GV.t.x},${GV.t.y}) scale(${GV.t.k})`);
-    const sel=GV.sel, conn=new Set();
+    const sel=GV.sel, conn=new Set(), fh=GV.flowHighlight;
     if(sel){ conn.add(sel); GV.links.forEach(l=>{ if(l.s===sel)conn.add(l.t); if(l.t===sel)conn.add(l.s); }); }
     let h='';
-    GV.links.forEach(l=>{
-      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b)return;
-      const hot=sel&&(l.s===sel||l.t===sel);
-      const mx=(a.x+b.x)/2;
-      const d=GV.mode==='hierarchy'?`M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`:`M${a.x} ${a.y} C${mx} ${a.y},${mx} ${b.y},${b.x} ${b.y}`;
-      h+=`<path class="lnk ${l.kind}${hot?' hot':''}" d="${d}"/>`;
+    // Layer background bands
+    const layerKeys = Object.keys(GV.layerY);
+    layerKeys.forEach(l => {
+      const y = GV.layerY[l], clr = GV.LAYER_COLORS[l] || 'var(--muted)';
+      h+=`<g class="lay-band"><rect x="-2000" y="${y-36}" width="4000" height="72" fill="${clr}08" stroke="${clr}15" stroke-width="1"/>
+        <text class="lbl" x="12" y="${y-12}">${l}</text></g>`;
     });
+    // Function expanded bands
+    const fileFns = {};
+    GV.nodes.filter(n=>n.type==='fn').forEach(n => { fileFns[n.parentId] = (fileFns[n.parentId]||0) + 1; });
+    Object.keys(fileFns).forEach(fid => {
+      const fn = GV.map[fid]; if(!fn) return;
+      const fns = GV.nodes.filter(n => n.parentId===fid);
+      if(!fns.length) return;
+      const maxY = Math.max(...fns.map(n => n.y));
+      h+=`<rect class="fn-band" x="${fn.x-90}" y="${fn.y+22}" width="180" height="${Math.max(20, maxY-fn.y+22)}" rx="4"/>`;
+    });
+    // Edges with orthogonal routing and arrowheads
+    GV.links.forEach(l=>{
+      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b) return;
+      const hot=sel&&(l.s===sel||l.t===sel);
+      const flow = fh && (fh.nodes.has(l.s) && fh.nodes.has(l.t));
+      const flowLight = fh && !flow && (fh.nodes.has(l.s) || fh.nodes.has(l.t));
+      let cls = 'lnk '+l.kind;
+      if(hot) cls+=' hot';
+      if(flow) cls+=' flow';
+      if(flowLight) cls+=' flow-light';
+      if(fh && !hot && !flow && !flowLight) cls+=' flow-dim';
+      let marker = 'marker-end="url(#arrow-';
+      if(flow) marker+='flow';
+      else if(hot) marker+='calls-hot';
+      else if(l.kind==='import'||l.kind==='tree') marker+='import';
+      else marker+='calls';
+      marker+=')"';
+      let d;
+      if(GV.mode==='hierarchy'){
+        d = `M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`;
+      } else if(a.y === b.y){
+        d = `M${a.x} ${a.y} L${b.x} ${b.y}`;
+      } else {
+        const mx = (a.x + b.x) / 2;
+        // Ensure last segment is horizontal for arrowhead alignment
+        const bx = b.x > a.x ? b.x - 4 : b.x + 4;
+        d = `M${a.x} ${a.y} L${mx} ${a.y} L${mx} ${b.y} L${bx} ${b.y}`;
+      }
+      h+=`<path class="${cls}" d="${d}" ${marker}/>`;
+    });
+    // Nodes
     GV.nodes.forEach(n=>{
-      const clr=GV.nodeColor(n); const dim=sel&&!conn.has(n.id)?' dim':''; const isSel=n.id===sel?' sel':'';
+      const clr=GV.nodeColor(n);
+      const dim = (sel&&!conn.has(n.id)) || (fh&&!fh.nodes.has(n.id)&&!sel) ?' dim':'';
+      const isSel=n.id===sel?' sel':'';
+      const flowGlow = fh && fh.nodes.has(n.id) && !sel;
       if(n.type==='fn'){
         const w=Math.max(30,n.label.length*5.5+12);
-        h+=`<g class="gn fn${dim}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${clr}18" stroke="${clr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        const fnClr = GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
+        h+=`<g class="gn fn${dim}${isSel}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${fnClr}18" stroke="${fnClr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else if(n.type==='layer'){
         const w=Math.max(70,n.label.length*7+20);
-        h+=`<g class="gn layer" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        h+=`<g class="gn layer${dim}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else if(n.type==='root'){
         const w=Math.max(60,n.label.length*8+20);
-        h+=`<g class="gn root" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+        h+=`<g class="gn root${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else {
-        const w=140,hh=38;
-        const isEp = !!(R.Architecture.Flows || []).some(f => f.Entry && n.source_file && f.Entry.includes(n.source_file));
+        const w=150,hh=40;
+        const isEp = GV.isEntrypoint(n);
         h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})">
-          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}18" stroke="${clr}"/>
-          <text class="t" x="${-w/2+10}" y="-2">${escHtml(n.label)}</text>
-          <text class="s" x="${-w/2+10}" y="13">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
-          ${isEp?`<circle cx="${w/2-10}" cy="${-hh/2+10}" r="5" fill="#3fb950" stroke="#3fb95088"/>`:''}
+          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}22" stroke="${clr}"${flowGlow?' stroke-width="3" stroke="var(--warn)"':''}/>
+          <text class="t" x="${-w/2+12}" y="-2">${escHtml(n.label)}</text>
+          <text class="s" x="${-w/2+12}" y="14">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
+          ${isEp?`<polygon class="ep-star ep-glow" points="${w/2-12},${-hh/2+5} ${w/2-8},${-hh/2+13} ${w/2-16},${-hh/2+9} ${w/2-4},${-hh/2+9} ${w/2-12},${-hh/2+13}" fill="var(--pass)" stroke="var(--pass)88" stroke-width="1"/>`:''}
         </g>`;
       }
     });
@@ -1078,8 +1114,7 @@ const GV = {
   },
   nodeColor(n){
     if(n.type==='fn') return GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
-    const LAYER_COLORS={'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
-    return LAYER_COLORS[n.layer] || '#8892a4';
+    return GV.LAYER_COLORS[n.layer] || '#8892a4';
   },
   nodeRole(n){
     const layers = {governance:'governance',orchestration:'orchestration',execution:'core',persistence:'adapter',surface:'surface'};
@@ -1197,12 +1232,9 @@ const GV = {
     gsvg.addEventListener('pointermove',ev=>{
       if(!drag)return;
       if(drag.pan){ GV.t.x=drag.tx+(ev.clientX-drag.sx); GV.t.y=drag.ty+(ev.clientY-drag.sy); GV.draw(); }
-      else if(drag.node){ const pt=svgPt(ev); drag.node.x=pt.x-drag.ox; drag.node.y=pt.y-drag.oy; GV.savePos(); GV.draw(); }
+      else if(drag.node){ const pt=svgPt(ev); drag.node.x=pt.x-drag.ox; drag.node.y=pt.y-drag.oy; GV.draw(); }
     });
-    gsvg.addEventListener('pointerup',ev=>{
-      if(drag&&drag.node){ drag.node.pin=false; if(GV.mode==='topology'){GV.ticks=60;GV.run();} }
-      drag=null; gsvg.classList.remove('grab');
-    });
+    gsvg.addEventListener('pointerup',ev=>{ drag=null; gsvg.classList.remove('grab'); });
     gsvg.addEventListener('click',ev=>{
       const g=ev.target.closest('.gn'); if(!g)return;
       const id=g.dataset.id;
@@ -1212,7 +1244,7 @@ const GV = {
     gsvg.addEventListener('dblclick',ev=>{
       const g=ev.target.closest('.gn'); if(!g||!g.classList.contains('file'))return;
       const id=g.dataset.id; if(GV.expand.has(id))GV.expand.delete(id); else GV.expand.add(id);
-      GV.pos={}; GV.build(); GV.fit();
+      GV.build(); GV.fit();
     });
     gsvg.addEventListener('wheel',ev=>{
       ev.preventDefault();
@@ -1228,14 +1260,14 @@ const GV = {
     const b_hierarchy=document.getElementById('b_hierarchy');
     const b_funcs=document.getElementById('b_funcs');
     const b_reset=document.getElementById('b_reset');
-    if(b_topology) b_topology.onclick=()=>{ GV.mode='topology'; b_topology.classList.add('on'); b_hierarchy.classList.remove('on'); GV.pos={}; GV.build(); GV.fit(); };
-    if(b_hierarchy) b_hierarchy.onclick=()=>{ GV.mode='hierarchy'; b_hierarchy.classList.add('on'); b_topology.classList.remove('on'); GV.pos={}; GV.build(); GV.fit(); };
+    if(b_topology) b_topology.onclick=()=>{ GV.mode='topology'; b_topology.classList.add('on'); b_hierarchy.classList.remove('on'); GV.build(); GV.fit(); };
+    if(b_hierarchy) b_hierarchy.onclick=()=>{ GV.mode='hierarchy'; b_hierarchy.classList.add('on'); b_topology.classList.remove('on'); GV.build(); GV.fit(); };
     if(b_funcs) b_funcs.onclick=()=>{
       const allOn=GV.nodes.filter(n=>n.type==='file').every(n=>GV.expand.has(n.id));
       GV.expand=allOn?new Set():new Set(GV.nodes.filter(n=>n.type==='file').map(n=>n.id));
-      b_funcs.classList.toggle('on',!allOn); GV.pos={}; GV.build(); GV.fit();
+      b_funcs.classList.toggle('on',!allOn); GV.build(); GV.fit();
     };
-    if(b_reset) b_reset.onclick=()=>{ GV.pos={}; GV.build(); GV.fit(); };
+    if(b_reset) b_reset.onclick=()=>{ GV.build(); GV.fit(); };
     // Legend
     const legend=document.getElementById('glegend');
     if(legend){
