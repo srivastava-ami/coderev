@@ -156,13 +156,14 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 		return err
 	}
 	graphDir := buildGraphInline(s.target, s.tc)
-	if err := writePromptFile(s.target, result.Findings, graphDir); err != nil {
+	rc := buildReviewContext(s.target, result.Findings, graphDir)
+	if err := writePromptFile(s.target, rc); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
 	}
 	if !flagReview {
 		return nil
 	}
-	return maybeSendToLLM(context.Background(), s.target, s.tc)
+	return maybeSendToLLM(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: rc})
 }
 
 
