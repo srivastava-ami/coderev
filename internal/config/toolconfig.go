@@ -17,17 +17,18 @@ import (
 //go:embed default_tool_config.toml
 var defaultToolConfigTOML string
 
-// LoadToolConfig parses a tool_config.toml. If path is empty, the built-in
-// defaults (embedded default_tool_config.toml) are returned.
+// LoadToolConfig parses a tool_config.toml overlaid on top of the built-in
+// defaults. If path is empty, only the defaults are returned. This means a
+// partial tool_config.toml (e.g. only [llm]) keeps all adapter defaults active.
 func LoadToolConfig(path string) (analysis.ToolConfig, error) {
-	if path == "" {
-		return defaultToolConfig()
+	tc, err := defaultToolConfig()
+	if err != nil || path == "" {
+		return tc, err
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return analysis.ToolConfig{}, fmt.Errorf("reading tool config: %w", err)
 	}
-	var tc analysis.ToolConfig
 	if _, err := toml.Decode(string(data), &tc); err != nil {
 		return analysis.ToolConfig{}, fmt.Errorf("parsing tool config TOML: %w", err)
 	}
