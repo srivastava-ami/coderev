@@ -109,6 +109,28 @@ func GraphNeighborhood(graphJSON []byte, changedFiles []string, hops int) ([]Gra
 	return buildNeighborList(gd.Links, nodeByID, visited), nil
 }
 
+// AllGraphNodes returns up to 60 nodes from the graph — used when there is no
+// diff to seed BFS from, so the LLM still has full structural context.
+func AllGraphNodes(graphJSON []byte) ([]GraphNeighbor, error) {
+	var gd graphData
+	if err := json.Unmarshal(graphJSON, &gd); err != nil {
+		return nil, err
+	}
+	limit := 60
+	if len(gd.Nodes) < limit {
+		limit = len(gd.Nodes)
+	}
+	nodeByID := make(map[string]graphNode, len(gd.Nodes))
+	visited := make(map[string]bool, limit)
+	for _, n := range gd.Nodes {
+		nodeByID[n.ID] = n
+	}
+	for _, n := range gd.Nodes[:limit] {
+		visited[n.ID] = true
+	}
+	return buildNeighborList(gd.Links, nodeByID, visited), nil
+}
+
 // bfsNeighbors walks calls/imports edges outward from seeds for hops steps,
 // capping the visited set at 60 nodes.
 func bfsNeighbors(links []graphLink, seeds []string, hops int) map[string]bool {
