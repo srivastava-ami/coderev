@@ -8,9 +8,23 @@ import (
 	"time"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
+	"github.com/srivastava-ami/coderev/internal/config"
 	"github.com/srivastava-ami/coderev/internal/graph"
 	"github.com/srivastava-ami/coderev/internal/llm"
 )
+
+const coderevIgnoreFile = ".coderev/.coderevignore"
+
+func loadIgnoreList(target string) config.IgnoreList {
+	ignorePath := filepath.Join(target, coderevIgnoreFile)
+	_ = config.WriteDefaultIgnoreList(ignorePath)
+	il, err := config.LoadIgnoreList(ignorePath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: loading .coderevignore: %v\n", err)
+		return config.IgnoreList{}
+	}
+	return il
+}
 
 const promptFile = ".coderev/prompt.md"
 const reviewFile = ".coderev/review.md"
@@ -55,6 +69,41 @@ func buildReviewContext(target string, findings []analysis.Finding, graphDir str
 		if data, err := os.ReadFile(filepath.Join(graphDir, "graph.json")); err == nil {
 			rc.Neighbors, _ = llm.AllGraphNodes(data)
 		}
+	}
+	return applyIgnoreList(target, rc)
+}
+
+func applyIgnoreList(target string, rc llm.ReviewContext) llm.ReviewContext {
+	il := loadIgnoreList(target)
+	before := len(rc.Hunks) + len(rc.Findings) + len(rc.Neighbors)
+
+	filtered := rc.Hunks[:0]
+	for _, h := range rc.Hunks {
+		if !il.Matches(h.File) {
+			filtered = append(filtered, h)
+		}
+	}
+	rc.Hunks = filtered
+
+	filteredF := rc.Findings[:0]
+	for _, f := range rc.Findings {
+		if !il.Matches(f.File) {
+			filteredF = append(filteredF, f)
+		}
+	}
+	rc.Findings = filteredF
+
+	filteredN := rc.Neighbors[:0]
+	for _, n := range rc.Neighbors {
+		if !il.Matches(n.File) {
+			filteredN = append(filteredN, n)
+		}
+	}
+	rc.Neighbors = filteredN
+
+	after := len(rc.Hunks) + len(rc.Findings) + len(rc.Neighbors)
+	if before-after > 0 {
+		fmt.Fprintf(os.Stderr, "  ignore: %d item(s) filtered from LLM context\n", before-after)
 	}
 	return rc
 }
