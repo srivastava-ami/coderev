@@ -13,14 +13,21 @@ import (
 // Summary is the architecture overview fed to the HTML report.
 type Summary struct {
 	Source      string // "doc" | "synthesised"
-	DocFile     string // path to the arch doc if found
+	DocFile     string // path to the primary arch doc if found
 	Text        string // human-readable summary
-	ArchDocHTML string // Text pre-rendered as HTML (non-empty when Source=="doc")
+	ArchDocHTML string // primary doc pre-rendered as HTML (non-empty when Source=="doc")
+	ArchDocFiles []ArchDocFile // all discovered .md files rendered to HTML
 	ProjectName string
 	Nodes       []Node
 	Edges       []Edge
 	Packages    []PackageInfo // Go package-level structure (populated for Go repos)
 	Flows       []Flow        // use-case flows traced from graph call edges (populated from graph.json)
+}
+
+type ArchDocFile struct {
+	Path    string `json:"path"`
+	Name    string `json:"name"`
+	HTML    string `json:"html"`
 }
 
 type Node struct {
@@ -222,24 +229,56 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 	}
 	WriteArchManifest(target, pkgs, flows)
 
+	// Discover all .md files (respect .gitignore via WalkIgnoring)
+	var docFiles []ArchDocFile
+	var primaryDocPath string
+	var primaryDocHTML string
+	var primaryDocText string
+	_ = analysis.WalkIgnoring(target, func(path string, d fs.DirEntry) error {
+		if d.IsDir() || !strings.HasSuffix(d.Name(), ".md") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		html := MarkdownToHTML(string(data))
+		rel, _ := filepath.Rel(target, path)
+		docFiles = append(docFiles, ArchDocFile{Path: rel, Name: d.Name(), HTML: html})
+		return nil
+	})
+	// Primary doc is the one matching archDocCandidates, or the first .md found
 	for _, candidate := range archDocCandidates {
 		path := filepath.Join(target, candidate)
 		data, err := os.ReadFile(path)
 		if err == nil {
-			text := string(data)
-			return Summary{
-				Source:      "doc",
-				DocFile:     path,
-				Text:        text,
-				ArchDocHTML: MarkdownToHTML(text),
-				Nodes:       []Node{},
-				Edges:       []Edge{},
-				Packages:    pkgs,
-				Flows:       flows,
-			}
+			primaryDocPath = path
+			primaryDocText = string(data)
+			primaryDocHTML = MarkdownToHTML(primaryDocText)
+			break
 		}
 	}
+	if primaryDocPath == "" && len(docFiles) > 0 {
+		primaryDocPath = filepath.Join(target, docFiles[0].Path)
+		primaryDocText = ""
+		primaryDocHTML = ""
+	}
+	// Build base with doc files found
+	base := Summary{ArchDocFiles: docFiles}
+	if primaryDocPath != "" {
+		base.Source = "doc"
+		base.DocFile = primaryDocPath
+		base.Text = primaryDocText
+		base.ArchDocHTML = primaryDocHTML
+	}
 	if s, ok := fromNXWorkspace(target); ok {
+		s.ArchDocFiles = docFiles
+		if base.Source == "doc" {
+			s.Source = "doc"
+			s.DocFile = primaryDocPath
+			s.Text = primaryDocText
+			s.ArchDocHTML = primaryDocHTML
+		}
 		s.Packages = pkgs
 		s.Flows = flows
 		return s
@@ -248,6 +287,13 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 		data, err := os.ReadFile(graphJSONPath)
 		if err == nil {
 			if s, ok := fromGraphJSON(data); ok {
+				s.ArchDocFiles = docFiles
+				if base.Source == "doc" {
+					s.Source = "doc"
+					s.DocFile = primaryDocPath
+					s.Text = primaryDocText
+					s.ArchDocHTML = primaryDocHTML
+				}
 				s.Packages = pkgs
 				s.Flows = flows
 				return s
@@ -255,6 +301,13 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 		}
 	}
 	s := synthesiseFromDirs(target)
+	s.ArchDocFiles = docFiles
+	if base.Source == "doc" {
+		s.Source = "doc"
+		s.DocFile = primaryDocPath
+		s.Text = primaryDocText
+		s.ArchDocHTML = primaryDocHTML
+	}
 	s.Packages = pkgs
 	s.Flows = flows
 	return s
