@@ -136,6 +136,43 @@ tr:hover td{background:var(--surface2)}
 .warnings{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem}
 .warnings strong{color:var(--major)}
 
+/* Interactive Architecture Graph */
+.gbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.seg{display:flex;border:1px solid var(--border);border-radius:9px;overflow:hidden}
+.seg .gbtn{border:0;border-radius:0;border-right:1px solid var(--border)}.seg .gbtn:last-child{border-right:0}
+.gbtn{font-size:12px;padding:6px 13px;border:1px solid var(--border);border-radius:8px;background:var(--surface2);color:var(--muted);cursor:pointer}
+.gbtn.on{color:#fff;border-color:var(--info);background:#1d2740}
+.gbtn:hover{color:var(--text)}
+.gbar .grow{flex:1}
+.glegend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px;color:var(--muted)}
+.glegend b{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle}
+#graph-host{height:480px;position:relative;background:var(--bg);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+#gsvg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#gsvg.grab{cursor:grabbing}
+.ghint{position:absolute;left:12px;bottom:10px;font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-radius:7px;padding:5px 9px;pointer-events:none;opacity:.85}
+.lnk{fill:none;stroke:var(--muted);opacity:.4}
+.lnk.import{stroke-width:1.4}.lnk.tree{stroke-width:1.2;opacity:.3}.lnk.calls{stroke-width:1;opacity:.3;stroke-dasharray:3 3}
+.lnk.hot{stroke:var(--info);opacity:1;stroke-width:2.2}
+.lnk.fn{stroke-width:.8;opacity:.2;stroke-dasharray:2 2}
+.gn{cursor:pointer}
+.gn rect{stroke-width:1.5}
+.gn:hover rect{filter:brightness(1.3)}
+.gn.sel rect{stroke:#fff;stroke-width:2.5}
+.gn.dim{opacity:.2}
+.gn .t{font-size:10px;font-weight:600;fill:var(--text);pointer-events:none;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+.gn .s{font-size:8px;fill:var(--muted);pointer-events:none}
+.gn.fn .t{font-family:'SF Mono',Consolas,monospace;font-size:8.5px;fill:var(--muted)}
+.gn.layer .t{font-weight:700;fill:#fff}
+.gcap{fill:var(--muted);font-size:9px;letter-spacing:1px;text-transform:uppercase}
+.gdetail{margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.gdetail .dtitle{font-size:15px;font-weight:700}.gdetail .dsub{font-family:'SF Mono',Consolas,monospace;font-size:11px;color:var(--info);margin-top:2px}
+.gdgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+.gfield{margin:0 0 10px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px}
+.gfield .gk{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.gfield .gv{margin-top:4px;font-size:12px}.gfield .gv i{color:var(--muted)}
+.gfn{font-family:'SF Mono',Consolas,monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin:2px 3px 0 0;display:inline-block;cursor:pointer;color:var(--text)}
+
+
 /* Responsive */
 @media(max-width:900px){
   .grid-4{grid-template-columns:repeat(2,1fr)}
@@ -210,6 +247,25 @@ tr:hover td{background:var(--surface2)}
         </div>
       </div>
       <div id="arch-flows"></div>
+      <div style="margin:16px 0 2px;padding:12px 0;border-top:1px solid var(--border)">
+        <div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Code Graph</div>
+        <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px">Interactive dependency graph — click a node to see details, drag to rearrange, double-click to expand functions.</div>
+        <div class="gbar">
+          <div class="seg">
+            <button class="gbtn on" id="b_topology">Topology</button>
+            <button class="gbtn" id="b_hierarchy">Hierarchy</button>
+          </div>
+          <button class="gbtn" id="b_funcs">＋ Functions</button>
+          <button class="gbtn" id="b_reset">Reset view</button>
+          <span class="grow"></span>
+          <div class="glegend" id="glegend"></div>
+        </div>
+        <div id="graph-host">
+          <svg id="gsvg"><g id="gview"></g></svg>
+          <div class="ghint">drag a node · scroll = zoom · drag canvas = pan · double-click file = expand functions</div>
+        </div>
+        <div class="gdetail" id="gdetail"></div>
+      </div>
       <div id="arch-pkg-map"></div>
     </div>
   </div>
@@ -641,6 +697,321 @@ function toggleLayer(header) {
   grid.classList.toggle('closed');
   chev.textContent = grid.classList.contains('closed') ? '▶' : '▼';
 }
+
+/* ====================== INTERACTIVE ARCHITECTURE GRAPH ====================== */
+const GV = {
+  mode:'topology', expand:new Set(), sel:null,
+  t:{x:0,y:0,k:1}, nodes:[], links:[], map:{}, pos:{}, ticks:0, raf:null,
+  W:0, H:480, graphData:null, pkgMap:{},
+  init(){
+    if(!R.GraphJSON) return;
+    try {
+      GV.graphData = JSON.parse(R.GraphJSON);
+    } catch(e){ return; }
+    // Build package lookup: file -> {layer, pkgName, doc, funcs}
+    const pm = {};
+    const repoPath = (R.Meta.RepoPath || '').replace(/\/+$/, '');
+    (R.Architecture.Packages||[]).forEach(p => {
+      Object.keys(p.Files||{}).forEach(f => {
+        const abs = repoPath + '/' + f;
+        pm[abs] = {layer:p.Layer, pkg:p.Name, doc:p.DocSummary, file:abs, funcs:p.Files[f]||[]};
+        pm[f] = pm[abs];
+        const short = f.split('/').pop();
+        pm[short] = pm[abs];
+      });
+    });
+    GV.pkgMap = pm;
+    GV.W = document.getElementById('graph-host').clientWidth;
+    GV.build();
+    GV.fit();
+    GV.draw();
+    GV.setupUI();
+  },
+  // Resolve the layer for a source_file
+  getLayer(file){
+    const m = GV.pkgMap[file] || GV.pkgMap[file?.replace(/.*\//,'')];
+    return m ? m.layer : null;
+  },
+  getPkgInfo(file){
+    return GV.pkgMap[file] || GV.pkgMap[file?.replace(/.*\//,'')] || null;
+  },
+  build(){
+    const ns=[], ls=[], map={};
+    const add=n=>{ if(GV.pos[n.id]){n.x=GV.pos[n.id].x;n.y=GV.pos[n.id].y;} ns.push(n); map[n.id]=n; return n; };
+    const g=GV.graphData;
+    if(!g) return;
+    if(GV.mode==='hierarchy'){
+      // Group by layer
+      const layers = {};
+      g.nodes.forEach(n => {
+        if(n.kind!=='file') return;
+        const layer = GV.getLayer(n.source_file) || 'other';
+        (layers[layer] = layers[layer] || []).push(n);
+      });
+      const layerIds = Object.keys(layers).sort();
+      if(!layerIds.length){ GV.nodes=[]; GV.links=[]; GV.map={}; return; }
+      const root=add({id:'__root',type:'root',label:R.Meta.RepoName,order:0});
+      layerIds.forEach((l,i) => {
+        const ln=add({id:'__L_'+l,type:'layer',layer:l,label:l,order:i+1});
+        ls.push({s:'__root',t:ln.id,kind:'tree'});
+        layers[l].forEach(fn => {
+          const n=add({id:fn.id,type:'file',label:fn.label||fn.id,source_file:fn.source_file,layer:l});
+          ls.push({s:ln.id,t:n.id,kind:'tree'});
+          if(GV.expand.has(n.id)){
+            const info = GV.getPkgInfo(fn.source_file);
+            const fns = info ? info.funcs : [];
+            fns.forEach(fname => {
+              const fid = n.id+'#'+fname;
+              add({id:fid,type:'fn',label:fname,parentId:n.id,layer:l});
+              ls.push({s:n.id,t:fid,kind:'fn'});
+            });
+          }
+        });
+      });
+    } else {
+      // Topology: file nodes with import/call edges
+      const fileNodes = {};
+      g.nodes.forEach(n => {
+        if(n.kind==='file'){
+          const layer = GV.getLayer(n.source_file) || 'other';
+          fileNodes[n.id]=1;
+          const node = add({id:n.id,type:'file',label:n.label||n.id,source_file:n.source_file,layer:layer});
+        }
+      });
+      // Add edges between files
+      g.links.forEach(lk => {
+        if(!fileNodes[lk.source] || !fileNodes[lk.target]) return;
+        if(lk.relation==='contains' || lk.relation==='imports' || lk.relation==='calls') {
+          ls.push({s:lk.source,t:lk.target,kind:(lk.relation==='calls'?'calls':'import'),relation:lk.relation});
+        }
+      });
+      // Expand functions
+      Object.keys(fileNodes).forEach(fid => {
+        if(GV.expand.has(fid)){
+          const info = GV.getPkgInfo(g.nodes.find(n=>n.id===fid)?.source_file||'');
+          const fns = info ? info.funcs : [];
+          fns.forEach(fname => {
+            const fnid = fid+'#'+fname;
+            add({id:fnid,type:'fn',label:fname,parentId:fid,layer:GV.map[fid]?.layer||'other'});
+            ls.push({s:fid,t:fnid,kind:'fn'});
+          });
+        }
+      });
+    }
+    GV.nodes=ns; GV.links=ls; GV.map=map;
+    // Init positions with layer-based x-offset
+    const layerIds = [...new Set(ns.filter(n=>n.type!=='fn'&&n.type!=='root'&&n.type!=='layer').map(n=>n.layer))];
+    ns.forEach(n => {
+      if(n.x!=null) return;
+      const ci = layerIds.indexOf(n.layer);
+      if(n.type==='fn'){ n.x=GV.map[n.parentId]?.x||200+(Math.random()*80-40); n.y=(GV.map[n.parentId]?.y||200)+50+Math.random()*60; }
+      else if(n.type==='layer'){ n.x=200+ci*160; n.y=100; }
+      else if(n.type==='root'){ n.x=200; n.y=40; }
+      else { n.x=200+ci*200+(Math.random()*50-25); n.y=GV.H/2-80+Math.random()*160; }
+      n.vx=n.vx||0; n.vy=n.vy||0;
+    });
+    if(GV.mode==='hierarchy'){ GV.layoutTree(); GV.ticks=0; } else { GV.ticks=200; GV.run(); }
+    GV.savePos();
+  },
+  layoutTree(){
+    let leaf=0; const vGap=100, hGap=100;
+    const place=(id,depth)=>{
+      const n=GV.map[id]; if(!n) return; n.depth=depth;
+      const kids=GV.links.filter(l=>l.s===id).map(l=>l.t);
+      if(kids.length){ kids.forEach(k=>place(k,depth+1)); n.x=(GV.map[kids[0]]?.x||0)+(kids.length>1?(GV.map[kids[kids.length-1]]?.x||0)- (GV.map[kids[0]]?.x||0))/2:0); }
+      else { n.x=leaf*hGap; leaf++; }
+      n.y=depth*vGap+40;
+    };
+    place('__root',0);
+    GV.savePos();
+  },
+  run(){ cancelAnimationFrame(GV.raf); const loop=()=>{ if(GV.ticks>0){ GV.sim(); GV.draw(); GV.ticks--; GV.raf=requestAnimationFrame(loop);} }; GV.raf=requestAnimationFrame(loop); },
+  sim(){
+    const ns=GV.nodes, CY=GV.H/2;
+    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){
+      const a=ns[i],b=ns[j];
+      let dx=a.x-b.x,dy=a.y-b.y,d2=dx*dx+dy*dy||0.01,d=Math.sqrt(d2);
+      const rep=(a.type==='fn'||b.type==='fn'?400:1200)/d2;
+      const fx=dx/d*rep,fy=dy/d*rep;
+      a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;
+    }
+    GV.links.forEach(l=>{
+      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b)return;
+      const L=l.kind==='fn'?50:120;
+      let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||0.01,f=(d-L)*0.035;
+      const fx=dx/d*f,fy=dy/d*f;
+      a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;
+    });
+    ns.forEach(n=>{
+      if(n.type==='file'||n.type==='layer'){
+        const layerIds=[...new Set(GV.nodes.filter(x=>x.type!=='fn').map(x=>x.layer))];
+        const ci=layerIds.indexOf(n.layer);
+        if(ci>=0&&GV.mode!=='hierarchy'){ n.vx+=(200+ci*200 - n.x)*0.01; }
+      }
+      if(n.type!=='fn') n.vy+=(CY-n.y)*0.003;
+      if(n.pin)return;
+      n.x+=Math.max(-10,Math.min(10,n.vx)); n.y+=Math.max(-10,Math.min(10,n.vy));
+      n.vx*=0.85; n.vy*=0.85;
+    });
+    GV.savePos();
+  },
+  savePos(){ GV.nodes.forEach(n=>{ if(n.type!=='fn') GV.pos[n.id]={x:n.x,y:n.y}; }); },
+  fit(){
+    const ns=GV.nodes.filter(n=>n.type!=='fn');
+    if(!ns.length) return;
+    const xs=ns.map(n=>n.x),ys=ns.map(n=>n.y);
+    const minx=Math.min(...xs)-80,maxx=Math.max(...xs)+80,miny=Math.min(...ys)-40,maxy=Math.max(...ys)+50;
+    const host=document.getElementById('graph-host'),w=host.clientWidth,h=host.clientHeight;
+    const k=Math.min(w/(maxx-minx),h/(maxy-miny),1.4);
+    GV.t.k=k; GV.t.x=(w-(minx+maxx)*k)/2; GV.t.y=(h-(miny+maxy)*k)/2;
+    GV.draw();
+  },
+  draw(){
+    const v=document.getElementById('gview');
+    if(!v) return;
+    v.setAttribute('transform',`translate(${GV.t.x},${GV.t.y}) scale(${GV.t.k})`);
+    const sel=GV.sel, conn=new Set();
+    if(sel){ conn.add(sel); GV.links.forEach(l=>{ if(l.s===sel)conn.add(l.t); if(l.t===sel)conn.add(l.s); }); }
+    let h='';
+    GV.links.forEach(l=>{
+      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b)return;
+      const hot=sel&&(l.s===sel||l.t===sel);
+      const mx=(a.x+b.x)/2;
+      const d=GV.mode==='hierarchy'?`M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`:`M${a.x} ${a.y} C${mx} ${a.y},${mx} ${b.y},${b.x} ${b.y}`;
+      h+=`<path class="lnk ${l.kind}${hot?' hot':''}" d="${d}"/>`;
+    });
+    GV.nodes.forEach(n=>{
+      const clr=GV.nodeColor(n); const dim=sel&&!conn.has(n.id)?' dim':''; const isSel=n.id===sel?' sel':'';
+      if(n.type==='fn'){
+        const w=Math.max(30,n.label.length*5.5+12);
+        h+=`<g class="gn fn${dim}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${clr}18" stroke="${clr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+      } else if(n.type==='layer'){
+        const w=Math.max(70,n.label.length*7+20);
+        h+=`<g class="gn layer" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+      } else if(n.type==='root'){
+        const w=Math.max(60,n.label.length*8+20);
+        h+=`<g class="gn root" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
+      } else {
+        const w=140,hh=38;
+        h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}18" stroke="${clr}"/><text class="t" x="${-w/2+10}" y="-2">${escHtml(n.label)}</text><text class="s" x="${-w/2+10}" y="13">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text></g>`;
+      }
+    });
+    v.innerHTML=h;
+  },
+  nodeColor(n){
+    if(n.type==='fn') return GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
+    const LAYER_COLORS={'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
+    return LAYER_COLORS[n.layer] || '#8892a4';
+  },
+  showDetail(id){
+    const n=GV.map[id]; if(!n){ document.getElementById('gdetail').innerHTML=''; return; }
+    const clr=GV.nodeColor(n);
+    if(n.type==='fn'){
+      GV.sel=n.parentId;
+      GV.showDetail(n.parentId);
+      GV.draw();
+      return;
+    }
+    GV.sel=id;
+    // Build connections
+    const calls=[], calledBy=[];
+    GV.links.forEach(l=>{
+      if(l.s===id && l.kind!=='fn' && l.kind!=='tree') calls.push(l.t);
+      if(l.t===id && l.kind!=='fn' && l.kind!=='tree') calledBy.push(l.s);
+    });
+    const info=GV.getPkgInfo(n.source_file||'');
+    const funcs=info?info.funcs:[];
+    const pkgName=info?info.pkg:'—';
+    const layLabel=n.layer?n.layer:'—';
+    const doc=info?info.doc:'';
+    const detail=document.getElementById('gdetail');
+    detail.innerHTML=`<div class="dtitle">${escHtml(n.label)}</div>
+      <div class="dsub">${escHtml(n.source_file||n.id)}</div>
+      <div style="margin:6px 0"><span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(pkgName)}</span><span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(layLabel)}</span></div>
+      <div class="gdgrid">
+        <div>
+          ${doc?`<div class="gfield"><div class="gk">Summary</div><div class="gv">${escHtml(doc)}</div></div>`:''}
+          ${funcs.length?`<div class="gfield"><div class="gk">Functions (${funcs.length})</div><div class="gv">${funcs.slice(0,20).map(f=>`<span class="gfn">${escHtml(f)}</span>`).join(' ')}${funcs.length>20?`<span style="color:var(--muted);font-size:10px"> +${funcs.length-20}</span>`:''}</div></div>`:''}
+        </div>
+        <div>
+          <div class="gfield"><div class="gk">Calls (${calls.length})</div><div class="gv">${calls.length?calls.map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t)}</span>`;}).join(' '):'<i>none</i>'}</div></div>
+          <div class="gfield"><div class="gk">Called by (${calledBy.length})</div><div class="gv">${calledBy.length?calledBy.map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t)}</span>`;}).join(' '):'<i>none</i>'}</div></div>
+        </div>
+      </div>`;
+    GV.draw();
+  },
+  setupUI(){
+    // Interactions
+    const gsvg=document.getElementById('gsvg');
+    if(!gsvg) return;
+    let drag=null;
+    gsvg.addEventListener('pointerdown',ev=>{
+      const g=ev.target.closest('.gn');
+      const pt=svgPt(ev);
+      if(g && g.classList.contains('file')){ const n=GV.map[g.dataset.id]; if(!n)return; drag={node:n,ox:pt.x-n.x,oy:pt.y-n.y}; n.pin=true; gsvg.setPointerCapture(ev.pointerId); }
+      else if(g && g.classList.contains('fn')){ /* handled on click */ }
+      else { drag={pan:true,sx:ev.clientX,sy:ev.clientY,tx:GV.t.x,ty:GV.t.y}; gsvg.classList.add('grab'); }
+    });
+    gsvg.addEventListener('pointermove',ev=>{
+      if(!drag)return;
+      if(drag.pan){ GV.t.x=drag.tx+(ev.clientX-drag.sx); GV.t.y=drag.ty+(ev.clientY-drag.sy); GV.draw(); }
+      else if(drag.node){ const pt=svgPt(ev); drag.node.x=pt.x-drag.ox; drag.node.y=pt.y-drag.oy; GV.savePos(); GV.draw(); }
+    });
+    gsvg.addEventListener('pointerup',ev=>{
+      if(drag&&drag.node){ drag.node.pin=false; if(GV.mode==='topology'){GV.ticks=60;GV.run();} }
+      drag=null; gsvg.classList.remove('grab');
+    });
+    gsvg.addEventListener('click',ev=>{
+      const g=ev.target.closest('.gn'); if(!g)return;
+      const id=g.dataset.id;
+      if(g.classList.contains('fn')){ GV.showDetail(g.dataset.parent); return; }
+      if(g.classList.contains('file')){ GV.showDetail(id); }
+    });
+    gsvg.addEventListener('dblclick',ev=>{
+      const g=ev.target.closest('.gn'); if(!g||!g.classList.contains('file'))return;
+      const id=g.dataset.id; if(GV.expand.has(id))GV.expand.delete(id); else GV.expand.add(id);
+      GV.pos={}; GV.build(); GV.fit();
+    });
+    gsvg.addEventListener('wheel',ev=>{
+      ev.preventDefault();
+      const r=gsvg.getBoundingClientRect();
+      const px=ev.clientX-r.left,py=ev.clientY-r.top;
+      const f=ev.deltaY<0?1.12:0.89;
+      const k2=Math.max(0.3,Math.min(2.6,GV.t.k*f));
+      const wx=(px-GV.t.x)/GV.t.k, wy=(py-GV.t.y)/GV.t.k;
+      GV.t.k=k2; GV.t.x=px-wx*k2; GV.t.y=py-wy*k2; GV.draw();
+    },{passive:false});
+    // Buttons
+    const b_topology=document.getElementById('b_topology');
+    const b_hierarchy=document.getElementById('b_hierarchy');
+    const b_funcs=document.getElementById('b_funcs');
+    const b_reset=document.getElementById('b_reset');
+    if(b_topology) b_topology.onclick=()=>{ GV.mode='topology'; b_topology.classList.add('on'); b_hierarchy.classList.remove('on'); GV.pos={}; GV.build(); GV.fit(); };
+    if(b_hierarchy) b_hierarchy.onclick=()=>{ GV.mode='hierarchy'; b_hierarchy.classList.add('on'); b_topology.classList.remove('on'); GV.pos={}; GV.build(); GV.fit(); };
+    if(b_funcs) b_funcs.onclick=()=>{
+      const allOn=GV.nodes.filter(n=>n.type==='file').every(n=>GV.expand.has(n.id));
+      GV.expand=allOn?new Set():new Set(GV.nodes.filter(n=>n.type==='file').map(n=>n.id));
+      b_funcs.classList.toggle('on',!allOn); GV.pos={}; GV.build(); GV.fit();
+    };
+    if(b_reset) b_reset.onclick=()=>{ GV.pos={}; GV.build(); GV.fit(); };
+    // Legend
+    const legend=document.getElementById('glegend');
+    if(legend){
+      const layers=[...new Set(GV.nodes.filter(n=>n.type==='file').map(n=>n.layer))];
+      legend.innerHTML=layers.map(l=>`<span><b style="background:${GV.nodeColor({layer:l})}"></b>${l}</span>`).join('');
+    }
+    window.addEventListener('resize',()=>GV.draw());
+  }
+};
+function svgPt(ev){
+  const gsvg=document.getElementById('gsvg'); if(!gsvg) return {x:0,y:0};
+  const r=gsvg.getBoundingClientRect(); return {x:(ev.clientX-r.left-GV.t.x)/GV.t.k, y:(ev.clientY-r.top-GV.t.y)/GV.t.k};
+}
+function cssV(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+// Boot graph on DOMContentLoaded via the renderArchitecture queue
+// We hook into renderArchitecture since the data (R.GraphJSON) is already available.
+(function(){ setTimeout(() => { if(R.GraphJSON) GV.init(); }, 100); })();
 
 // ── Exceptions ────────────────────────────────────────────────────────────────
 function renderExceptions() {
