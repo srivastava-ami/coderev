@@ -173,6 +173,40 @@ tr:hover td{background:var(--surface2)}
 .gfn{font-family:'SF Mono',Consolas,monospace;font-size:10px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;margin:2px 3px 0 0;display:inline-block;cursor:pointer;color:var(--text)}
 
 
+/* Architecture overview cards */
+.arch-overview-row{display:flex;gap:10px;flex-wrap:wrap}
+.arch-ocard{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:12px 16px;flex:1;min-width:160px}
+.arch-ocard .oval{font-size:1.6rem;font-weight:700;line-height:1.2}
+.arch-ocard .olabel{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.arch-ocard .oitems{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.role-badge{display:inline-flex;align-items:center;gap:4px;font-size:.68rem;padding:2px 8px;border-radius:10px;font-weight:600;white-space:nowrap}
+.role-entry{background:#3fb95020;color:var(--pass);border:1px solid #3fb95055}
+.role-core{background:#58a6ff20;color:var(--info);border:1px solid #58a6ff55}
+.role-adapter{background:#a78bfa20;color:#a78bfa;border:1px solid #a78bfa55}
+.role-surface{background:#f472b620;color:#f472b6;border:1px solid #f472b655}
+.role-unknown{background:#ffffff10;color:var(--muted);border:1px solid var(--border)}
+/* Flow step clickable */
+.fstep{cursor:pointer;transition:opacity .15s}
+.fstep:hover{opacity:.7}
+.fstep:hover .fstep-fn{color:var(--info)}
+.fstep-fn{font-family:'SF Mono',Consolas,monospace;font-size:.72rem;transition:color .1s}
+/* Detail panel enrichment */
+.gd-sublabel{font-size:.68rem;color:var(--muted);margin-top:2px}
+.gd-flow{margin-top:10px}
+.gd-flow-item{padding:6px 8px;margin-bottom:4px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:.75rem;cursor:pointer;transition:border-color .15s}
+.gd-flow-item:hover{border-color:var(--info)}
+.gd-flow-item .gdf-name{font-weight:600;color:var(--text)}
+.gd-flow-item .gdf-steps{display:flex;gap:3px;flex-wrap:wrap;margin-top:4px;align-items:center;font-size:.65rem}
+.gd-flow-item .gdf-step{font-family:'SF Mono',Consolas,monospace;white-space:nowrap}
+.gd-external{margin-top:6px;display:flex;gap:4px;flex-wrap:wrap}
+.gd-rule{font-size:.68rem;padding:4px 8px;border-radius:4px;margin-top:6px}
+.gd-rule.pass{background:#3fb95015;color:var(--pass);border:1px solid #3fb95033}
+.gd-rule.fail{background:#ef444415;color:var(--fail);border:1px solid #ef444433}
+.gd-deps{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.gd-dep-group{font-size:.65rem}
+.gd-dep-group .dd-label{color:var(--muted);margin-right:3px}
+.gd-dep-group .dd-count{font-weight:600;color:var(--text)}
+
 /* Responsive */
 @media(max-width:900px){
   .grid-4{grid-template-columns:repeat(2,1fr)}
@@ -238,6 +272,7 @@ tr:hover td{background:var(--surface2)}
     <div class="arch-content">
       <div id="arch-status"></div>
       <div id="arch-doc-wrapper" style="display:none"></div>
+      <div id="arch-overview" style="margin-bottom:16px"></div>
       <div id="arch-flows"></div>
       <div style="margin:16px 0 2px;padding:12px 0;border-top:1px solid var(--border)">
         <div style="font-size:.85rem;font-weight:600;margin-bottom:2px">Code Graph</div>
@@ -562,6 +597,7 @@ function heatToColor(score) {
 function renderArchitecture() {
   const arch = R.Architecture;
   renderArchStatus(arch);
+  renderArchOverview(arch);
   if (arch && arch.Flows && arch.Flows.length) {
     renderFlows(arch.Flows);
   }
@@ -573,11 +609,87 @@ function renderArchitecture() {
   }
 }
 
+function renderArchOverview(arch) {
+  const el = document.getElementById('arch-overview');
+  if (!arch) { el.innerHTML = ''; return; }
+  // Build entry points list from flows
+  const flows = arch.Flows || [];
+  const entries = [...new Set(flows.map(f => f.Entry).filter(Boolean))];
+  const pkgs = arch.Packages || [];
+  // Layer distribution
+  const layerCount = {};
+  pkgs.forEach(p => { layerCount[p.Layer] = (layerCount[p.Layer] || 0) + 1; });
+  const LAYER_ORDER = ['governance','orchestration','execution','persistence','surface'];
+  const LAYER_COLORS = {'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
+  // Total file count from packages
+  const fileSet = new Set();
+  pkgs.forEach(p => { Object.keys(p.Files||{}).forEach(f => fileSet.add(f)); });
+  const totalFiles = fileSet.size;
+  // Entry link map: flow entry node ID → flow name
+  const entryFlows = {};
+  flows.forEach(f => {
+    const e = f.Entry;
+    if (!entryFlows[e]) entryFlows[e] = [];
+    entryFlows[e].push(f.Name);
+  });
+  const entryLabels = entries.map(e => {
+    const label = e.split(':').pop() || e.split('/').pop() || e;
+    return { id: e, label, flows: entryFlows[e] || [] };
+  });
+  let html = '<div class="arch-overview-row">';
+  // Entry points card
+  html += `<div class="arch-ocard">
+    <div class="olabel">Entry points</div>
+    <div class="oval">${entries.length}</div>
+    <div class="oitems">${entryLabels.length ? entryLabels.map(e => `<span class="role-badge role-entry" onclick="focusEntry('${escHtml(e.id)}')">${escHtml(e.label)}</span>`).join('') : '<span style="font-size:.72rem;color:var(--muted)">none</span>'}</div>
+  </div>`;
+  // Layer distribution
+  html += `<div class="arch-ocard">
+    <div class="olabel">Layers</div>
+    <div class="oval">${LAYER_ORDER.filter(l => layerCount[l]).length}</div>
+    <div class="oitems">${LAYER_ORDER.filter(l => layerCount[l]).map(l => `<span style="display:inline-flex;align-items:center;gap:3px;font-size:.65rem;padding:1px 6px;border-radius:8px;background:${LAYER_COLORS[l]}22;border:1px solid ${LAYER_COLORS[l]}55;color:${LAYER_COLORS[l]}">${l} ${layerCount[l]}</span>`).join('')}</div>
+  </div>`;
+  // Flows card
+  html += `<div class="arch-ocard">
+    <div class="olabel">Execution flows</div>
+    <div class="oval">${flows.length}</div>
+    <div class="oitems">${flows.slice(0,8).map(f => `<span class="role-badge role-core" onclick="focusFlow('${escHtml(f.Name)}')">${escHtml(f.Name)}</span>`).join('')}${flows.length > 8 ? `<span style="font-size:.65rem;color:var(--muted)">+${flows.length-8}</span>` : ''}</div>
+  </div>`;
+  // Files card
+  html += `<div class="arch-ocard">
+    <div class="olabel">Files (in graph)</div>
+    <div class="oval">${totalFiles}</div>
+    <div class="oitems" style="font-size:.65rem;color:var(--muted)">${pkgs.length} packages across ${Object.keys(layerCount).length} layers</div>
+  </div>`;
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 function toggleDocPanel(header) {
   const body = header.nextElementSibling;
   const chev = header.querySelector('.adoc-chev');
   body.classList.toggle('open');
   chev.textContent = body.classList.contains('open') ? '▲' : '▼';
+}
+
+// Focus the graph on a specific file/entry point by node ID (file path)
+function focusEntry(entryId) {
+  // entryId is like "file.go:main" — file part is before last colon
+  const fileId = entryId.includes(':') ? entryId.slice(0, entryId.lastIndexOf(':')) : entryId;
+  const tab = document.querySelector('.tab[onclick*="architecture"]');
+  if (tab) tab.click();
+  setTimeout(() => {
+    const node = GV.map[fileId];
+    if (node) { GV.showDetail(fileId); GV.draw(); }
+  }, 200);
+}
+
+// Focus the graph on the entry file of a specific flow
+function focusFlow(flowName) {
+  const arch = R.Architecture;
+  const flow = (arch.Flows || []).find(f => f.Name === flowName);
+  if (!flow) return;
+  focusEntry(flow.Entry);
 }
 
 function renderDocs() {
@@ -619,10 +731,21 @@ function renderArchStatus(arch) {
   }
 }
 
+function flowClickStep(s) {
+  const repoPath = (R.Meta.RepoPath || '').replace(/\/+$/, '');
+  const absPath = s.File ? (s.File.startsWith('/') ? s.File : repoPath + '/' + s.File) : '';
+  const node = GV.map[absPath];
+  if (node) {
+    const tab = document.querySelector('.tab[onclick*="architecture"]');
+    if (tab) tab.click();
+    setTimeout(() => { GV.showDetail(absPath); GV.draw(); }, 200);
+  }
+}
+
 function renderFlows(flows) {
   const el = document.getElementById('arch-flows');
   const LAYER_COLORS = {governance:'var(--info)',orchestration:'var(--advisory)',execution:'var(--pass)',persistence:'#a78bfa',surface:'#f472b6'};
-  let html = `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Use-case flows traced from code graph call edges.</div>`;
+  let html = `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Use-case flows traced from code graph call edges — click a step to highlight in graph.</div>`;
   flows.forEach(f => {
     html += `<div style="border:1px solid var(--surface2);border-radius:6px;margin-bottom:8px;overflow:hidden">
       <div style="background:var(--surface2);padding:6px 12px;font-size:.8rem;font-weight:600">${escHtml(f.Name)}</div>
@@ -634,7 +757,7 @@ function renderFlows(flows) {
       const arrow = i > 0 ? `<span style="color:var(--muted);margin:0 4px;font-size:.7rem">→</span>` : '';
       const badge = s.Layer !== lastLayer ? `<span style="display:inline-block;background:${color};color:#fff;border-radius:3px;padding:0 5px;font-size:.63rem;font-weight:600;margin-right:4px">${s.Layer}</span>` : '';
       lastLayer = s.Layer;
-      html += `${arrow}${badge}<span style="font-size:.72rem;font-family:var(--mono)">${escHtml(s.Func)}</span>`;
+      html += `${arrow}${badge}<span class="fstep" onclick="flowClickStep({File:'${escHtml(s.File)}',Func:'${escHtml(s.Func)}'})"><span class="fstep-fn">${escHtml(s.Func)}</span><span style="font-size:.62rem;color:var(--muted);margin-left:2px">${escHtml(s.File||'').split('/').pop()}</span></span>`;
     });
     html += `</div></div>`;
   });
@@ -741,6 +864,16 @@ const GV = {
       });
     });
     GV.pkgMap = pm;
+    // Build flow-file index: source_file → [flow names]
+    GV.flowFiles = {};
+    const repoPath = (R.Meta.RepoPath || '').replace(/\/+$/, '');
+    (R.Architecture.Flows || []).forEach(f => {
+      (f.Steps || []).forEach(s => {
+        const absPath = s.File ? (s.File.startsWith('/') ? s.File : repoPath + '/' + s.File) : '';
+        if (!GV.flowFiles[absPath]) GV.flowFiles[absPath] = [];
+        if (!GV.flowFiles[absPath].includes(f.Name)) GV.flowFiles[absPath].push(f.Name);
+      });
+    });
     GV.W = document.getElementById('graph-host').clientWidth;
     GV.build();
     GV.fit();
@@ -916,7 +1049,13 @@ const GV = {
         h+=`<g class="gn root" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
       } else {
         const w=140,hh=38;
-        h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}18" stroke="${clr}"/><text class="t" x="${-w/2+10}" y="-2">${escHtml(n.label)}</text><text class="s" x="${-w/2+10}" y="13">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text></g>`;
+        const isEp = !!(R.Architecture.Flows || []).some(f => f.Entry && n.source_file && f.Entry.includes(n.source_file));
+        h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})">
+          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}18" stroke="${clr}"/>
+          <text class="t" x="${-w/2+10}" y="-2">${escHtml(n.label)}</text>
+          <text class="s" x="${-w/2+10}" y="13">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
+          ${isEp?`<circle cx="${w/2-10}" cy="${-hh/2+10}" r="5" fill="#3fb950" stroke="#3fb95088"/>`:''}
+        </g>`;
       }
     });
     v.innerHTML=h;
@@ -925,6 +1064,28 @@ const GV = {
     if(n.type==='fn') return GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
     const LAYER_COLORS={'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
     return LAYER_COLORS[n.layer] || '#8892a4';
+  },
+  nodeRole(n){
+    const layers = {governance:'governance',orchestration:'orchestration',execution:'core',persistence:'adapter',surface:'surface'};
+    return layers[n.layer] || 'unknown';
+  },
+  roleLabel(role){
+    return {entrypoint:'Entry point',governance:'Governance',orchestration:'Orchestration',core:'Core logic',adapter:'Adapter',surface:'Output'}[role] || role;
+  },
+  roleBadge(role){
+    const cls = {entrypoint:'role-entry',governance:'role-badge role-unknown',orchestration:'role-badge role-unknown',core:'role-core',adapter:'role-adapter',surface:'role-surface'}[role] || 'role-unknown';
+    return `<span class="role-badge ${cls}">${this.roleLabel(role) || role}</span>`;
+  },
+  isEntrypoint(n){
+    const arch = R.Architecture;
+    return (arch.Flows || []).some(f => f.Entry && f.Entry.includes(n.source_file||''));
+  },
+  entryFor(n){
+    const arch = R.Architecture;
+    return (arch.Flows || []).filter(f => f.Entry && f.Entry.includes(n.source_file||''));
+  },
+  flowsThrough(file){
+    return GV.flowFiles ? (GV.flowFiles[file] || []) : [];
   },
   showDetail(id){
     const n=GV.map[id]; if(!n){ document.getElementById('gdetail').innerHTML=''; return; }
@@ -947,18 +1108,60 @@ const GV = {
     const pkgName=info?info.pkg:'—';
     const layLabel=n.layer?n.layer:'—';
     const doc=info?info.doc:'';
+    const externalLibs=info?null:[]; // external libs only available from Packages directly, not per-file
+    const isEntry = GV.isEntrypoint(n);
+    const entryFlows = GV.entryFor(n);
+    const flowsThrough = GV.flowsThrough(n.source_file||'');
+    const role = isEntry ? 'entrypoint' : GV.nodeRole(n);
+    // Group calls by layer
+    const layerOrder = ['governance','orchestration','execution','persistence','surface'];
+    const LAYER_COLORS = {'governance':'var(--info)','orchestration':'var(--advisory)','execution':'var(--pass)','persistence':'#a78bfa','surface':'#f472b6'};
+    const groupByLayer = (items) => {
+      const groups = {};
+      items.forEach(t => {
+        const tn = GV.map[t];
+        const l = tn ? (tn.layer || 'other') : 'other';
+        if (!groups[l]) groups[l] = [];
+        groups[l].push(t);
+      });
+      return groups;
+    };
+    const callGroups = groupByLayer(calls);
+    const calledByGroups = groupByLayer(calledBy);
+    // Dependency rule check: core (execution) should not call outward (persistence, surface)
+    const ruleViolation = n.layer === 'execution' && (callGroups['persistence'] || callGroups['surface']);
+    const ruleWarn = n.layer === 'execution' && callGroups['orchestration'];
+    // Get external libs from package data
+    const pkgInfo = (R.Architecture.Packages || []).find(p => {
+      return Object.keys(p.Files||{}).some(f => {
+        const abs = (R.Meta.RepoPath||'') + '/' + f;
+        return abs === n.source_file || f.endsWith('/' + (n.source_file||'').split('/').pop());
+      });
+    });
+    const extLibs = pkgInfo ? (pkgInfo.ExternalLibs || []) : [];
     const detail=document.getElementById('gdetail');
     detail.innerHTML=`<div class="dtitle">${escHtml(n.label)}</div>
       <div class="dsub">${escHtml(n.source_file||n.id)}</div>
-      <div style="margin:6px 0"><span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(pkgName)}</span><span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(layLabel)}</span></div>
+      <div class="gd-sublabel" style="margin-top:4px">${GV.roleBadge(role)} <span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(pkgName)}</span> <span class="pkg-dep-tag" style="color:${clr};border-color:${clr}55">${escHtml(layLabel)}</span></div>
       <div class="gdgrid">
         <div>
           ${doc?`<div class="gfield"><div class="gk">Summary</div><div class="gv">${escHtml(doc)}</div></div>`:''}
           ${funcs.length?`<div class="gfield"><div class="gk">Functions (${funcs.length})</div><div class="gv">${funcs.slice(0,20).map(f=>`<span class="gfn">${escHtml(f)}</span>`).join(' ')}${funcs.length>20?`<span style="color:var(--muted);font-size:10px"> +${funcs.length-20}</span>`:''}</div></div>`:''}
+          ${extLibs.length?`<div class="gfield"><div class="gk">External libs (${extLibs.length})</div><div class="gv">${extLibs.slice(0,10).map(l=>`<span class="gfn">${escHtml(l)}</span>`).join(' ')}${extLibs.length>10?`<span style="color:var(--muted);font-size:10px"> +${extLibs.length-10}</span>`:''}</div></div>`:''}
+          ${flowsThrough.length?`<div class="gfield"><div class="gk">Part of flows</div><div class="gv">${flowsThrough.map(fn=>`<span class="gfn" onclick="focusFlow('${escHtml(fn)}')">${escHtml(fn)}</span>`).join(' ')}</div></div>`:''}
+          ${entryFlows.length?`<div class="gfield"><div class="gk">Entry for flows</div><div class="gv">${entryFlows.map(f=>`<span class="gfn" onclick="focusFlow('${escHtml(f.Name)}')">${escHtml(f.Name)}</span>`).join(' ')}</div></div>`:''}
         </div>
         <div>
-          <div class="gfield"><div class="gk">Calls (${calls.length})</div><div class="gv">${calls.length?calls.map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t)}</span>`;}).join(' '):'<i>none</i>'}</div></div>
-          <div class="gfield"><div class="gk">Called by (${calledBy.length})</div><div class="gv">${calledBy.length?calledBy.map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t)}</span>`;}).join(' '):'<i>none</i>'}</div></div>
+          ${ruleViolation||ruleWarn?`<div class="gd-rule ${ruleViolation?'fail':'pass'}">${ruleViolation?'⚠ Dependency rule violation: core (execution) must not depend on adapters (persistence/surface)':'⚠ Suspicious: execution layer calling upward to orchestration'}</div>`:''}
+          <div class="gfield"><div class="gk">Calls to (${calls.length})</div>
+            <div class="gd-deps">${layerOrder.filter(l=>callGroups[l]).map(l=>`<span class="gd-dep-group"><span class="dd-label" style="color:${LAYER_COLORS[l]||'var(--muted)'}">${l}</span> <span class="dd-count">${callGroups[l].length}</span></span>`).join('')}${Object.keys(callGroups).filter(l=>!layerOrder.includes(l)).length?`<span class="gd-dep-group"><span class="dd-label" style="color:var(--muted)">other</span> <span class="dd-count">${Object.keys(callGroups).filter(l=>!layerOrder.includes(l)).reduce((s,l)=>s+callGroups[l].length,0)}</span></span>`:''}
+            </div>
+            <div style="margin-top:6px">${calls.slice(0,12).map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t.split('/').pop())}</span>`;}).join(' ')}${calls.length>12?`<span style="color:var(--muted);font-size:10px"> +${calls.length-12}</span>`:''}</div>
+          </div>
+          <div class="gfield"><div class="gk">Called by (${calledBy.length})</div>
+            <div class="gd-deps">${layerOrder.filter(l=>calledByGroups[l]).map(l=>`<span class="gd-dep-group"><span class="dd-label" style="color:${LAYER_COLORS[l]||'var(--muted)'}">${l}</span> <span class="dd-count">${calledByGroups[l].length}</span></span>`).join('')}</div>
+            <div style="margin-top:6px">${calledBy.slice(0,12).map(t=>{const tn=GV.map[t];return tn?`<span class="gfn">${escHtml(tn.label)}</span>`:`<span class="gfn">${escHtml(t.split('/').pop())}</span>`;}).join(' ')}${calledBy.length>12?`<span style="color:var(--muted);font-size:10px"> +${calledBy.length-12}</span>`:''}</div>
+          </div>
         </div>
       </div>`;
     GV.draw();
