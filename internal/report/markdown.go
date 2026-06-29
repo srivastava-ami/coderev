@@ -40,6 +40,7 @@ func writeMarkdown(b *strings.Builder, r Report) {
 	writeDeltaLine(b, r)
 	b.WriteString("---\n\n")
 
+	writeArchSection(b, r)
 	writeSummaryTable(b, r)
 	writePillarSections(b, r)
 	writeFileHeatmap(b, r)

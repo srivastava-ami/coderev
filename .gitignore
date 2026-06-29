@@ -24,11 +24,8 @@ plan.md
 # OS
 .DS_Store
 
-# coderev generated artifacts — tool_config.toml is NOT listed so teams can commit it
-.coderev/graph/
-.coderev/report.md
-.coderev/report.html
-.coderev/report.sarif
-.coderev/prompt.md
-.coderev/review.md
-.coderev/baseline.json
+# opencode config
+opencode.json
+
+# coderev generated scan artifacts — regenerate on every run
+.coderev/
