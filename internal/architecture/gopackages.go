@@ -15,13 +15,14 @@ import (
 
 // PackageInfo holds the deterministic architecture view of one Go package.
 type PackageInfo struct {
-	ImportPath      string   // relative to module root, e.g. "internal/analysis"
-	Name            string   // Go package name
-	Layer           string   // NXS layer: governance|orchestration|execution|persistence|surface
-	DocSummary      string   // first sentence of the package doc comment
-	Deps            []string // intra-module imports only, sorted
-	ExportedSymbols []string // exported func/type names, sorted
-	ExternalLibs    []string // external (non-stdlib, non-module) import paths, sorted
+	ImportPath      string              // relative to module root, e.g. "internal/analysis"
+	Name            string              // Go package name
+	Layer           string              // NXS layer: governance|orchestration|execution|persistence|surface
+	DocSummary      string              // first sentence of the package doc comment
+	Deps            []string            // intra-module imports only, sorted
+	ExportedSymbols []string            // exported func/type names, sorted
+	ExternalLibs    []string            // external (non-stdlib, non-module) import paths, sorted
+	Files           map[string][]string // source file (relative path) → list of functions/types in that file
 }
 
 // ScanGoPackages walks root and returns one PackageInfo per Go package.
@@ -77,14 +78,17 @@ func parsePackageDir(fset *token.FileSet, root, dir, modPrefix string) (PackageI
 	}
 	for _, pkg := range pkgs {
 		deps, extLibs := collectImports(pkg, modPrefix, importPath)
+		exported := collectExported(pkg)
+		files := collectFileSymbols(pkg)
 		return PackageInfo{
 			ImportPath:      importPath,
 			Name:            pkg.Name,
 			Layer:           nxsLayer(importPath),
 			DocSummary:      packageDocSummary(pkg),
 			Deps:            deps,
-			ExportedSymbols: collectExported(pkg),
+			ExportedSymbols: exported,
 			ExternalLibs:    extLibs,
+			Files:           files,
 		}, true
 	}
 	return PackageInfo{}, false
@@ -159,6 +163,32 @@ func collectGenDeclExported(d *ast.GenDecl, seen map[string]bool) {
 			seen[ts.Name.Name] = true
 		}
 	}
+}
+
+func collectFileSymbols(pkg *ast.Package) map[string][]string {
+	files := map[string][]string{}
+	for fname, f := range pkg.Files {
+		var syms []string
+		for _, decl := range f.Decls {
+			switch d := decl.(type) {
+			case *ast.FuncDecl:
+				if d.Name != nil && isExported(d.Name.Name) {
+					syms = append(syms, d.Name.Name)
+				}
+			case *ast.GenDecl:
+				for _, spec := range d.Specs {
+					if ts, ok := spec.(*ast.TypeSpec); ok && isExported(ts.Name.Name) {
+						syms = append(syms, ts.Name.Name)
+					}
+				}
+			}
+		}
+		if len(syms) > 0 {
+			sort.Strings(syms)
+			files[fname] = syms
+		}
+	}
+	return files
 }
 
 func isExported(name string) bool {

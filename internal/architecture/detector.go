@@ -20,6 +20,7 @@ type Summary struct {
 	Nodes       []Node
 	Edges       []Edge
 	Packages    []PackageInfo // Go package-level structure (populated for Go repos)
+	Flows       []Flow        // use-case flows traced from graph call edges (populated from graph.json)
 }
 
 type Node struct {
@@ -207,8 +208,20 @@ func filter(nodes []Node, t string) []Node {
 // file-level architecture nodes and call edges when no architecture doc is found.
 // It always populates Packages for Go repos and writes .coderev/architecture.toml.
 func DetectWithGraph(target, graphJSONPath string) Summary {
-	pkgs := ScanGoPackages(target)
-	WriteArchManifest(target, pkgs)
+	var pkgs []PackageInfo
+	var flows []Flow
+
+	if graphJSONPath != "" {
+		data, err := os.ReadFile(graphJSONPath)
+		if err == nil {
+			pkgs, flows = PackagesFromGraph(data, target)
+		}
+	}
+	if len(pkgs) == 0 {
+		pkgs = ScanGoPackages(target)
+	}
+	WriteArchManifest(target, pkgs, flows)
+
 	for _, candidate := range archDocCandidates {
 		path := filepath.Join(target, candidate)
 		data, err := os.ReadFile(path)
@@ -222,11 +235,13 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 				Nodes:       []Node{},
 				Edges:       []Edge{},
 				Packages:    pkgs,
+				Flows:       flows,
 			}
 		}
 	}
 	if s, ok := fromNXWorkspace(target); ok {
 		s.Packages = pkgs
+		s.Flows = flows
 		return s
 	}
 	if graphJSONPath != "" {
@@ -234,12 +249,14 @@ func DetectWithGraph(target, graphJSONPath string) Summary {
 		if err == nil {
 			if s, ok := fromGraphJSON(data); ok {
 				s.Packages = pkgs
+				s.Flows = flows
 				return s
 			}
 		}
 	}
 	s := synthesiseFromDirs(target)
 	s.Packages = pkgs
+	s.Flows = flows
 	return s
 }
 

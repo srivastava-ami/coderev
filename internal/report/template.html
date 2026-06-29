@@ -209,6 +209,7 @@ tr:hover td{background:var(--surface2)}
           <div class="adoc-body arch-text" id="adoc-body"></div>
         </div>
       </div>
+      <div id="arch-flows"></div>
       <div id="arch-pkg-map"></div>
     </div>
   </div>
@@ -510,6 +511,9 @@ function renderArchitecture() {
     document.getElementById('adoc-file').textContent = arch.DocFile || '';
     document.getElementById('adoc-body').innerHTML = arch.ArchDocHTML;
   }
+  if (arch && arch.Flows && arch.Flows.length) {
+    renderFlows(arch.Flows);
+  }
   if (arch && arch.Packages && arch.Packages.length) {
     renderPackageMap(arch.Packages);
   } else {
@@ -537,6 +541,28 @@ function toggleArchDoc() {
   const chev = document.getElementById('adoc-chev');
   body.classList.toggle('open');
   chev.textContent = body.classList.contains('open') ? '▲' : '▼';
+}
+
+function renderFlows(flows) {
+  const el = document.getElementById('arch-flows');
+  const LAYER_COLORS = {governance:'var(--info)',orchestration:'var(--advisory)',execution:'var(--pass)',persistence:'#a78bfa',surface:'#f472b6'};
+  let html = `<div style="font-size:.72rem;color:var(--muted);margin-bottom:6px">Use-case flows traced from code graph call edges.</div>`;
+  flows.forEach(f => {
+    html += `<div style="border:1px solid var(--surface2);border-radius:6px;margin-bottom:8px;overflow:hidden">
+      <div style="background:var(--surface2);padding:6px 12px;font-size:.8rem;font-weight:600">${escHtml(f.Name)}</div>
+      <div style="padding:6px 12px;font-size:.72rem;color:var(--muted)">${escHtml(f.Description)}</div>
+      <div style="padding:0 12px 8px 12px">`;
+    var lastLayer = '';
+    f.Steps.forEach((s,i) => {
+      const color = LAYER_COLORS[s.Layer] || 'var(--muted)';
+      const arrow = i > 0 ? `<span style="color:var(--muted);margin:0 4px;font-size:.7rem">→</span>` : '';
+      const badge = s.Layer !== lastLayer ? `<span style="display:inline-block;background:${color};color:#fff;border-radius:3px;padding:0 5px;font-size:.63rem;font-weight:600;margin-right:4px">${s.Layer}</span>` : '';
+      lastLayer = s.Layer;
+      html += `${arrow}${badge}<span style="font-size:.72rem;font-family:var(--mono)">${escHtml(s.Func)}</span>`;
+    });
+    html += `</div></div>`;
+  });
+  el.innerHTML = html;
 }
 
 const NXS_LAYERS = [
@@ -584,13 +610,23 @@ function buildLayerSection(l, items) {
 function buildPkgCard(p) {
   const deps = p.Deps || [];
   const syms = p.ExportedSymbols || [];
+  const files = p.Files || {};
+  const fileKeys = Object.keys(files).sort();
+  let fileHtml = '';
+  if (fileKeys.length) {
+    fileHtml = fileKeys.map(f => {
+      const syms = files[f] || [];
+      if (!syms.length) return '';
+      return `<div style="margin-top:4px;font-size:.68rem;padding:2px 0"><span style="color:var(--muted)">${escHtml(f.split('/').pop())}</span> ${syms.slice(0,8).map(s=>`<span class="pkg-dep-tag" style="color:var(--info)">${escHtml(s)}</span>`).join('')}${syms.length>8?`<span style="color:var(--muted);font-size:.65rem"> +${syms.length-8}</span>`:''}</div>`;
+    }).join('');
+  }
   const depHtml = deps.length
     ? `<div class="pkg-dep-panel">
         <div class="pkg-dep-lbl">Depends on (${deps.length})</div>
         ${deps.map(d=>`<span class="pkg-dep-tag">${escHtml(d.split('/').pop())}</span>`).join('')}
-        ${syms.length ? `<div class="pkg-dep-lbl" style="margin-top:6px">Exports (${syms.length})</div>${syms.slice(0,20).map(s=>`<span class="pkg-dep-tag" style="color:var(--info)">${escHtml(s)}</span>`).join('')}${syms.length>20?`<span style="color:var(--muted);font-size:.68rem"> +${syms.length-20}</span>`:''}` : ''}
+        ${syms.length ? `<div class="pkg-dep-lbl" style="margin-top:6px">Exports (${syms.length})</div>${fileHtml}` : ''}
        </div>`
-    : (syms.length ? `<div class="pkg-dep-panel"><div class="pkg-dep-lbl">Exports (${syms.length})</div>${syms.slice(0,20).map(s=>`<span class="pkg-dep-tag" style="color:var(--info)">${escHtml(s)}</span>`).join('')}${syms.length>20?`<span style="color:var(--muted);font-size:.68rem"> +${syms.length-20}</span>`:''}</div>` : '');
+    : (syms.length ? `<div class="pkg-dep-panel"><div class="pkg-dep-lbl">Exports (${syms.length})</div>${fileHtml}</div>` : '');
   const docHtml = p.DocSummary ? `<div class="pkg-doc">${escHtml(p.DocSummary)}</div>` : '';
   return `<div class="pkg-card" onclick="this.classList.toggle('open')">
     <div class="pkg-name">${escHtml(p.Name)}</div>
