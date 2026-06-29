@@ -96,7 +96,7 @@ tr:hover td{background:var(--surface2)}
 .file-row.open .file-findings{display:block}
 
 /* Architecture */
-.arch-content{display:grid;grid-template-columns:1fr 420px;gap:24px}
+.arch-content{display:flex;flex-direction:column;gap:16px}
 .arch-text{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:24px;font-size:.88rem;line-height:1.7}
 .arch-text h2,.arch-text h3{margin:16px 0 8px;color:var(--text)}
 .arch-text h2{font-size:1.1rem}
@@ -106,9 +106,40 @@ tr:hover td{background:var(--surface2)}
 .arch-text strong{color:var(--text)}
 .arch-text code{background:var(--surface2);padding:1px 5px;border-radius:3px;font-family:'SF Mono',Consolas,monospace;font-size:.8rem}
 .arch-text blockquote{border-left:2px solid var(--border);padding-left:12px;color:var(--muted);margin:12px 0}
-.graph-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
-.graph-card-title{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
-#dep-graph{width:100%;height:400px}
+.graph-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.graph-card-title{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;
+  padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border)}
+#graph-host{height:500px;position:relative;overflow:hidden;
+  background:radial-gradient(circle at 1px 1px,#ffffff06 1px,transparent 0) 0 0/24px 24px,var(--surface2)}
+#g-svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#g-svg.grab{cursor:grabbing}
+.g-hint{position:absolute;left:10px;bottom:8px;font-size:10px;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:3px 8px;pointer-events:none}
+.g-legend{position:absolute;right:10px;bottom:8px;display:flex;gap:9px;font-size:10px;color:var(--muted);
+  background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:4px 9px}
+.g-legend b{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:3px;vertical-align:middle}
+.g-seg{display:flex;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.g-btn{font-size:11px;padding:3px 10px;border:none;background:var(--surface2);color:var(--muted);cursor:pointer}
+.g-btn.on{color:var(--text);background:var(--surface)}
+.g-btn:hover{color:var(--text)}
+.g-btn.standalone{border:1px solid var(--border);border-radius:5px}
+.g-search{font-size:11px;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:5px;color:var(--text);outline:none;width:140px}
+.g-search:focus{border-color:var(--info)}
+.g-stats{font-size:10px;color:var(--muted);margin-left:auto}
+#g-detail{max-height:180px;overflow-y:auto;border-top:1px solid var(--border);padding:10px 14px;display:none;font-size:.82rem}
+#g-detail.vis{display:block}
+.gn{cursor:pointer}.gn rect{stroke-width:1.4}.gn:hover rect{filter:brightness(1.3)}
+.gn.sel rect{stroke:var(--text)!important;stroke-width:2.4}.gn.dim{opacity:.14}
+.gt{font-size:10px;font-weight:600;fill:var(--text);pointer-events:none}
+.gs{font-size:8.5px;fill:var(--muted);pointer-events:none}
+.gfn .gt{font-family:'SF Mono',Consolas,monospace;font-size:9.5px}
+.glnk{fill:none;stroke:var(--muted);opacity:.3;stroke-width:1}
+.glnk.hot{stroke:var(--info);opacity:.9;stroke-width:1.8}
+.gdf{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin:4px 6px 4px 0;display:inline-block;font-size:.8rem}
+.gdf .gdk{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:3px}
+.gfn-tag{font-family:'SF Mono',Consolas,monospace;font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:3px;padding:1px 4px;margin:1px 2px 0 0;display:inline-block}
+.gpl{display:inline-block;font-size:9.5px;padding:2px 6px;border-radius:12px;border:1px solid var(--border);color:var(--muted);margin:1px 2px 0 0}
 
 /* Warnings */
 .warnings{background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:.82rem}
@@ -118,8 +149,7 @@ tr:hover td{background:var(--surface2)}
 @media(max-width:900px){
   .grid-4{grid-template-columns:repeat(2,1fr)}
   .chart-row{grid-template-columns:1fr}
-  .arch-content{grid-template-columns:1fr}
-  .graph-card{display:none}
+  #graph-host{height:380px}
 }
 @media(max-width:600px){
   .header,.container{padding-left:16px;padding-right:16px}
@@ -179,8 +209,29 @@ tr:hover td{background:var(--surface2)}
     <div class="arch-content">
       <div class="arch-text" id="arch-text">Loading…</div>
       <div class="graph-card">
-        <div class="graph-card-title">Dependency Graph</div>
-        <div id="dep-graph"></div>
+        <div class="graph-card-title">
+          <span>Code Graph</span>
+          <div class="g-seg">
+            <button class="g-btn on" id="gb-files" onclick="setGraphMode('files')">Files</button>
+            <button class="g-btn" id="gb-funcs" onclick="setGraphMode('functions')">Functions</button>
+          </div>
+          <input class="g-search" id="g-search" placeholder="Search…" autocomplete="off" oninput="GV.filter=this.value;GV.draw()">
+          <button class="g-btn standalone" onclick="GV.pos={};GV.ticks=150;GV.build();setTimeout(()=>GV.fit(),250)">Reset</button>
+          <span class="g-stats" id="g-stats"></span>
+        </div>
+        <div id="graph-host">
+          <svg id="g-svg">
+            <defs><marker id="garr" viewBox="0 -4 8 8" refX="14" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-4L8,0L0,4" fill="#555"/></marker></defs>
+            <g id="g-view"></g>
+          </svg>
+          <div class="g-hint">drag node · scroll = zoom · drag canvas = pan · click = inspect</div>
+          <div class="g-legend">
+            <span><b style="background:#58a6ff"></b>file</span>
+            <span><b style="background:#3fb950"></b>function</span>
+            <span><b style="background:#d29922"></b>type</span>
+          </div>
+        </div>
+        <div id="g-detail"></div>
       </div>
     </div>
   </div>
@@ -476,70 +527,251 @@ function heatToColor(score) {
 function renderArchitecture() {
   const arch = R.Architecture;
   const el = document.getElementById('arch-text');
-
   if (!arch || !arch.Text) {
     el.innerHTML = '<p style="color:var(--muted)">No architecture information available.</p>';
-    return;
-  }
-
-  el.innerHTML = markdownToHtml(arch.Text);
-
-  if (arch.Source === 'doc') {
-    el.insertAdjacentHTML('afterbegin',
-      `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--pass)">
-        ✓ Loaded from <code>${arch.DocFile}</code>
-      </div>`);
   } else {
-    el.insertAdjacentHTML('afterbegin',
-      `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--advisory)">
-        ⚠ Architecture synthesised — add <code>docs/architecture.md</code> to provide a curated overview.
-      </div>`);
+    el.innerHTML = markdownToHtml(arch.Text);
+    if (arch.Source === 'doc') {
+      el.insertAdjacentHTML('afterbegin',
+        `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--pass)">
+          ✓ Loaded from <code>${arch.DocFile}</code>
+        </div>`);
+    } else {
+      el.insertAdjacentHTML('afterbegin',
+        `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:.78rem;margin-bottom:16px;color:var(--advisory)">
+          ⚠ Architecture synthesised — add <code>docs/architecture.md</code> to provide a curated overview.
+        </div>`);
+    }
   }
-
-  renderDepGraph(arch);
+  initCodeGraph();
 }
 
-function renderDepGraph(arch) {
-  const container = document.getElementById('dep-graph');
-  if (!arch.Nodes || arch.Nodes.length === 0) {
-    container.innerHTML = '<div style="color:var(--muted);font-size:.8rem;padding:20px">No dependency graph data.</div>';
-    return;
-  }
+// ── Interactive code graph ────────────────────────────────────────────────────
+const GCOL = {file:'#58a6ff',function:'#3fb950',type:'#d29922'};
+let GV_RAW_NODES = [], GV_RAW_LINKS = [], GV_FILES = [], GV_FILE_LINKS = [];
 
-  const W = 388, H = 400;
-  const nodes = arch.Nodes;
-  const edges = arch.Edges || [];
+function initCodeGraph() {
+  const raw = R.GraphJSON;
+  if (!raw) { showGraphEmpty('No code graph — run coderev . first.'); return; }
+  let g; try { g = JSON.parse(raw); } catch(e) { showGraphEmpty('Graph data unreadable.'); return; }
+  GV_RAW_NODES = (g.nodes||[]).map(n=>({...n, group: n.kind}));
+  GV_RAW_LINKS = (g.links||[]).map(l=>({source:l.source,target:l.target}));
+  buildFileLevelData();
+  GV.build();
+  setTimeout(()=>GV.fit(), 300);
+}
 
-  // Simple force-free layout: arrange in a circle.
-  const nodeMap = {};
-  nodes.forEach((n, i) => {
-    const angle = (2 * Math.PI * i) / nodes.length - Math.PI / 2;
-    const r = Math.min(W, H) / 2 - 40;
-    nodeMap[n.ID] = { x: W / 2 + r * Math.cos(angle), y: H / 2 + r * Math.sin(angle), ...n };
+function buildFileLevelData() {
+  const meta = {};
+  const fnToFile = {};
+  GV_RAW_NODES.forEach(n=>{
+    if(!meta[n.source_file]) meta[n.source_file]={sumX:0,sumY:0,cnt:0,fns:[]};
+    meta[n.source_file].cnt++;
+    if(n.kind==='function'||n.kind==='type') meta[n.source_file].fns.push(n.label);
+    fnToFile[n.id]=n.source_file;
   });
-
-  const typeColors = { app: '#60a5fa', lib: '#a78bfa', service: '#34d399', external: '#94a3b8' };
-
-  let svg = `<svg width="${W}" height="${H}" style="background:var(--surface2);border-radius:8px">`;
-
-  for (const edge of edges) {
-    const s = nodeMap[edge.from], t = nodeMap[edge.to];
-    if (!s || !t) continue;
-    svg += `<line x1="${s.x}" y1="${s.y}" x2="${t.x}" y2="${t.y}" stroke="var(--border)" stroke-width="1.5" marker-end="url(#arrow)"/>`;
-  }
-
-  svg += `<defs><marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="var(--muted)"/></marker></defs>`;
-
-  for (const n of Object.values(nodeMap)) {
-    const color = typeColors[n.type] || '#8892a4';
-    const label = n.label.length > 14 ? n.label.slice(0, 12) + '…' : n.label;
-    svg += `<circle cx="${n.x}" cy="${n.y}" r="18" fill="${color}" opacity=".2" stroke="${color}" stroke-width="1.5"/>`;
-    svg += `<text x="${n.x}" y="${n.y + 4}" text-anchor="middle" fill="${color}" font-size="9" font-weight="600">${label}</text>`;
-  }
-
-  svg += '</svg>';
-  container.innerHTML = svg;
+  GV_FILES = Object.entries(meta).map(([id,m])=>({
+    id, label:id.split('/').pop(), kind:'file',
+    fn_count:m.fns.length, fns:m.fns, x:0, y:0
+  }));
+  const seen={};
+  GV_FILE_LINKS=[];
+  GV_RAW_LINKS.forEach(l=>{
+    const sf=fnToFile[l.source], tf=fnToFile[l.target];
+    if(!sf||!tf||sf===tf) return;
+    const k=sf+'|'+tf; if(seen[k]) return; seen[k]=true;
+    GV_FILE_LINKS.push({source:sf,target:tf});
+  });
 }
+
+function showGraphEmpty(msg) {
+  document.getElementById('graph-host').innerHTML =
+    `<div style="color:var(--muted);font-size:.85rem;padding:40px;text-align:center">${msg}</div>`;
+}
+
+function nodeColor(n){ return GCOL[n.kind]||GCOL[n.group]||'#8892a4'; }
+function gesc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function gshort(s,max){ return s.length>max?s.slice(0,max-1)+'…':s; }
+
+const GV = {
+  mode:'files', sel:null, filter:'',
+  t:{x:0,y:0,k:1}, nodes:[], links:[], map:{},
+  pos:{}, ticks:0, raf:null,
+
+  build(){
+    const raw = GV.mode==='files' ? GV_FILES : GV_RAW_NODES;
+    const rawL = GV.mode==='files' ? GV_FILE_LINKS : GV_RAW_LINKS;
+    GV.nodes=[]; GV.links=rawL; GV.map={};
+    raw.forEach(n=>{
+      const p=GV.pos[n.id]||{x:n.x||300,y:n.y||250};
+      const node={...n,x:p.x,y:p.y,vx:0,vy:0};
+      GV.nodes.push(node); GV.map[n.id]=node;
+    });
+    if(GV.ticks<80) GV.ticks=80;
+    GV.run();
+  },
+
+  run(){
+    cancelAnimationFrame(GV.raf);
+    const tick=()=>{ if(GV.ticks>0){GV.sim();GV.draw();GV.ticks--;GV.raf=requestAnimationFrame(tick);} };
+    GV.raf=requestAnimationFrame(tick);
+  },
+
+  sim(){
+    const ns=GV.nodes;
+    const host=document.getElementById('graph-host');
+    const cy=host.clientHeight/2;
+    const rep=GV.mode==='files'?10000:2500;
+    const tgt=GV.mode==='files'?200:130;
+    for(let i=0;i<ns.length;i++) for(let j=i+1;j<ns.length;j++){
+      const a=ns[i],b=ns[j],dx=a.x-b.x,dy=a.y-b.y;
+      const d2=dx*dx+dy*dy||0.01,d=Math.sqrt(d2),f=rep/d2;
+      a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;
+    }
+    GV.links.forEach(l=>{
+      const a=GV.map[l.source],b=GV.map[l.target]; if(!a||!b) return;
+      const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||0.01,f=(d-tgt)*0.04;
+      a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;
+    });
+    const W=Math.max(host.clientWidth,400),H=Math.max(host.clientHeight,300);
+    ns.forEach(n=>{
+      n.vy+=(cy-n.y)*0.003;
+      if(!n.pin){
+        n.x+=Math.max(-10,Math.min(10,n.vx));
+        n.y+=Math.max(-10,Math.min(10,n.vy));
+        n.x=Math.max(40,Math.min(W-40,n.x));
+        n.y=Math.max(40,Math.min(H-40,n.y));
+      }
+      n.vx*=0.78; n.vy*=0.78;
+    });
+    GV.savePos();
+  },
+
+  draw(){
+    const v=document.getElementById('g-view');
+    if(!v) return;
+    v.setAttribute('transform',`translate(${GV.t.x},${GV.t.y}) scale(${GV.t.k})`);
+    const sel=GV.sel, q=GV.filter.toLowerCase();
+    const conn=new Set();
+    if(sel){ conn.add(sel); GV.links.forEach(l=>{if(l.source===sel)conn.add(l.target);if(l.target===sel)conn.add(l.source);}); }
+    const vis=new Set();
+    if(q){ GV.nodes.forEach(n=>{if(n.label.toLowerCase().includes(q)||(n.id&&n.id.toLowerCase().includes(q)))vis.add(n.id);}); }
+    let h='';
+    GV.links.forEach(l=>{
+      const a=GV.map[l.source],b=GV.map[l.target]; if(!a||!b) return;
+      const hot=sel&&(l.source===sel||l.target===sel);
+      const mx=(a.x+b.x)/2;
+      h+=`<path class="glnk${hot?' hot':''}" d="M${a.x} ${a.y} C${mx} ${a.y},${mx} ${b.y},${b.x} ${b.y}" marker-end="url(#garr)"/>`;
+    });
+    GV.nodes.forEach(n=>{
+      const c=nodeColor(n);
+      const dim=(sel&&!conn.has(n.id))||(q&&!vis.has(n.id))?1:0;
+      const isSel=n.id===sel;
+      const lbl=gesc(gshort(n.label,22));
+      if(GV.mode==='files'){
+        const w=Math.max(100,lbl.length*7+24),hh=42;
+        h+=`<g class="gn${dim?' dim':''}${isSel?' sel':''}" data-id="${gesc(n.id)}" transform="translate(${n.x},${n.y})">
+<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${c}20" stroke="${c}"/>
+<text class="gt" x="0" y="-3" text-anchor="middle">${lbl}</text>
+${n.fn_count?`<text class="gs" x="0" y="11" text-anchor="middle">${n.fn_count} symbols</text>`:''}
+</g>`;
+      } else {
+        const w=Math.max(72,lbl.length*6+18),hh=26;
+        h+=`<g class="gn gfn${dim?' dim':''}${isSel?' sel':''}" data-id="${gesc(n.id)}" transform="translate(${n.x},${n.y})">
+<rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="5" fill="${c}18" stroke="${c}99"/>
+<text class="gt" x="0" y="4" text-anchor="middle">${lbl}</text>
+</g>`;
+      }
+    });
+    v.innerHTML=h;
+    const st=document.getElementById('g-stats');
+    if(st) st.textContent=`${GV.nodes.length} nodes · ${GV.links.length} edges`;
+  },
+
+  savePos(){ GV.nodes.forEach(n=>GV.pos[n.id]={x:n.x,y:n.y}); },
+
+  fit(){
+    const host=document.getElementById('graph-host');
+    if(!host||!GV.nodes.length) return;
+    const w=host.clientWidth,h=host.clientHeight;
+    const xs=GV.nodes.map(n=>n.x),ys=GV.nodes.map(n=>n.y);
+    const pad=80;
+    const k=Math.min(w/(Math.max(...xs)-Math.min(...xs)+2*pad),h/(Math.max(...ys)-Math.min(...ys)+2*pad),1.6);
+    GV.t.k=k;
+    GV.t.x=(w-(Math.min(...xs)+Math.max(...xs))*k)/2;
+    GV.t.y=(h-(Math.min(...ys)+Math.max(...ys))*k)/2;
+    GV.draw();
+  },
+};
+
+function showGraphDetail(id) {
+  const panel=document.getElementById('g-detail');
+  if(!panel) return;
+  if(GV.mode==='files'){
+    const n=GV_FILES.find(f=>f.id===id); if(!n){panel.classList.remove('vis');return;}
+    const callers=GV_FILE_LINKS.filter(l=>l.target===id).map(l=>GV_FILES.find(x=>x.id===l.source)?.label||l.source.split('/').pop());
+    const callees=GV_FILE_LINKS.filter(l=>l.source===id).map(l=>GV_FILES.find(x=>x.id===l.target)?.label||l.target.split('/').pop());
+    panel.innerHTML=`<strong>${gesc(n.label)}</strong> <span style="color:var(--muted);font-size:.78rem">${gesc(n.id)}</span><br>
+<div style="margin-top:6px">
+${n.fns&&n.fns.length?`<span class="gdf"><span class="gdk">Symbols (${n.fns.length})</span>${n.fns.slice(0,14).map(f=>`<span class="gfn-tag">${gesc(f)}</span>`).join('')}${n.fns.length>14?` +${n.fns.length-14}`:''}
+</span>`:''}
+${callers.length?`<span class="gdf"><span class="gdk">Used by</span>${callers.map(l=>`<span class="gpl">${gesc(l)}</span>`).join('')}</span>`:''}
+${callees.length?`<span class="gdf"><span class="gdk">Uses</span>${callees.map(l=>`<span class="gpl">${gesc(l)}</span>`).join('')}</span>`:''}
+</div>`;
+  } else {
+    const n=GV_RAW_NODES.find(nd=>nd.id===id); if(!n){panel.classList.remove('vis');return;}
+    const c=nodeColor(n);
+    const callers=GV_RAW_LINKS.filter(l=>l.target===id).map(l=>GV_RAW_NODES.find(nd=>nd.id===l.source)?.label||l.source);
+    const callees=GV_RAW_LINKS.filter(l=>l.source===id).map(l=>GV_RAW_NODES.find(nd=>nd.id===l.target)?.label||l.target);
+    panel.innerHTML=`<strong>${gesc(n.label)}</strong> <span style="color:var(--muted);font-size:.78rem">${gesc(n.source_file||'')}</span>
+<span class="gpl" style="border-color:${c};color:${c}">${n.kind||'?'}</span><br>
+<div style="margin-top:6px">
+${callers.length?`<span class="gdf"><span class="gdk">Called by (${callers.length})</span>${callers.slice(0,10).map(l=>`<span class="gfn-tag">${gesc(l)}</span>`).join('')}${callers.length>10?` +${callers.length-10}`:''}</span>`:''}
+${callees.length?`<span class="gdf"><span class="gdk">Calls (${callees.length})</span>${callees.slice(0,10).map(l=>`<span class="gfn-tag">${gesc(l)}</span>`).join('')}${callees.length>10?` +${callees.length-10}`:''}</span>`:''}
+</div>`;
+  }
+  panel.classList.add('vis');
+}
+
+function setGraphMode(m){
+  GV.mode=m;
+  document.getElementById('gb-files').classList.toggle('on',m==='files');
+  document.getElementById('gb-funcs').classList.toggle('on',m==='functions');
+  GV.sel=null;
+  const d=document.getElementById('g-detail'); if(d) d.classList.remove('vis');
+  GV.pos={}; GV.ticks=150; GV.build(); setTimeout(()=>GV.fit(),260);
+}
+
+(function setupGraphInteraction(){
+  const gsvg=document.getElementById('g-svg'); if(!gsvg) return;
+  let drag=null;
+  function svgPt(ev){const r=gsvg.getBoundingClientRect();return {x:(ev.clientX-r.left-GV.t.x)/GV.t.k,y:(ev.clientY-r.top-GV.t.y)/GV.t.k};}
+  gsvg.addEventListener('pointerdown',ev=>{
+    const g=ev.target.closest('.gn');
+    if(g){const n=GV.map[g.dataset.id];if(!n)return;const pt=svgPt(ev);drag={node:n,ox:pt.x-n.x,oy:pt.y-n.y};n.pin=true;gsvg.setPointerCapture(ev.pointerId);}
+    else{drag={pan:true,sx:ev.clientX,sy:ev.clientY,tx:GV.t.x,ty:GV.t.y};gsvg.classList.add('grab');}
+  });
+  gsvg.addEventListener('pointermove',ev=>{
+    if(!drag)return;
+    if(drag.pan){GV.t.x=drag.tx+(ev.clientX-drag.sx);GV.t.y=drag.ty+(ev.clientY-drag.sy);GV.draw();}
+    else{const pt=svgPt(ev);drag.node.x=pt.x-drag.ox;drag.node.y=pt.y-drag.oy;GV.savePos();GV.draw();}
+  });
+  gsvg.addEventListener('pointerup',()=>{if(drag&&drag.node){drag.node.pin=false;GV.ticks=60;GV.run();}drag=null;gsvg.classList.remove('grab');});
+  gsvg.addEventListener('click',ev=>{
+    const g=ev.target.closest('.gn');if(!g)return;
+    const id=g.dataset.id;GV.sel=(GV.sel===id)?null:id;
+    if(GV.sel)showGraphDetail(GV.sel); else{const d=document.getElementById('g-detail');if(d)d.classList.remove('vis');}
+    GV.draw();
+  });
+  gsvg.addEventListener('wheel',ev=>{
+    ev.preventDefault();
+    const r=gsvg.getBoundingClientRect(),px=ev.clientX-r.left,py=ev.clientY-r.top;
+    const f=ev.deltaY<0?1.12:0.89,k2=Math.max(0.15,Math.min(4,GV.t.k*f));
+    const wx=(px-GV.t.x)/GV.t.k,wy=(py-GV.t.y)/GV.t.k;
+    GV.t.k=k2;GV.t.x=px-wx*k2;GV.t.y=py-wy*k2;GV.draw();
+  },{passive:false});
+  window.addEventListener('resize',()=>GV.draw());
+})();
 
 // ── Exceptions ────────────────────────────────────────────────────────────────
 function renderExceptions() {
@@ -594,6 +826,7 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
+  if (name === 'architecture') { setTimeout(() => { if (GV.nodes.length) GV.fit(); }, 50); }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ type Report struct {
 	Warnings     []analysis.AdapterWarning
 	Exceptions   []analysis.Exception
 	AIReview     string
+	GraphJSON    string // raw content of graph.json — parsed by the report template JS
 	Generated    time.Time
 }
 
@@ -68,6 +69,7 @@ type BuildRequest struct {
 	Arch      architecture.Summary
 	Delta     *baseline.Delta // optional: trend vs saved baseline
 	AIReview  string          // optional: content of .coderev/review.md
+	GraphJSON string          // optional: raw graph.json for the interactive Architecture graph
 }
 
 // Build constructs a Report from raw analysis output.
@@ -82,6 +84,7 @@ func Build(req BuildRequest) Report {
 		Warnings:     req.Warnings,
 		Exceptions:   req.Standards.Exceptions,
 		AIReview:     req.AIReview,
+		GraphJSON:    req.GraphJSON,
 		Generated:    time.Now(),
 	}
 }

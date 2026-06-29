@@ -98,11 +98,17 @@ func runAnalysis(target string, stds analysis.Standards, tc analysis.ToolConfig,
 	return result, nil
 }
 
-func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string, error) {
+func buildAndWrite(s runSetup, result analysis.RunResult, graphDir string) (report.Report, string, error) {
 	target := s.target
 	base, _ := baseline.Load(target)
 	delta := baseline.Compute(base, result.Findings)
 	existingReview, _ := os.ReadFile(filepath.Join(target, ".coderev", "review.md"))
+	var graphJSON string
+	if graphDir != "" {
+		if data, err := os.ReadFile(filepath.Join(graphDir, "graph.json")); err == nil {
+			graphJSON = string(data)
+		}
+	}
 	r := report.Build(report.BuildRequest{
 		Target:    target,
 		Standards: s.stds,
@@ -113,6 +119,7 @@ func buildAndWrite(s runSetup, result analysis.RunResult) (report.Report, string
 		Arch:      architecture.DetectWithGraph(target, graphJSONPath(target, s.tc)),
 		Delta:     &delta,
 		AIReview:  string(existingReview),
+		GraphJSON: graphJSON,
 	})
 	if flagUpdateBaseline {
 		if err := baseline.Save(target, result.Findings); err != nil {
