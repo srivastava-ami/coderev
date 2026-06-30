@@ -12,8 +12,8 @@ import (
 
 // PatternMatcher loads TOML rule definitions and applies them to source code.
 type PatternMatcher struct {
-	rules map[string]*Rule           // rule_id -> Rule
-	cache map[string]*regexp.Regexp // compiled regex patterns
+	rules map[string]*Rule
+	cache map[string]*regexp.Regexp
 }
 
 type Rule struct {
