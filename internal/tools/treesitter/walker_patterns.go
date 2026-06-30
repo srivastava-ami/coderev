@@ -8,30 +8,79 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
-func (w *fileWalker) checkPatterns() {
-	lines := strings.Split(string(w.src), "\n")
-	checks := []func(string, int){
+var linePatternChecks = func(w *fileWalker) []func(string, int) {
+	return []func(string, int){
 		w.checkConsolLog, w.checkAnyType, w.checkEmptyCatch, w.checkHardcodedURL,
 		w.checkEval, w.checkInnerHTML, w.checkWeakCrypto, w.checkPrototypePollution,
 		w.checkThrowLiteral, w.checkNonNullAssertion, w.checkForceCast, w.checkDeepImport,
 		w.checkGoFmtPrint, w.checkGoPanicInLib, w.checkGoSQLStringConcat,
 		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
+		w.checkGoGoroutineLeak, w.checkGoDeadlockPattern,
+		w.checkGoDeferPanic, w.checkGoUncheckedError, w.checkGoInterfaceBloat,
+		w.checkGoUnclosedBody, w.checkGoFileDescriptorLeak, w.checkGoNilSliceIteration,
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
+		w.checkPythonConventionTypeHintsMissing, w.checkPythonConventionNoneCoercion,
+		w.checkPythonConventionDynamicAttribute, w.checkPythonConventionTypeInconsistency,
+		w.checkPythonConventionDuckTypingUnsafe, w.checkPythonConventionUnclosedAsyncResource,
+		w.checkPythonConventionAsyncDeadlock, w.checkPythonConventionTaskLeak,
+		w.checkPythonConventionEventLoopMismatch, w.checkPythonConventionBareExcept,
+		w.checkPythonConventionExceptionSwallowing, w.checkPythonConventionExceptionChaining,
+		w.checkPythonConventionFinallySideEffects, w.checkPythonConventionCircularImport,
+		w.checkPythonConventionImportOrder, w.checkPythonConventionUnusedImport,
+		w.checkPythonConventionResourceLeak, w.checkPythonConventionUnboundedGrowth,
 		w.checkRustUnwrap, w.checkRustPanic, w.checkRustExpect, w.checkRustUnsafe,
 		w.checkRustTransmute, w.checkRustCloneOnCopy, w.checkRustTodo, w.checkRustDbgMacro,
+		w.checkRustUnsafeBlockJustif, w.checkRustPanicInLibrary, w.checkRustUnwrapInLibrary,
+		w.checkRustMutableStatic, w.checkRustErrorPropagation, w.checkRustCloneHeavy,
+		w.checkRustExpensiveOpLoop, w.checkRustIterCollectChain, w.checkRustAsyncCancelSafety,
+		w.checkAnyTypeUsage, w.checkTypeCoercion, w.checkOptionalChainingOveruse,
+		w.checkNullCoalescingCorrect, w.checkTypeAssertionUnsafe, w.checkUnhandledPromise,
+		w.checkAsyncAwaitChaining, w.checkPromiseRaceHazard, w.checkCallbackHell,
+		w.checkStreamNotPiped, w.checkBackpressureIgnored, w.checkStreamErrorUnhandled,
+		w.checkStreamLeak, w.checkEventListenerLeak, w.checkOnceVsOn,
+		w.checkErrorEventUnhandled, w.checkPromiseSwallowing, w.checkAsyncIteratorIncomplete,
+		w.checkConcurrentOperationsUnbounded, w.checkMemoryLeakTimers,
+		w.checkUnboundedBuffer, w.checkCpuBlocking,
 	}
+}
+
+func (w *fileWalker) checkPatterns() {
+	lines := strings.Split(string(w.src), "\n")
 	for i, line := range lines {
-		for _, check := range checks {
+		for _, check := range linePatternChecks(w) {
 			check(line, i+1)
 		}
 	}
+	w.checkMultiLinePatterns(lines)
+	w.applyTOMLMatcher(lines)
+}
+
+func (w *fileWalker) checkMultiLinePatterns(lines []string) {
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)
 	w.checkGoIOCopyNoLimit(lines)
 	w.checkSecretFallbackInEnv(lines)
 	w.checkInjectionPatterns(lines)
+	w.checkTerraformConventions(lines)
+	w.checkCallbackHellNJS(lines)
+}
+
+func (w *fileWalker) applyTOMLMatcher(lines []string) {
+	if w.matcher == nil {
+		return
+	}
+	findings, err := w.matcher.Match(string(w.src), w.file, w.lang)
+	if err != nil {
+		return
+	}
+	for _, pf := range findings {
+		w.emitFinding(analysis.Finding{
+			Rule: pf.Rule, Pillar: pf.Pillar, Severity: analysis.Severity(pf.Severity),
+			Line: pf.Line, Message: pf.Message, Remediation: pf.Remediation,
+		})
+	}
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {

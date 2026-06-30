@@ -13,11 +13,14 @@ type Standards struct {
 	Documentation     DocumentationStd      `toml:"documentation"`
 	Testing           TestingStd            `toml:"testing"`
 	Performance       PerformanceStd        `toml:"performance"`
-	NxConventions     NxConventionsStd      `toml:"nx_conventions"`
-	GoConventions     GoConventionsStd      `toml:"go_conventions"`
-	PythonConventions PythonConventionsStd  `toml:"python_conventions"`
-	RustConventions   RustConventionsStd    `toml:"rust_conventions"`
-	Exceptions        []Exception           `toml:"exceptions"`
+	NxConventions         NxConventionsStd         `toml:"nx_conventions"`
+	GoConventions         GoConventionsStd         `toml:"go_conventions"`
+	PythonConventions     PythonConventionsStd     `toml:"python_conventions"`
+	RustConventions       RustConventionsStd       `toml:"rust_conventions"`
+	JavaScriptConventions JavaScriptConventionsStd `toml:"javascript_conventions"`
+	NodeJsConventions     NodeJsConventionsStd     `toml:"nodejs_conventions"`
+	TerraformConventions  TerraformConventionsStd  `toml:"terraform_conventions"`
+	Exceptions            []Exception              `toml:"exceptions"`
 }
 
 type Meta struct {

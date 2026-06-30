@@ -36,8 +36,8 @@ function renderHeader() {
 function renderWarnings() {
   const el = document.getElementById('warnings-banner');
   if (!R.Warnings || R.Warnings.length === 0) return;
-  renderHTML(el, '<div class="warnings"><strong>⚠ Adapter warnings:</strong> ' +)
-    R.Warnings.map(w => `<code>${w.Adapter}</code>: ${w.Reason}`).join(' | ') + '</div>';
+  renderHTML(el, '<div class="warnings"><strong>⚠ Adapter warnings:</strong> ' +
+    R.Warnings.map(w => `<code>${w.Adapter}</code>: ${w.Reason}`).join(' | ') + '</div>');
 }
 
 // ── Summary ───────────────────────────────────────────────────────────────────

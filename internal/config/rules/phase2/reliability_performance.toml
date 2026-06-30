@@ -1,0 +1,203 @@
+# Phase 2: Reliability and Performance Rules
+# 8 cross-language rules covering timeout management, circuit breaker patterns, graceful degradation, and performance anti-patterns
+
+[rules.reliability_timeout_missing]
+rule = "reliability.timeout_missing"
+severity = "major"
+pillar = "reliability"
+cwe = "CWE-1091"
+description = "External operations (HTTP, database, RPC) without timeout risk indefinite blocking. When a network operation hangs, threads/goroutines accumulate, exhausting system resources and making the application unresponsive."
+remediation = "Add explicit timeout: http.Client{Timeout: 30*time.Second} for HTTP clients. Use context.WithTimeout(ctx, duration) for database and RPC operations. Set reasonable defaults (30-60s for user-facing, 5-10s for background)."
+standards = ["CWE-1091"]
+reference_url = "https://www.cloudflare.com/learning/performance/more/timeout/"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.reliability_timeout_missing.patterns]]
+type = "negative"
+function_calls = ["http.Get", "fetch(", "db.Query", "axios.", "requests.", "sql.Query", ".Get("]
+missing = "timeout|WithTimeout|ctx.*timeout|Timeout|setTimeout"
+confidence = "high"
+message = "External call (HTTP/DB) without timeout — blocks indefinitely on network issues"
+
+[[rules.reliability_timeout_missing.patterns]]
+type = "negative"
+function_calls = ["context.Background", "context.TODO"]
+missing = "WithTimeout|WithDeadline"
+confidence = "high"
+message = "Using context.Background/TODO without timeout — should use WithTimeout(ctx, duration)"
+
+[rules.reliability_circuit_breaker_missing]
+rule = "reliability.circuit_breaker_missing"
+severity = "major"
+pillar = "reliability"
+cwe = "CWE-1091"
+description = "Retry loops calling external services without circuit breaker pattern allow cascading failures. When a dependent service fails, continuous retries amplify load on the failing service and propagate the outage upstream."
+remediation = "Implement circuit breaker: track consecutive failures, stop sending requests after N failures (fast fail), wait for cooldown before resuming. Consider bulkhead pattern to isolate failures. Use established libraries (hystrix, opossum, pybreaker)."
+standards = ["CWE-1091"]
+reference_url = "https://martinfowler.com/bliki/CircuitBreaker.html"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.reliability_circuit_breaker_missing.patterns]]
+type = "multi_line"
+lines = 15
+pattern_sequence = ["for.*{|while", "http\\.|fetch\\(|\\.query\\(|requests\\.", "failure|error|catch"]
+confidence = "high"
+message = "Retry loop with external call lacks circuit breaker — cascading failures possible"
+
+[[rules.reliability_circuit_breaker_missing.patterns]]
+type = "negative"
+function_calls = ["callExternalService", "makeRequest", "queryDatabase", "rpcCall"]
+missing = "circuitBreaker|failureCount|maxFailures|fallback|bulkhead"
+confidence = "high"
+message = "External service call without circuit breaker pattern — no protection against cascading failure"
+
+[rules.reliability_retry_logic_safe]
+rule = "reliability.retry_logic_safe"
+severity = "major"
+pillar = "reliability"
+cwe = "CWE-391"
+description = "Infinite retry loops without max attempts or exponential backoff consume resources unboundedly. Tight retries without backoff overwhelm failing services and prevent recovery."
+remediation = "Add max attempts limit (for i := 0; i < maxRetries; i++). Implement exponential backoff: sleep(Math.pow(2, i) * baseDelay) or use jitter to avoid thundering herd. Example: min(baseDelay * 2^attempt, maxDelay) + random(0, jitter)."
+standards = ["CWE-391"]
+reference_url = "https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.reliability_retry_logic_safe.patterns]]
+type = "string_match"
+pattern = "for\\s*{\\s*retry|while\\s*\\(\\s*true\\s*\\)|for\\s*\\(\\s*;\\s*;\\s*\\)"
+confidence = "high"
+message = "Infinite retry loop without max attempts — unbounded resource consumption"
+
+[[rules.reliability_retry_logic_safe.patterns]]
+type = "negative"
+function_calls = ["for.*retry", "while.*retry", "retry_attempt"]
+missing = "exponential|backoff|sleep\\(2\\^|Math.pow|Math.min.*delay"
+confidence = "high"
+message = "Retry loop without exponential backoff — may overwhelm failing service"
+
+[rules.reliability_graceful_degradation]
+rule = "reliability.graceful_degradation"
+severity = "major"
+pillar = "reliability"
+cwe = "CWE-754"
+description = "Critical dependencies without fallback make the entire service unavailable when a single non-critical component fails. Graceful degradation allows the service to operate in reduced-functionality mode."
+remediation = "Add fallback strategies: use cached values when service fails, return default config, enable degraded feature set. Example: if service.fail() then return cache.get() else return default(). Separate critical from non-critical paths."
+standards = ["CWE-754"]
+reference_url = "https://www.nginx.com/resources/glossary/graceful-degradation/"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.reliability_graceful_degradation.patterns]]
+type = "negative"
+function_calls = ["callCriticalService", "getConfiguration", "fetchUserProfile", "loadCache"]
+missing = "fallback|default|fallbackValue|cached|gracefulDegrade|useDefault"
+confidence = "high"
+message = "Critical dependency failure without fallback — service becomes unavailable"
+
+[[rules.reliability_graceful_degradation.patterns]]
+type = "negative"
+function_calls = ["try"]
+missing = "catch.*fallback|finally.*default|return.*default"
+confidence = "medium"
+message = "Exception caught but no fallback strategy — error silently fails"
+
+[rules.performance_database_query_n_plus_one]
+rule = "performance.database_query_n_plus_one"
+severity = "major"
+pillar = "performance"
+cwe = "CWE-1121"
+description = "N+1 query problem: 1 query fetches a list, then N additional queries fetch details per item, resulting in O(N) queries. Scales poorly: 100 items = 101 database round-trips."
+remediation = "Use JOIN or subqueries to fetch all data in one query: SELECT users.*, orders.* FROM users LEFT JOIN orders ON users.id = orders.user_id. For ORMs, use eager loading/includes. For impossible joins, batch queries: SELECT * WHERE id IN (id1, id2, ...)."
+standards = ["CWE-1121"]
+reference_url = "https://stackoverflow.com/questions/97197/what-is-the-n1-selects-problem-in-orm-orm-mapping"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.performance_database_query_n_plus_one.patterns]]
+type = "multi_line"
+lines = 10
+pattern_sequence = ["for.*in|foreach|for\\(", ".*", "db\\.query|\\. query\\(|sql\\.Query|SELECT|session\\.query"]
+confidence = "high"
+message = "Database query inside loop (N+1 problem) — scales poorly; query per iteration"
+
+[[rules.performance_database_query_n_plus_one.patterns]]
+type = "string_match"
+pattern = "for.*{.*SELECT|for.*in.*SELECT|foreach.*SELECT"
+confidence = "high"
+message = "SQL SELECT directly in loop — N+1 query pattern detected"
+
+[rules.performance_unnecessary_memory_allocation]
+rule = "performance.unnecessary_memory_allocation"
+severity = "major"
+pillar = "performance"
+cwe = "CWE-770"
+description = "Allocating memory per iteration in hot loops increases garbage collection pressure and slows performance. Large array allocations with user-controlled sizes enable denial-of-service attacks."
+remediation = "Pre-allocate before loop: buffer := make([]byte, capacity). For user-controlled sizes, validate maximum: if len > maxSize { return error }. Consider object pools for high-frequency allocations: sync.Pool for reusable objects."
+standards = ["CWE-770"]
+reference_url = "https://golang.org/doc/effective_go#allocation_new"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.performance_unnecessary_memory_allocation.patterns]]
+type = "loop_contains"
+inside = "for|while"
+contains = ["make(", "malloc", "new ", "append", "\\.push("]
+confidence = "high"
+message = "Memory allocation in loop — creates garbage pressure; consider pre-allocating or using object pool"
+
+[[rules.performance_unnecessary_memory_allocation.patterns]]
+type = "string_match"
+pattern = "make\\(\\[.*\\].*len\\(.*\\)|new.*Array\\(.*length.*\\)"
+confidence = "high"
+message = "Array/slice created with user-controlled size — potential DoS (unbounded allocation)"
+
+[rules.performance_synchronous_block_async]
+rule = "performance.synchronous_block_async"
+severity = "major"
+pillar = "performance"
+cwe = "CWE-827"
+description = "Synchronous (blocking) I/O in async functions halts the event loop, preventing other concurrent operations from executing. This defeats the purpose of async and degrades performance for all concurrent users."
+remediation = "Use async alternatives: readFile() instead of readFileSync(), execFile() instead of execSync(), await async operations. Defer blocking work: setImmediate(() => blocking_call()) or use worker threads for CPU-intensive blocking code."
+standards = ["CWE-827"]
+reference_url = "https://nodejs.org/en/docs/guides/nodejs-performance-note-on-blocking-vs-non-blocking/"
+languages = ["javascript", "typescript", "nodejs", "python"]
+
+[[rules.performance_synchronous_block_async.patterns]]
+type = "string_match"
+pattern = "async.*{.*\\.join\\(|async.*{.*\\.readFileSync|async.*{.*Sync|async.*{.*blocking"
+confidence = "high"
+message = "Synchronous I/O in async function — blocks event loop, defeating async benefit"
+
+[[rules.performance_synchronous_block_async.patterns]]
+type = "negative"
+function_calls = ["readFileSync", "execSync", "renameSync", "unlinkSync", ".join(", "time.sleep"]
+missing = "await.*readFile|await.*exec|setImmediate|nextTick"
+confidence = "high"
+message = "Blocking function called in async context — use async alternative or defer with setImmediate"
+
+[rules.performance_unbounded_resource_growth]
+rule = "performance.unbounded_resource_growth"
+severity = "major"
+pillar = "performance"
+cwe = "CWE-770"
+description = "Unbounded resource accumulation in collections (queues, caches, timers) causes memory leaks. As resources accumulate without limits, memory grows indefinitely, eventually causing out-of-memory crashes."
+remediation = "Add limits: queue.setMaxSize(1000), implement LRU cache eviction, use TTL for cache entries, cancel timers on shutdown. Monitor collection sizes in production. Use bounded queues: BlockingQueue(capacity) or similar."
+standards = ["CWE-770"]
+reference_url = "https://nodejs.org/en/docs/guides/simple-profiling/"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.performance_unbounded_resource_growth.patterns]]
+type = "negative"
+function_calls = ["queue.push", "cache.set", "map.add", "list.append", "buffer.write"]
+missing = "maxSize|maxLength|limit|bounded|capacity|check.*size"
+confidence = "high"
+message = "Unbounded collection growth — memory leak risk; add max size check"
+
+[[rules.performance_unbounded_resource_growth.patterns]]
+type = "string_match"
+pattern = "cache\\.set|cache\\[.*\\].*=|lru_cache|@cache|memoize"
+confidence = "medium"
+message = "Cache without eviction policy — may grow unbounded; use LRU or TTL"
+
+[[rules.performance_unbounded_resource_growth.patterns]]
+type = "string_match"
+pattern = "setInterval|setTimeout.*loop|new Timer|schedule.*recurring"
+confidence = "medium"
+message = "Timer/interval without cancellation logic — resource leak on app exit"

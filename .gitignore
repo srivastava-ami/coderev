@@ -21,6 +21,13 @@ AGENTS.md
 # implementation plan (dev-only, never shipped)
 plan.md
 
+# dispatch prompt and temporary logs
+.dispatch-prompt.txt
+.tmp-scan.log
+
+# compiled binary (always build fresh via go build)
+/coderev
+
 # OS
 .DS_Store
 

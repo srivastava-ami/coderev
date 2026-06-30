@@ -1,26 +1,44 @@
 package treesitter
 
 import (
+	"strings"
+
 	sitter "github.com/smacker/go-tree-sitter"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
-// fileWalker performs all AST-based checks on a single parsed file.
-type fileWalker struct {
-	def      *LangDef
-	src      []byte
-	file     string
-	lang     analysis.Language
-	stds     analysis.Standards
-	isMain   bool // Go package main — stdout output is legitimate, not a logging bypass
-	findings []analysis.Finding
+// lineScanner provides line-based access to source code.
+type lineScanner struct {
+	Lines []string
 }
 
-func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards) *fileWalker {
+// fileWalker performs all AST-based checks on a single parsed file.
+type fileWalker struct {
+	def                 *LangDef
+	src                 []byte
+	file                string
+	lang                analysis.Language
+	stds                analysis.Standards
+	matcher             *PatternMatcher  // TOML rule matcher (Phase A)
+	isMain              bool             // Go package main — stdout output is legitimate, not a logging bypass
+	findings            []analysis.Finding
+	scanner             *lineScanner
+	fileHasSetHook      bool // Rust: tracks if panic::set_hook found in main.rs
+	lastErrorStructLine int  // Rust: tracks last Error struct definition line
+}
+
+func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards, matcher *PatternMatcher) *fileWalker {
+	lines := strings.Split(string(fi.Content), "\n")
 	return &fileWalker{
-		def: def, src: fi.Content, file: fi.Path, lang: fi.Language, stds: stds,
-		isMain: fi.Language == analysis.LangGo && isGoMainPackage(fi.Content),
+		def:     def,
+		src:     fi.Content,
+		file:    fi.Path,
+		lang:    fi.Language,
+		stds:    stds,
+		matcher: matcher,
+		isMain:  fi.Language == analysis.LangGo && isGoMainPackage(fi.Content),
+		scanner: &lineScanner{Lines: lines},
 	}
 }
 

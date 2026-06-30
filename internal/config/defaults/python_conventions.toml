@@ -1,2 +1,97 @@
 [python_conventions]
 severity = "advisory"
+
+# ── Type Safety ─────────────────────────────────────────────────────────────
+[python_conventions.type_safety.type_hints_missing]
+rule        = "python_conventions.type_hints_missing"
+severity    = "advisory"
+remediation = "Add type hints to function parameters and return types: def fn(x: int) -> str:"
+
+[python_conventions.type_safety.none_coercion]
+rule        = "python_conventions.none_coercion"
+severity    = "major"
+remediation = "Use explicit None checks: if x is not None: ... instead of falsy checks"
+
+[python_conventions.type_safety.dynamic_attribute]
+rule        = "python_conventions.dynamic_attribute"
+severity    = "major"
+remediation = "Use __slots__ or define class attributes explicitly instead of dynamic setattr()"
+
+[python_conventions.type_safety.type_inconsistency]
+rule        = "python_conventions.type_inconsistency"
+severity    = "advisory"
+remediation = "Ensure return types match declared hints; use type checkers like mypy"
+
+[python_conventions.type_safety.duck_typing_unsafe]
+rule        = "python_conventions.duck_typing_unsafe"
+severity    = "advisory"
+remediation = "Add isinstance() checks before operations that assume specific types"
+
+# ── Async/Concurrency ────────────────────────────────────────────────────────
+[python_conventions.async_patterns.unclosed_async_resource]
+rule        = "python_conventions.unclosed_async_resource"
+severity    = "blocker"
+remediation = "Use async context managers (async with) to ensure resources are closed"
+
+[python_conventions.async_patterns.async_deadlock]
+rule        = "python_conventions.async_deadlock"
+severity    = "major"
+remediation = "Avoid synchronous blocking calls in async functions; use await for all I/O"
+
+[python_conventions.async_patterns.task_leak]
+rule        = "python_conventions.task_leak"
+severity    = "major"
+remediation = "Ensure all asyncio.create_task() calls are awaited or properly tracked"
+
+[python_conventions.async_patterns.event_loop_mismatch]
+rule        = "python_conventions.event_loop_mismatch"
+severity    = "major"
+remediation = "Use the current running event loop; avoid creating nested event loops"
+
+# ── Exception Handling ───────────────────────────────────────────────────────
+[python_conventions.exception_handling.bare_except]
+rule        = "python_conventions.bare_except"
+severity    = "blocker"
+remediation = "Catch specific exception types: except ValueError: instead of bare except:"
+
+[python_conventions.exception_handling.exception_swallowing]
+rule        = "python_conventions.exception_swallowing"
+severity    = "major"
+remediation = "Log or re-raise exceptions; never silently catch without handling"
+
+[python_conventions.exception_handling.exception_chaining]
+rule        = "python_conventions.exception_chaining"
+severity    = "advisory"
+remediation = "Use 'raise NewException() from e' to preserve exception context"
+
+[python_conventions.exception_handling.finally_side_effects]
+rule        = "python_conventions.finally_side_effects"
+severity    = "major"
+remediation = "Avoid side effects (I/O, mutations) in finally blocks; resource cleanup only"
+
+# ── Import Organization ─────────────────────────────────────────────────────
+[python_conventions.imports.circular_import]
+rule        = "python_conventions.circular_import"
+severity    = "major"
+remediation = "Restructure to break cycles; move imports inside functions if necessary"
+
+[python_conventions.imports.import_order]
+rule        = "python_conventions.import_order"
+severity    = "advisory"
+remediation = "Follow PEP 8: stdlib, then third-party, then local imports; sort alphabetically"
+
+[python_conventions.imports.unused_import]
+rule        = "python_conventions.unused_import"
+severity    = "advisory"
+remediation = "Remove unused imports or use __all__ to re-export"
+
+# ── Memory & Resource Management ────────────────────────────────────────────
+[python_conventions.memory_resources.resource_leak]
+rule        = "python_conventions.resource_leak"
+severity    = "blocker"
+remediation = "Use context managers (with statement) for all resources (files, sockets, DB connections)"
+
+[python_conventions.memory_resources.unbounded_growth]
+rule        = "python_conventions.unbounded_growth"
+severity    = "major"
+remediation = "Add bounds checks; use LRU caches with limits; monitor heap growth in long-running services"

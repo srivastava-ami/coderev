@@ -1,0 +1,97 @@
+# Node.js Convention Rules (14 enterprise-grade rules)
+# For production Node.js applications covering Streams, Event Emitters, Async Patterns, and Performance.
+
+[nodejs_conventions]
+severity = "blocker"
+
+# ── Streams (4 rules) ──────────────────────────────────────────────────────────
+
+[nodejs_conventions.streams.stream_not_piped]
+rule        = "nodejs_conventions.stream_not_piped"
+severity    = "major"
+description = "Stream created but not piped — memory leak if not consumed"
+remediation = "Pipe the stream to a destination (.pipe()) or attach handlers (.on('data'))"
+
+[nodejs_conventions.streams.backpressure_ignored]
+rule        = "nodejs_conventions.backpressure_ignored"
+severity    = "blocker"
+description = "Ignoring stream.write() return value (backpressure) — memory buildup if destination is slow"
+remediation = "Check if write() returns false; pause the source stream until 'drain' event fires"
+
+[nodejs_conventions.streams.stream_error_unhandled]
+rule        = "nodejs_conventions.stream_error_unhandled"
+severity    = "blocker"
+description = "Stream error handler missing — errors crash the application"
+remediation = "Attach .on('error', ...) handler to every stream to prevent uncaught errors"
+
+[nodejs_conventions.streams.stream_leak]
+rule        = "nodejs_conventions.stream_leak"
+severity    = "blocker"
+description = "Stream not destroyed on error or cleanup — resource leak"
+remediation = "Call stream.destroy() in error handlers or use finally/cleanup logic"
+
+# ── Event Emitters (3 rules) ───────────────────────────────────────────────────
+
+[nodejs_conventions.event_emitters.event_listener_leak]
+rule        = "nodejs_conventions.event_listener_leak"
+severity    = "major"
+description = "Event listeners not removed — memory leak from accumulated listeners"
+remediation = "Use .removeListener() or .off() when listeners are no longer needed"
+
+[nodejs_conventions.event_emitters.once_vs_on]
+rule        = "nodejs_conventions.once_vs_on"
+severity    = "advisory"
+description = "Using .on() for single-event listeners — should use .once() for efficiency"
+remediation = "Replace .on() with .once() when the handler should only fire once"
+
+[nodejs_conventions.event_emitters.error_event_unhandled]
+rule        = "nodejs_conventions.error_event_unhandled"
+severity    = "blocker"
+description = "EventEmitter 'error' event handler missing — uncaught errors crash the application"
+remediation = "Attach .on('error', ...) handler to every EventEmitter"
+
+# ── Async Patterns (4 rules) ───────────────────────────────────────────────────
+
+[nodejs_conventions.async_patterns.callback_hell]
+rule        = "nodejs_conventions.callback_hell"
+severity    = "advisory"
+description = "Deeply nested callbacks (>3 levels) reduce readability and error handling clarity"
+remediation = "Convert to async/await or extract named helper functions"
+
+[nodejs_conventions.async_patterns.promise_swallowing]
+rule        = "nodejs_conventions.promise_swallowing"
+severity    = "blocker"
+description = "Promise without error handling (.catch or try/await) — unhandled rejections"
+remediation = "Add .catch(err => {...}) or use try/catch with await; never fire-and-forget promises"
+
+[nodejs_conventions.async_patterns.async_iterator_incomplete]
+rule        = "nodejs_conventions.async_iterator_incomplete"
+severity    = "major"
+description = "Async iterator missing Symbol.asyncIterator or return() method — incomplete implementation"
+remediation = "Implement Symbol.asyncIterator and return() method for proper cleanup"
+
+[nodejs_conventions.async_patterns.concurrent_operations_unbounded]
+rule        = "nodejs_conventions.concurrent_operations_unbounded"
+severity    = "major"
+description = "Unbounded concurrent operations (no limit on Promise.all, queue size, etc.) — memory/CPU exhaustion"
+remediation = "Cap concurrency with pLimit, p-queue, or manual task batching"
+
+# ── Performance (3 rules) ──────────────────────────────────────────────────────
+
+[nodejs_conventions.performance.memory_leak_timers]
+rule        = "nodejs_conventions.memory_leak_timers"
+severity    = "major"
+description = "setInterval without clearInterval — timer persists indefinitely"
+remediation = "Store the timer ID and call clearInterval() during cleanup or app shutdown"
+
+[nodejs_conventions.performance.unbounded_buffer]
+rule        = "nodejs_conventions.unbounded_buffer"
+severity    = "major"
+description = "Unbounded internal buffering (array/queue growth without cleanup) — memory leak"
+remediation = "Implement size limits and eviction policies; use size checks with backpressure"
+
+[nodejs_conventions.performance.cpu_blocking]
+rule        = "nodejs_conventions.cpu_blocking"
+severity    = "major"
+description = "Synchronous operations on event loop block async I/O — degraded responsiveness"
+remediation = "Move CPU-intensive work to Worker threads or use setImmediate() to yield"
