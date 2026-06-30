@@ -1,0 +1,47 @@
+# Sample rule file demonstrating the TOML pattern DSL for Phase A Chunk 1
+# This file is used for validating the pattern_matcher.go loadRules() functionality.
+
+[rules.security_hardcoded_http]
+rule = "security.hardcoded_http"
+severity = "major"
+pillar = "security"
+description = "Unencrypted HTTP connection (PCI-DSS requirement)"
+remediation = "Use HTTPS/TLS for all network communication"
+cwe = "CWE-295"
+owasp = "A02:2021"
+languages = ["javascript", "typescript", "python", "go"]
+
+[[rules.security_hardcoded_http.patterns]]
+type = "string_match"
+pattern = "http://"
+exclude = ["localhost", "127.0.0.1", "test", "mock"]
+confidence = "high"
+message = "Unencrypted HTTP URL detected"
+
+[rules.complexity_cyclomatic]
+rule = "complexity.cyclomatic"
+severity = "blocker"
+pillar = "complexity"
+description = "Cyclomatic complexity exceeds threshold"
+remediation = "Extract branches into named helpers. Each function should do one thing."
+languages = ["javascript", "typescript", "go", "python"]
+
+[[rules.complexity_cyclomatic.patterns]]
+type = "metric"
+pattern = "cyclomatic_complexity"
+confidence = "high"
+message = "Cyclomatic complexity exceeds 10"
+
+[rules.stability_error_handling]
+rule = "stability.error_handling"
+severity = "blocker"
+pillar = "stability"
+description = "Error handling issues detected"
+remediation = "Always handle errors explicitly"
+languages = ["javascript", "typescript", "go", "python"]
+
+[[rules.stability_error_handling.patterns]]
+type = "multi_line"
+pattern = "empty_catch"
+confidence = "high"
+message = "Empty catch block (swallowed exception)"

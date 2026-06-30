@@ -3,12 +3,14 @@ package treesitter
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"sync"
 
 	sitter "github.com/smacker/go-tree-sitter"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
+	"github.com/srivastava-ami/coderev/internal/config"
 )
 
 const adapterName = "treesitter"
@@ -20,11 +22,28 @@ const maxConcurrentFileAnalyses = 8
 // Adapter parses source files with tree-sitter and runs all structural checks.
 // It is the primary analysis engine — no external binaries required.
 type Adapter struct {
-	stds analysis.Standards
+	stds    analysis.Standards
+	matcher *PatternMatcher
 }
 
 func New(stds analysis.Standards) *Adapter {
-	return &Adapter{stds: stds}
+	a := &Adapter{stds: stds}
+	// Initialize the pattern matcher and load TOML rules.
+	// Graceful failure: log warning but continue if rules fail to load.
+	matcher, err := NewPatternMatcher()
+	if err != nil {
+		log.Printf("treesitter: failed to create pattern matcher: %v", err)
+		return a
+	}
+
+	// Load TOML rules from embedded filesystem in internal/config.
+	if err := matcher.LoadRules(config.RulesFS, "rules"); err != nil {
+		log.Printf("treesitter: warning — failed to load TOML rules: %v (continuing without pattern matching)", err)
+		// Continue anyway — the adapter still works, just without TOML rules.
+	}
+
+	a.matcher = matcher
+	return a
 }
 
 func (a *Adapter) Name() string      { return adapterName }
@@ -121,7 +140,7 @@ func (a *Adapter) analyseFile(fi analysis.FileInfo) ([]analysis.Finding, error) 
 	}
 	defer tree.Close()
 
-	walker := newFileWalker(def, fi, a.stds)
+	walker := newFileWalker(def, fi, a.stds, a.matcher)
 	return walker.walk(tree.RootNode()), nil
 }
 

@@ -20,14 +20,15 @@ type fileWalker struct {
 	file                string
 	lang                analysis.Language
 	stds                analysis.Standards
-	isMain              bool // Go package main — stdout output is legitimate, not a logging bypass
+	matcher             *PatternMatcher  // TOML rule matcher (Phase A)
+	isMain              bool             // Go package main — stdout output is legitimate, not a logging bypass
 	findings            []analysis.Finding
 	scanner             *lineScanner
 	fileHasSetHook      bool // Rust: tracks if panic::set_hook found in main.rs
 	lastErrorStructLine int  // Rust: tracks last Error struct definition line
 }
 
-func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards) *fileWalker {
+func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards, matcher *PatternMatcher) *fileWalker {
 	lines := strings.Split(string(fi.Content), "\n")
 	return &fileWalker{
 		def:     def,
@@ -35,6 +36,7 @@ func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards) 
 		file:    fi.Path,
 		lang:    fi.Language,
 		stds:    stds,
+		matcher: matcher,
 		isMain:  fi.Language == analysis.LangGo && isGoMainPackage(fi.Content),
 		scanner: &lineScanner{Lines: lines},
 	}

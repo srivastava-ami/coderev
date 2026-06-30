@@ -1,0 +1,101 @@
+# Phase 2: Compliance & Security Rules
+# 5 compliance-heavy patterns: OWASP, PCI-DSS, HIPAA-adjacent
+
+[rules.security_owasp_a01_injection]
+rule = "security.owasp_a01_injection"
+severity = "blocker"
+pillar = "security"
+description = "SQL injection vulnerability pattern (OWASP A01:2021)"
+remediation = "Use parameterized queries with placeholders. Never concatenate user input into SQL strings. Use an ORM or prepared statements."
+cwe = "CWE-89"
+owasp = "A01:2021"
+standards = ["OWASP-2021-A01", "CWE-89"]
+reference_url = "https://owasp.org/Top10/A01_2021-Injection/"
+languages = ["javascript", "typescript", "python", "go", "java"]
+
+[[rules.security_owasp_a01_injection.patterns]]
+type = "string_match"
+pattern = "SELECT|INSERT|UPDATE|DELETE"
+confidence = "low"
+message = "SQL keyword detected — verify query is parameterized, not string-concatenated"
+
+[[rules.security_owasp_a01_injection.patterns]]
+type = "multi_line"
+pattern = "sql_concatenation"
+pattern_sequence = ["(SELECT|INSERT|UPDATE|DELETE)", "\\+", "(query|user|input)"]
+lines = 3
+confidence = "high"
+message = "Potential SQL injection: SQL keyword + string concatenation with user-controlled variable"
+
+[rules.security_owasp_a02_auth]
+rule = "security.owasp_a02_auth"
+severity = "blocker"
+pillar = "security"
+description = "Missing authentication/authorization check (OWASP A02:2021)"
+remediation = "Add explicit auth check: middleware, decorator, or guard clause. Verify token/session validity before handling sensitive data."
+cwe = "CWE-287"
+owasp = "A02:2021"
+standards = ["OWASP-2021-A02", "CWE-287"]
+reference_url = "https://owasp.org/Top10/A02_2021-Broken_Authentication/"
+languages = ["javascript", "typescript", "python", "go"]
+
+[[rules.security_owasp_a02_auth.patterns]]
+type = "negative"
+function_calls = ["app.post", "app.get", "app.put", "app.delete"]
+missing = "auth|verify|token|jwt|permission|role"
+confidence = "medium"
+message = "HTTP endpoint defined without visible authentication/authorization check"
+
+[rules.compliance_pci_dss_encryption]
+rule = "compliance.pci_dss_encryption"
+severity = "blocker"
+pillar = "security"
+description = "Unencrypted HTTP connection (PCI-DSS 4.1)"
+remediation = "All network traffic must use HTTPS/TLS. Use https:// URLs, enforce HSTS headers, use TLS 1.2+."
+cwe = "CWE-295"
+standards = ["PCI-DSS-4.1", "CWE-295"]
+reference_url = "https://www.pcisecuritystandards.org/documents/PCI_DSS-v3_2_1.pdf"
+languages = ["javascript", "typescript", "python", "go", "java"]
+
+[[rules.compliance_pci_dss_encryption.patterns]]
+type = "string_match"
+pattern = "http://"
+exclude = ["localhost", "127.0.0.1", "test", "mock", "example.com"]
+confidence = "high"
+message = "Unencrypted HTTP URL detected — PCI-DSS requires HTTPS for all network communication"
+
+[rules.reliability_timeout_missing]
+rule = "reliability.timeout_missing"
+severity = "major"
+pillar = "reliability"
+description = "Network/database operation without timeout (denial-of-service risk)"
+remediation = "Add a timeout: context.WithTimeout(), requests.get(..., timeout=30), or conn.setQueryTimeout()."
+cwe = "CWE-1091"
+standards = ["CWE-1091"]
+languages = ["javascript", "typescript", "python", "go"]
+
+[[rules.reliability_timeout_missing.patterns]]
+type = "negative"
+function_calls = ["fetch", "axios", "requests.get", "http.Client", "Query"]
+missing = "timeout|WithTimeout|time.Duration"
+confidence = "medium"
+message = "Network/database call detected without visible timeout configuration"
+
+[rules.performance_n_plus_one_query]
+rule = "performance.n_plus_one_query"
+severity = "major"
+pillar = "performance"
+description = "N+1 query pattern: loop with database query inside (performance regression)"
+remediation = "Use JOIN or batch query. Load all data in one query outside the loop, then process in memory."
+cwe = "CWE-1048"
+standards = ["CWE-1048"]
+reference_url = "https://use-the-index-luke.com/sql/join"
+languages = ["javascript", "typescript", "python", "go", "java"]
+
+[[rules.performance_n_plus_one_query.patterns]]
+type = "multi_line"
+pattern = "n_plus_one"
+pattern_sequence = ["for|while|forEach", "(SELECT|Query|db\\.|cursor)"]
+lines = 5
+confidence = "high"
+message = "Loop with database query inside — classic N+1 pattern; use JOIN or batch query instead"

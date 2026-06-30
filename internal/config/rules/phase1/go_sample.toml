@@ -1,0 +1,86 @@
+# Phase 1: Go Convention Rules
+# 5 common Go patterns that lead to runtime failures or deadlocks
+
+[rules.go_goroutine_leak]
+rule = "go.goroutine_leak"
+severity = "blocker"
+pillar = "stability"
+description = "Goroutine launched without cancellation context"
+remediation = "Always pass context.Context to goroutines; use context.WithCancel or context.WithTimeout. Monitor goroutine cleanup in tests."
+cwe = "CWE-772"
+owasp = "A08:2021"
+standards = ["OWASP-2021-A08", "CWE-772"]
+languages = ["go"]
+
+[[rules.go_goroutine_leak.patterns]]
+type = "string_match"
+pattern = "go\\s+[a-zA-Z_][a-zA-Z0-9_.]*\\((?!.*ctx|.*context)"
+confidence = "medium"
+message = "Goroutine launched without context parameter — potential resource leak if parent cancels"
+
+[rules.go_deadlock_pattern]
+rule = "go.deadlock_pattern"
+severity = "major"
+pillar = "stability"
+description = "Channel operation without timeout — potential deadlock"
+remediation = "Use context.WithTimeout or select with time.After() to prevent indefinite blocking on channel receive."
+cwe = "CWE-833"
+standards = ["CWE-833"]
+languages = ["go"]
+
+[[rules.go_deadlock_pattern.patterns]]
+type = "negative"
+function_calls = ["<-ch", "ch <-"]
+missing = "time.After|context|timeout|select"
+confidence = "medium"
+message = "Channel operation detected without visible timeout guard"
+
+[rules.go_defer_panic]
+rule = "go.defer_panic"
+severity = "advisory"
+pillar = "stability"
+description = "Defer with panic recovery without context"
+remediation = "Ensure defer blocks log the panic reason and stack trace for diagnostics."
+cwe = "CWE-391"
+standards = ["CWE-391"]
+languages = ["go"]
+
+[[rules.go_defer_panic.patterns]]
+type = "string_match"
+pattern = "defer.*recover\\(\\)"
+confidence = "high"
+message = "Panic recovery in defer block — ensure context is logged before recovery"
+
+[rules.go_unchecked_error]
+rule = "go.unchecked_error"
+severity = "blocker"
+pillar = "stability"
+description = "Error return value discarded with blank identifier"
+remediation = "Check the error explicitly: if err != nil { handle the error }. Only use _ = err for intentional ignorance (document why)."
+cwe = "CWE-391"
+standards = ["CWE-391"]
+languages = ["go"]
+
+[[rules.go_unchecked_error.patterns]]
+type = "string_match"
+pattern = "_\\s*=\\s*.*\\(.*\\).*error"
+confidence = "high"
+message = "Error return value explicitly discarded with _ — potential silent failures"
+
+[rules.go_interface_bloat]
+rule = "go.interface_bloat"
+severity = "major"
+pillar = "complexity"
+description = "Interface with too many methods (hard to test, violates interface segregation)"
+remediation = "Split interface into smaller, focused interfaces. Aim for ≤3 methods per interface (go proverb: 'Write code for the reader, not for the writer')."
+cwe = "CWE-1071"
+standards = ["CWE-1071"]
+languages = ["go"]
+
+[[rules.go_interface_bloat.patterns]]
+type = "metric"
+pattern = "interface_method_count"
+metric = "method_count"
+threshold_gt = 5
+confidence = "high"
+message = "Interface has >5 methods — too large, hard to mock in tests, violates interface segregation principle"

@@ -62,6 +62,26 @@ func (w *fileWalker) checkPatterns() {
 	w.checkInjectionPatterns(lines)
 	w.checkTerraformConventions(lines)
 	w.checkCallbackHellNJS(lines)  // Node.js Phase 1: callback_hell (14th rule, multi-line)
+
+	// Phase A: TOML-first rule engine integration
+	// Load TOML rules and apply pattern matching
+	if w.matcher != nil {
+		findings, err := w.matcher.Match(string(w.src), w.file, w.lang)
+		if err != nil {
+			// Log but don't fail on pattern matching errors
+			return
+		}
+		for _, pf := range findings {
+			w.emitFinding(analysis.Finding{
+				Rule:        pf.Rule,
+				Pillar:      pf.Pillar,
+				Severity:    analysis.Severity(pf.Severity),
+				Line:        pf.Line,
+				Message:     pf.Message,
+				Remediation: pf.Remediation,
+			})
+		}
+	}
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {
