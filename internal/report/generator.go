@@ -11,6 +11,12 @@ import (
 //go:embed template.html
 var htmlTemplate string
 
+//go:embed static/report.css
+var cssContent string
+
+//go:embed static/report.js
+var jsContent string
+
 // Generate writes the self-contained HTML report to outputPath.
 func Generate(r Report, outputPath string) error {
 	reportJSON, err := json.Marshal(r)
@@ -32,9 +38,13 @@ func Generate(r Report, outputPath string) error {
 	data := struct {
 		ReportJSON template.JS
 		Meta       Meta
+		CSS        template.CSS
+		JS         template.JS
 	}{
 		ReportJSON: template.JS(reportJSON),
 		Meta:       r.Meta,
+		CSS:        template.CSS(cssContent),
+		JS:         template.JS(jsContent),
 	}
 
 	if err := tmpl.Execute(f, data); err != nil {
