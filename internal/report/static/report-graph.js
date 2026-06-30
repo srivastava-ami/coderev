@@ -78,63 +78,70 @@
       h+=`<rect class="fn-band" x="${fn.x-90}" y="${fn.y+22}" width="180" height="${Math.max(20, maxY-fn.y+22)}" rx="4"/>`;
     });
     // Edges with orthogonal routing and arrowheads
-    GV.links.forEach(l=>{
-      const a=GV.map[l.s],b=GV.map[l.t]; if(!a||!b) return;
-      const hot=sel&&(l.s===sel||l.t===sel);
-      const flow = fh && (fh.nodes.has(l.s) && fh.nodes.has(l.t));
-      const flowLight = fh && !flow && (fh.nodes.has(l.s) || fh.nodes.has(l.t));
-      let cls = 'lnk '+l.kind;
-      if(hot) cls+=' hot';
-      if(flow) cls+=' flow';
-      if(flowLight) cls+=' flow-light';
-      if(fh && !hot && !flow && !flowLight) cls+=' flow-dim';
-      let marker = 'marker-end="url(#arrow-';
-      if(flow) marker+='flow';
-      else if(hot) marker+='calls-hot';
-      else if(l.kind==='import'||l.kind==='tree') marker+='import';
-      else marker+='calls';
-      marker+=')"';
-      let d;
-      if(GV.mode==='hierarchy'){
-        d = `M${a.x} ${a.y+14} C${a.x} ${(a.y+b.y)/2},${b.x} ${(a.y+b.y)/2},${b.x} ${b.y-14}`;
-      } else if(a.y === b.y){
-        d = `M${a.x} ${a.y} L${b.x} ${b.y}`;
-      } else {
-        const mx = (a.x + b.x) / 2;
-        // Ensure last segment is horizontal for arrowhead alignment
-        const bx = b.x > a.x ? b.x - 4 : b.x + 4;
-        d = `M${a.x} ${a.y} L${mx} ${a.y} L${mx} ${b.y} L${bx} ${b.y}`;
-      }
-      h+=`<path class="${cls}" d="${d}" ${marker}/>`;
-    });
+    GV.links.forEach(link => { h += GV.renderEdge(link, sel, fh); });
     // Nodes
-    GV.nodes.forEach(n=>{
-      const clr=GV.nodeColor(n);
-      const dim = (sel&&!conn.has(n.id)) || (fh&&!fh.nodes.has(n.id)&&!sel) ?' dim':'';
-      const isSel=n.id===sel?' sel':'';
-      const flowGlow = fh && fh.nodes.has(n.id) && !sel;
-      if(n.type==='fn'){
-        const w=Math.max(30,n.label.length*5.5+12);
-        const fnClr = GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
-        h+=`<g class="gn fn${dim}${isSel}" data-id="${n.id}" data-parent="${n.parentId}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${fnClr}18" stroke="${fnClr}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(n.label)}</text></g>`;
-      } else if(n.type==='layer'){
-        const w=Math.max(70,n.label.length*7+20);
-        h+=`<g class="gn layer${dim}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${clr}22" stroke="${clr}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(n.label)}</text></g>`;
-      } else if(n.type==='root'){
-        const w=Math.max(60,n.label.length*8+20);
-        h+=`<g class="gn root${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(n.label)}</text></g>`;
-      } else {
-        const w=150,hh=40;
-        const isEp = GV.isEntrypoint(n);
-        h+=`<g class="gn file${dim}${isSel}" data-id="${n.id}" transform="translate(${n.x},${n.y})">
-          <rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${clr}22" stroke="${clr}"${flowGlow?' stroke-width="3" stroke="var(--warn)"':''}/>
-          <text class="t" x="${-w/2+12}" y="-2">${escHtml(n.label)}</text>
-          <text class="s" x="${-w/2+12}" y="14">${n.source_file?escHtml(n.source_file.split('/').pop()):''}</text>
-          ${isEp?`<polygon class="ep-star ep-glow" points="${w/2-12},${-hh/2+5} ${w/2-8},${-hh/2+13} ${w/2-16},${-hh/2+9} ${w/2-4},${-hh/2+9} ${w/2-12},${-hh/2+13}" fill="var(--pass)" stroke="var(--pass)88" stroke-width="1"/>`:''}
-        </g>`;
-      }
-    });
+    GV.nodes.forEach(node => { h += GV.renderNode(node, sel, conn, fh); });
     renderHTML(v, h);
+  },
+  renderEdge(link, selectedNode, flowHighlight){
+    const from=GV.map[link.s], to=GV.map[link.t];
+    if(!from||!to) return '';
+    let classes = 'lnk ' + link.kind;
+    const isHot = selectedNode && (link.s===selectedNode || link.t===selectedNode);
+    const hasFlow = flowHighlight && flowHighlight.nodes.has(link.s) && flowHighlight.nodes.has(link.t);
+    const hasFlowLight = flowHighlight && !hasFlow && (flowHighlight.nodes.has(link.s) || flowHighlight.nodes.has(link.t));
+    if(isHot) classes += ' hot';
+    if(hasFlow) classes += ' flow';
+    if(hasFlowLight) classes += ' flow-light';
+    if(flowHighlight && !isHot && !hasFlow && !hasFlowLight) classes += ' flow-dim';
+    let marker = 'marker-end="url(#arrow-';
+    if(hasFlow) marker += 'flow';
+    else if(isHot) marker += 'calls-hot';
+    else if(link.kind==='import'||link.kind==='tree') marker += 'import';
+    else marker += 'calls';
+    marker += ')"';
+    let path;
+    if(GV.mode==='hierarchy'){
+      path = `M${from.x} ${from.y+14} C${from.x} ${(from.y+to.y)/2},${to.x} ${(from.y+to.y)/2},${to.x} ${to.y-14}`;
+    } else if(from.y === to.y){
+      path = `M${from.x} ${from.y} L${to.x} ${to.y}`;
+    } else {
+      const midX = (from.x + to.x) / 2;
+      const endX = to.x > from.x ? to.x - 4 : to.x + 4;
+      path = `M${from.x} ${from.y} L${midX} ${from.y} L${midX} ${to.y} L${endX} ${to.y}`;
+    }
+    return `<path class="${classes}" d="${path}" ${marker}/>`;
+  },
+  renderNode(node, selectedNode, connectedSet, flowHighlight){
+    const color = GV.nodeColor(node);
+    const isDim = (selectedNode && !connectedSet.has(node.id)) || (flowHighlight && !flowHighlight.nodes.has(node.id) && !selectedNode) ? ' dim' : '';
+    const isSelected = node.id === selectedNode ? ' sel' : '';
+    const hasFlowGlow = flowHighlight && flowHighlight.nodes.has(node.id) && !selectedNode;
+    if(node.type==='fn') return GV.renderFnNode(node, isDim, isSelected, color);
+    if(node.type==='layer') return GV.renderLayerNode(node, isDim, color);
+    if(node.type==='root') return GV.renderRootNode(node, isDim, isSelected);
+    return GV.renderFileNode(node, isDim, isSelected, color, hasFlowGlow);
+  },
+  renderFnNode(node, dimClass, selClass, color){
+    const w = Math.max(30, node.label.length*5.5+12);
+    const parentColor = GV.nodeColor(GV.map[node.parentId])||'var(--muted)';
+    return `<g class="gn fn${dimClass}${selClass}" data-id="${node.id}" data-parent="${node.parentId}" transform="translate(${node.x},${node.y})"><rect x="${-w/2}" y="-9" width="${w}" height="18" rx="9" fill="${parentColor}18" stroke="${parentColor}77"/><text class="t" x="0" y="3" text-anchor="middle">${escHtml(node.label)}</text></g>`;
+  },
+  renderLayerNode(node, dimClass, color){
+    const w = Math.max(70, node.label.length*7+20);
+    return `<g class="gn layer${dimClass}" data-id="${node.id}" transform="translate(${node.x},${node.y})"><rect x="${-w/2}" y="-12" width="${w}" height="24" rx="12" fill="${color}22" stroke="${color}"/><text class="t" x="0" y="4" text-anchor="middle">${escHtml(node.label)}</text></g>`;
+  },
+  renderRootNode(node, dimClass, selClass){
+    const w = Math.max(60, node.label.length*8+20);
+    return `<g class="gn root${dimClass}${selClass}" data-id="${node.id}" transform="translate(${node.x},${node.y})"><rect x="${-w/2}" y="-14" width="${w}" height="28" rx="8" fill="#1d2740" stroke="${cssV('--info')}"/><text class="t" x="0" y="5" text-anchor="middle">${escHtml(node.label)}</text></g>`;
+  },
+  renderFileNode(node, dimClass, selClass, color, flowGlow){
+    const w = 150, hh = 40;
+    const isEp = GV.isEntrypoint(node);
+    const glowAttr = flowGlow ? ' stroke-width="3" stroke="var(--warn)"' : '';
+    const epPolygon = isEp ? `<polygon class="ep-star ep-glow" points="${w/2-12},${-hh/2+5} ${w/2-8},${-hh/2+13} ${w/2-16},${-hh/2+9} ${w/2-4},${-hh/2+9} ${w/2-12},${-hh/2+13}" fill="var(--pass)" stroke="var(--pass)88" stroke-width="1"/>` : '';
+    const srcFile = node.source_file ? escHtml(node.source_file.split('/').pop()) : '';
+    return `<g class="gn file${dimClass}${selClass}" data-id="${node.id}" transform="translate(${node.x},${node.y})"><rect x="${-w/2}" y="${-hh/2}" width="${w}" height="${hh}" rx="7" fill="${color}22" stroke="${color}"${glowAttr}/><text class="t" x="${-w/2+12}" y="-2">${escHtml(node.label)}</text><text class="s" x="${-w/2+12}" y="14">${srcFile}</text>${epPolygon}</g>`;
   },
   nodeColor(n){
     if(n.type==='fn') return GV.nodeColor(GV.map[n.parentId])||'var(--muted)';
