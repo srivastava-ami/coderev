@@ -45,6 +45,7 @@ func Annotate(req AnnotateRequest) error {
 	}
 	comments := buildComments(req.Report.Findings, req.Target, diffed)
 	if len(comments) == 0 {
+		fmt.Fprintf(os.Stderr, "ghpr: no findings matched lines in PR diff — skipping inline annotation\n")
 		return nil
 	}
 	poster := &commentPoster{repoSlug: req.RepoSlug, prNumber: req.PRNumber, sha: sha}
@@ -180,6 +181,46 @@ type prPost struct {
 	prNumber int
 	sha      string
 	comment  prComment
+}
+
+// PostInlineComment posts a single body as an inline review comment on the first
+// file of the PR diff, so it appears inline in the Files Changed tab.
+func PostInlineComment(repoSlug string, prNumber int, target, body string) error {
+	if err := checkGHAvailable(); err != nil {
+		return err
+	}
+	sha, err := headSHA(target)
+	if err != nil {
+		return fmt.Errorf("ghpr: resolving HEAD SHA: %w", err)
+	}
+	files, err := listDiffFiles(repoSlug, prNumber)
+	if err != nil || len(files) == 0 {
+		return fmt.Errorf("ghpr: no files in PR diff to attach inline comment")
+	}
+	rel := filepath.ToSlash(files[0])
+	if err := postComment(prPost{repoSlug: repoSlug, prNumber: prNumber, sha: sha, comment: prComment{path: rel, line: 1, body: body}}); err != nil {
+		return err
+	}
+	fmt.Fprintf(os.Stderr, "ghpr: posted AI review as inline comment on %s in PR #%d\n", rel, prNumber)
+	return nil
+}
+
+// listDiffFiles returns the filename of every file changed in the PR.
+func listDiffFiles(repoSlug string, prNumber int) ([]string, error) {
+	endpoint := fmt.Sprintf("repos/%s/pulls/%d/files", repoSlug, prNumber)
+	cmd := exec.Command("gh", "api", "--paginate", "--jq", ".[].filename", endpoint)
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("gh api %s: %w", endpoint, err)
+	}
+	var files []string
+	for _, f := range strings.Fields(string(out)) {
+		f = strings.TrimSpace(f)
+		if f != "" {
+			files = append(files, f)
+		}
+	}
+	return files, nil
 }
 
 func postComment(p prPost) error {
