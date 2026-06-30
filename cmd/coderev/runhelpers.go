@@ -10,6 +10,7 @@ import (
 	"github.com/srivastava-ami/coderev/internal/architecture"
 	"github.com/srivastava-ami/coderev/internal/baseline"
 	"github.com/srivastava-ami/coderev/internal/config"
+	"github.com/srivastava-ami/coderev/internal/github"
 	"github.com/srivastava-ami/coderev/internal/output"
 	"github.com/srivastava-ami/coderev/internal/output/ghpr"
 	"github.com/srivastava-ami/coderev/internal/plugin"
@@ -162,6 +163,37 @@ func postAnnotate(r report.Report, target string) error {
 		fmt.Printf("warning: PR annotation failed: %v\n", err)
 	}
 	return nil
+}
+
+func postReviewToPR(target string, tc analysis.ToolConfig, repoSlug string, prNumber int) {
+	body, err := os.ReadFile(filepath.Join(target, ".coderev", "review.md"))
+	if err != nil {
+		return
+	}
+	if repoSlug == "" {
+		repoSlug, err = ghpr.RepoSlug(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: detecting repo: %v\n", err)
+			return
+		}
+	}
+	if prNumber == 0 {
+		prNumber, err = ghpr.OpenPR(target)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: detecting PR: %v\n", err)
+			return
+		}
+	}
+	client, err := github.New(tc.Github.BaseURL)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: %v\n", err)
+		return
+	}
+	if err := client.UpsertCommentContext(context.Background(), github.PRTarget{Repo: repoSlug, PR: prNumber}, string(body)); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: %v\n", err)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "  review-posted: AI review upserted to PR #%d\n", prNumber)
 }
 
 // generateAllReports writes all three formats (md, html, sarif) into .coderev/.

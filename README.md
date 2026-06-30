@@ -3,7 +3,7 @@
 [![CI](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml/badge.svg?branch=main)](https://github.com/srivastava-ami/coderev/actions/workflows/code-quality.yml)
 [![License: BUSL-1.1](https://img.shields.io/badge/License-BUSL--1.1-blue.svg)](LICENSE)
 
-**One command to check your code, map it, and get an AI review.**
+**One command to scan your code, map it, and get an AI review.**
 
 ## Install
 
@@ -11,7 +11,7 @@
 brew install srivastava-ami/tools/coderev
 ```
 
-That's it. No Python, no Node, no config file needed.
+No Python, no Node, no config file needed.
 
 ## Run it
 
@@ -19,45 +19,146 @@ That's it. No Python, no Node, no config file needed.
 coderev .
 ```
 
-That's the whole command. Run it in any project folder. It:
-
-1. **Scans your code** for bugs, secrets, and quality issues
-2. **Builds a code map** (`graph.html`) you can open in your browser
-3. **Writes a prompt file** ready for any AI to review
+Scans your code for bugs, secrets, and quality issues in one pass — no extra tools required. Produces a markdown report at `.coderev/report.md`.
 
 ```
-✓ PASS  (or ✗ FAIL — fix the blockers shown in coderev-report.md)
+✓ PASS  (or ✗ FAIL — fix the blockers shown in the report)
 
-  graph:   .coderev/graph/graph.html
-  prompt:  .coderev/prompt.md
+  adapters: treesitter, imports ✓, coverage ✓
+  graph:    .coderev/graph/graph.json
+  report:   .coderev/report.md
 ```
 
-Open `coderev-report.md` to see every finding with file name, line number, and what to fix.
+### What it checks
 
-## Get an AI review
+| What | How |
+|---|---|
+| Code quality | Tree-sitter AST analysis — cyclomatic complexity, deep nesting, long functions, magic numbers, duplication |
+| Secrets & credentials | Pattern-based secret detection — API keys, passwords left in code |
+| Circular dependencies | Import cycle detection for JS/TS and Go |
+| Dependency CVEs | Known vulnerabilities in npm/Go/Python packages (via OSV.dev snapshot) |
+| Code coverage | Reads Go/coverage/Java/JS coverage reports, warns on untested files |
+| Security patterns | Semgrep rules — SQL injection, hardcoded URLs, unsafe inputs |
+| Hardcoded secrets | Gitleaks — git history + files |
+| JS module structure | Madge — circular deps and module graph |
+| npm audit | Standard npm audit output |
+| Graph analysis | Architecture-layer violation detection from the code graph |
+| Custom plugins | Script-based adapters from `tool_config.toml` |
 
-Run this once to connect your Claude subscription:
+Works on **TypeScript, JavaScript, Go, Python, and Rust** out of the box.
+
+## Output formats
 
 ```bash
-coderev config llm --enable --provider cli --command "claude -p {prompt}"
+coderev .                        # markdown report (default)
+coderev . --format html          # self-contained HTML report
+coderev . --format sarif         # SARIF (static analysis results interchange)
+coderev . --json                 # findings as JSON to stdout
+coderev . --output ./myreport.md # custom output path
 ```
 
-Now every `coderev .` also writes `.coderev/review.md` — an AI review that looks at
-your code map, your findings, and what actually changed, then tells you about logic
-bugs and edge cases the scanner can't catch.
-
-## Review only what changed (PR mode)
+## Review only what changed
 
 ```bash
 coderev --diff main .
 ```
 
-Same as above but only looks at files you changed compared to `main`.
-Useful before you push or open a pull request.
+Only scans files changed since `main`. Useful before you push or open a PR.
+
+## Quality gate
+
+```bash
+coderev --gate .coderev-gate.toml .
+```
+
+Evaluates findings against configurable thresholds (blockers allowed, min score). Fails the exit code if the gate isn't met — use in CI to enforce standards.
+
+## Baseline & trend tracking
+
+```bash
+coderev --update-baseline .
+```
+
+Saves current findings to `.coderev/baseline.json`. Future runs show added/removed findings as a delta.
+
+## AI-powered code review
+
+```bash
+# 1. Configure your LLM provider
+coderev config llm --enable --provider cli --command "claude -p {prompt}"
+coderev config llm --enable --provider anthropic  # reads ANTHROPIC_API_KEY
+coderev config llm --enable --provider ollama
+
+# 2. Run coderev with review (uses findings + graph context)
+coderev --review .
+
+# Or review a specific diff
+coderev review --diff main .
+
+# Post the AI review back to a PR comment
+export GITHUB_TOKEN=ghp_...
+coderev review --diff main --post-pr .
+```
+
+The review prompt includes:
+- git diff hunks
+- code graph neighbors of changed files
+- static analysis findings
+- `.coderevignore` filtering
+
+For large diffs, the review is automatically chunked per-file and sent in parallel.
+
+### Full graph review (no diff required)
+
+```bash
+coderev --full-review .
+```
+
+Reviews every file in the code graph — useful for onboarding or deep architecture audits.
+
+## Code graph
+
+```bash
+coderev graph .                            # build graph
+coderev graph . --output ./custom-dir      # custom output dir
+```
+
+Builds a native graph (`.coderev/graph/graph.json` + `graph.html`) with file, function, and type nodes connected by imports, calls, and containment edges.
+
+## Ask the LLM anything
+
+```bash
+coderev ask "What does the graph adapter do?"
+```
+
+Sends a raw prompt to the configured LLM provider using the tool config.
+
+## GitHub PR annotations
+
+```bash
+coderev --diff main --annotate-pr --repo owner/repo --pr 42 .
+```
+
+Posts findings as inline PR comments (requires `gh` CLI and `GITHUB_TOKEN`). Repo and PR number auto-detect from git remote if omitted.
+
+## Plugins
+
+```bash
+coderev plugin install manifest.toml   # install a custom plugin
+coderev plugin list                    # list installed plugins
+```
+
+Extend analysis with script-based adapters defined in manifest files.
+
+## Setup
+
+```bash
+coderev setup   # install external deps (gitleaks, semgrep, madge) + git hooks
+coderev install-deps   # external deps only
+coderev install-hooks  # pre-commit/pre-push git hooks only
+```
 
 ## Add it to GitHub Actions
-
-Paste this into `.github/workflows/coderev.yml`:
 
 ```yaml
 name: coderev
@@ -76,40 +177,20 @@ jobs:
             ghcr.io/srivastava-ami/coderev:latest \
             --diff "origin/${{ github.base_ref }}" \
             --annotate-pr \
+            --gate /src/.coderev-gate.toml \
             --repo "${{ github.repository }}" \
             --pr "${{ github.event.pull_request.number }}" \
             /src
 ```
 
-This posts findings as inline comments on the PR and fails the check if there are blockers.
-
-## What does it check?
-
-Everything in one pass, no extra tools needed:
-
-| What | Examples |
-|---|---|
-| Secrets & credentials | API keys, passwords left in code |
-| Circular dependencies | Module A imports B imports A |
-| Complexity | Functions that are too long or deeply nested |
-| Security patterns | SQL injection, hardcoded URLs, unsafe inputs |
-| Dependency CVEs | Known vulnerabilities in your npm/Go/Python packages |
-
-Works on **TypeScript, JavaScript, Go, Python, and Rust** out of the box.
-
 ## Using with AI agents (Claude Code, Copilot, Cursor)
-
-Add this to your `CLAUDE.md` or `AGENTS.md`:
 
 ```markdown
 ## Quality gate
 Before every commit: `coderev .`
-Fix all blockers listed in `coderev-report.md` before pushing.
+Fix all blockers listed in `.coderev/report.md` before pushing.
 For AI review: read `.coderev/review.md` after running.
 ```
-
-The agent runs `coderev .`, reads the report and review files, and fixes issues —
-without sending your whole codebase to an LLM.
 
 ## License
 

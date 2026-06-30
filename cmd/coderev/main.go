@@ -59,7 +59,7 @@ Standards are built into the binary. Run coderev . with no configuration needed.
 	root.Flags().StringVar(&flagFormat, "format", "", "output format: markdown (default), html, sarif")
 	root.Flags().StringVar(&flagRepo, "repo", "", "owner/repo slug — auto-detected from git remote (e.g. acme/my-repo)")
 	root.Flags().IntVar(&flagPR, "pr", 0, "PR number — auto-detected from gh CLI if omitted")
-	root.Flags().BoolVar(&flagAnnotatePR, "annotate-pr", false, "post findings as inline GitHub PR comments (requires gh CLI)")
+	root.Flags().BoolVar(&flagAnnotatePR, "annotate-pr", false, "post findings as inline PR comments; also posts AI review when --review is used (requires GITHUB_TOKEN + gh CLI)")
 	root.Flags().StringVar(&flagDiff, "diff", "", "incremental mode: only scan files changed since this git ref (e.g. HEAD~1, main)")
 	root.Flags().BoolVar(&flagUpdateBaseline, "update-baseline", false, "save current findings as new baseline in .coderev/baseline.json")
 	root.Flags().BoolVar(&flagJSON, "json", false, "output findings as JSON instead of markdown")
@@ -171,10 +171,14 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 		if err := maybeSendToLLM(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: rc}); err != nil {
 			return err
 		}
-	} else {
-		return nil
 	}
-	return refreshHTMLWithReview(r, s.target)
+	if err := refreshHTMLWithReview(r, s.target); err != nil {
+		return err
+	}
+	if (flagReview || flagFullReview) && flagAnnotatePR {
+		postReviewToPR(s.target, s.tc, flagRepo, flagPR)
+	}
+	return nil
 }
 
 
