@@ -50,7 +50,7 @@ advisory only — it never affects the scan gate (coderev . owns pass/fail).`,
 		},
 	}
 	cmd.Flags().StringVar(&f.diffRef, "diff", "HEAD~1", "git ref to diff against")
-	cmd.Flags().BoolVar(&f.postPR, "post-pr", false, "post review as upserted PR comment via GitHub")
+	cmd.Flags().BoolVar(&f.postPR, "post-pr", false, "post review as upserted PR comment via GitHub (requires GITHUB_TOKEN)")
 	cmd.Flags().IntVar(&f.prNum, "pr", 0, "PR number (0 = auto-detect via gh CLI)")
 	cmd.Flags().StringVar(&f.repo, "repo", "", "owner/repo slug (auto-detect from git remote)")
 	cmd.Flags().StringVar(&f.output, "output", "", "write review to file instead of stdout")
