@@ -36,3 +36,14 @@ opencode.json
 
 # coderev generated scan artifacts — regenerate on every run
 .coderev/
+
+# temporary work documents (phase summaries, spec drafts, snippet collections)
+COPY_PASTE_SNIPPETS.md
+PHASE2_SUMMARY.txt
+TERRAFORM_PHASE1_SPECIFICATION.md
+
+# git worktrees (isolated development, not part of main branch)
+.worktrees/
+
+# git worktrees (isolated development, not part of main branch)
+.worktrees/
