@@ -55,11 +55,11 @@ func (w *fileWalker) checkCyclomatic(s *functionScope, loc string) {
 
 	switch {
 	case s.cyclomatic >= hardBlock:
-		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
+		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
 			Message:     fmt.Sprintf("%s: cyclomatic complexity %d exceeds hard block (%d)", loc, s.cyclomatic, hardBlock),
 			Remediation: w.stds.Complexity.Cyclomatic.Remediation})
 	case s.cyclomatic > maxCC:
-		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
+		w.emitFinding(analysis.Finding{Rule: "complexity.cyclomatic", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
 			Message:     fmt.Sprintf("%s: cyclomatic complexity %d exceeds max (%d)", loc, s.cyclomatic, maxCC),
 			Remediation: w.stds.Complexity.Cyclomatic.Remediation})
 	case s.cyclomatic > advisory:
@@ -77,7 +77,7 @@ func (w *fileWalker) checkCognitive(s *functionScope, loc string) {
 	if s.cognitive <= maxCog {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.cognitive", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.cognitive", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
 		Message:     fmt.Sprintf("%s: cognitive complexity %d exceeds max (%d)", loc, s.cognitive, maxCog),
 		Remediation: "Flatten nesting with guard clauses; extract inner blocks to named helpers."})
 }
@@ -107,7 +107,7 @@ func (w *fileWalker) checkParams(s *functionScope, loc string) {
 	if s.params <= maxParams {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.parameter_count", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.parameter_count", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
 		Message:     fmt.Sprintf("%s: %d parameters (max %d) — introduce a parameter object", loc, s.params, maxParams),
 		Remediation: w.stds.Complexity.Parameters.Remediation})
 }
@@ -120,7 +120,7 @@ func (w *fileWalker) checkNesting(s *functionScope, loc string) {
 	if s.maxNesting <= maxNest {
 		return
 	}
-	w.emitFinding(analysis.Finding{Rule: "complexity.nesting", Pillar: "complexity", Severity: w.testSev(analysis.SeverityBlocker), Line: s.startLine,
+	w.emitFinding(analysis.Finding{Rule: "complexity.nesting", Pillar: "complexity", Severity: analysis.SeverityAdvisory, Line: s.startLine,
 		Message:     fmt.Sprintf("%s: nesting depth %d (max %d)", loc, s.maxNesting, maxNest),
 		Remediation: w.stds.Complexity.Nesting.Remediation})
 }

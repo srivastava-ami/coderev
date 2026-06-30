@@ -74,57 +74,41 @@ func (pm *PatternMatcher) LoadRules(rulesFS fs.FS, basePath string) error {
 	if err != nil {
 		return fmt.Errorf("reading rules directory %s: %w", basePath, err)
 	}
-
 	for _, entry := range entries {
-		if entry.IsDir() {
-			// Recursively load from subdirectories (core/, phase1/, phase2/)
-			subPath := basePath + "/" + entry.Name()
-			if err := pm.LoadRules(rulesFS, subPath); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if !strings.HasSuffix(entry.Name(), ".toml") {
-			continue // Skip non-TOML files
-		}
-
-		filePath := basePath + "/" + entry.Name()
-		data, err := fs.ReadFile(rulesFS, filePath)
-		if err != nil {
-			return fmt.Errorf("reading TOML file %s: %w", filePath, err)
-		}
-
-		// Parse TOML into generic map, then extract rules.
-		var doc map[string]map[string]interface{}
-		if _, err := toml.Decode(string(data), &doc); err != nil {
-			return fmt.Errorf("parsing TOML file %s: %w", filePath, err)
-		}
-
-		// Extract rules section
-		rulesSection, ok := doc["rules"]
-		if !ok {
-			continue // File has no rules section
-		}
-
-		for ruleID := range rulesSection {
-			// For Phase A1, accept that full TOML unmarshaling to RuleDefinition
-			// requires reflection. We validate that rule_id is present and non-empty.
-			// Phase A2 will enhance this with full pattern matching.
-
-			rule := &Rule{
-				ID: ruleID,
-			}
-
-			// Validate rule_id is set
-			if rule.ID == "" {
-				return fmt.Errorf("rule in file %s has empty rule_id", filePath)
-			}
-
-			pm.rules[rule.ID] = rule
+		if err := pm.loadEntry(rulesFS, basePath, entry); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func (pm *PatternMatcher) loadEntry(rulesFS fs.FS, basePath string, entry fs.DirEntry) error {
+	if entry.IsDir() {
+		return pm.LoadRules(rulesFS, basePath+"/"+entry.Name())
+	}
+	if !strings.HasSuffix(entry.Name(), ".toml") {
+		return nil
+	}
+	filePath := basePath + "/" + entry.Name()
+	data, err := fs.ReadFile(rulesFS, filePath)
+	if err != nil {
+		return fmt.Errorf("reading TOML file %s: %w", filePath, err)
+	}
+	var doc map[string]map[string]interface{}
+	if _, err := toml.Decode(string(data), &doc); err != nil {
+		return fmt.Errorf("parsing TOML file %s: %w", filePath, err)
+	}
+	rulesSection, ok := doc["rules"]
+	if !ok {
+		return nil
+	}
+	for ruleID := range rulesSection {
+		rule := &Rule{ID: ruleID}
+		if rule.ID == "" {
+			return fmt.Errorf("rule in file %s has empty rule_id", filePath)
+		}
+		pm.rules[rule.ID] = rule
+	}
 	return nil
 }
 
