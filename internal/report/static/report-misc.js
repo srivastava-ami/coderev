@@ -17,7 +17,7 @@ function rebuildFileList(files) {
     return;
   }
 
-  renderHTML(el, filtered.map((file, i) => {)
+  renderHTML(el, filtered.map((file, i) => {
     const shortPath = file.Path.split('/').slice(-4).join('/');
     const heatColor = heatToColor(file.HeatScore);
     const count = file.Findings ? file.Findings.length : 0;
@@ -162,7 +162,7 @@ function renderDocs() {
     return;
   }
   if (tab) tab.style.display = '';
-  renderHTML(el, docs.map((d, i) => {)
+  renderHTML(el, docs.map((d, i) => {
     const isPrimary = i === 0;
     const rendered = d.content ? markdownToHtml(d.content) : (d.html || '');
     return `<div class="adoc-panel" style="margin-bottom:8px">
