@@ -198,3 +198,4 @@ function setSevFilter(sev, btn) {
   document.querySelectorAll('.filter-btn[data-sev]').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   rebuildViolationsTable(R.Findings || []);
+}
