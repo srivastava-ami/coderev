@@ -17,7 +17,7 @@ var linePatternChecks = func(w *fileWalker) []func(string, int) {
 		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
 		w.checkGoGoroutineLeak, w.checkGoDeadlockPattern,
 		w.checkGoDeferPanic, w.checkGoUncheckedError, w.checkGoInterfaceBloat,
-		w.checkGoUnclosedBody, w.checkGoFileDescriptorLeak, w.checkGoNilSliceIteration,
+		w.checkGoNilSliceIteration,
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
