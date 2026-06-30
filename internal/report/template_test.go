@@ -117,14 +117,15 @@ func TestGenerateHTMLReportValid(t *testing.T) {
 		}
 	}
 
-	// Check for broken arrow function syntax (misplaced closing paren after {)
-	brokenArrows := []string{
-		`=> \{\)`,  // Should be => {, not => {)
+	// Check for broken JavaScript syntax patterns (these SHOULD NOT exist)
+	// The most common error: stray closing paren after arrow function opening brace
+	if regexp.MustCompile(`=> \{\)`).MatchString(html) {
+		t.Error("detected broken arrow function syntax: => {)")
 	}
 
-	for _, pattern := range brokenArrows {
-		if regexp.MustCompile(pattern).MatchString(html) {
-			t.Errorf("detected broken arrow function syntax: %s", pattern)
-		}
+	// Verify proper JavaScript patterns exist
+	// renderHTML should end with ).join(''));
+	if !regexp.MustCompile(`\.join\(''\)\)`).MatchString(html) {
+		t.Error("renderHTML calls may not be properly closed — expected .join('')) pattern not found")
 	}
 }
