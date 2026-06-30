@@ -17,6 +17,14 @@ type Standards struct {
 	GoConventions     GoConventionsStd      `toml:"go_conventions"`
 	PythonConventions PythonConventionsStd  `toml:"python_conventions"`
 	RustConventions   RustConventionsStd    `toml:"rust_conventions"`
+	JavaScriptConventions JavaScriptConventionsStd `toml:"javascript_conventions"`
+	NodeJsConventions     NodeJsConventionsStd     `toml:"nodejs_conventions"`
+	TerraformConventions  TerraformConventionsStd  `toml:"terraform_conventions"`
+
+	// Generic map-based fields for TOML-driven extensibility.
+	Pillars  map[string]map[string]GenericRuleCategory `toml:"-"`
+	Severity map[string]string                        `toml:"-"`
+	RawData  map[string]interface{}                   `toml:"-"`
 	Exceptions        []Exception           `toml:"exceptions"`
 }
 
@@ -34,4 +42,16 @@ type Exception struct {
 	ApprovedBy    string `toml:"approved_by"`
 	Expires       string `toml:"expires"`
 	Ticket        string `toml:"ticket"`
+}
+
+// UnmarshalTOML populates the generic Pillars map after TOML deserialization.
+func (s *Standards) UnmarshalTOML(data interface{}) error {
+	m, ok := data.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	s.RawData = m
+	PopulateGenericPillars(s, m)
+	RegisterRulesFromStandards(s)
+	return nil
 }
