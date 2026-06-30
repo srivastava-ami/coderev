@@ -74,22 +74,18 @@ function escHtml(s) {
 
 **File:** `.git/hooks/pre-commit`
 
-Validates JavaScript syntax BEFORE commits:
+Validates known broken patterns BEFORE commits:
 
 ```bash
-# Comprehensive validation using Node.js
-if command -v node &> /dev/null; then
-    node -c "$js_file"  # Syntax check without execution
-fi
+# Check for known broken patterns (=> {) is the most common error)
+grep -q "=> {)" "$js_file"
 ```
 
-**Why Node.js `node -c`?**
-- Catches ALL JavaScript syntax errors (not just pattern matching)
-- Fast — no execution, just parsing
-- No dependencies — Node.js is standard on most dev systems
-- Prevents broken code from reaching commits
+**Note:** The JavaScript files are fragments (not standalone) that get concatenated by Go. Comprehensive validation happens in the unit test (TestGenerateHTMLReportValid) which validates the complete generated HTML.
 
-**Fallback:** If Node.js not available, regex pattern matching detects known broken patterns.
+**Why this two-layer approach?**
+1. **Pattern check** (pre-commit) — catches known issues immediately
+2. **Unit test** (go test) — validates the complete generated HTML with all JavaScript together
 
 ### 4. Unit Test Validation
 
