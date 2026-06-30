@@ -145,7 +145,7 @@ function renderPillars() {
       <div class="pillar-bar-bg"><div class="pillar-bar" style="width:${pct}%;background:${color}"></div></div>
       <div class="pillar-count">${count} finding${count !== 1 ? 's' : ''} · score ${pct}%</div>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 
 // ── Violations ────────────────────────────────────────────────────────────────
@@ -183,7 +183,7 @@ function rebuildViolationsTable(findings) {
       <td>${escHtml(f.Message)}${snip}</td>
       <td style="color:var(--muted);font-size:.78rem">${escHtml(f.Remediation || '')}</td>
     </tr>`;
-  }).join('');
+  }).join(''));
 }
 
 function toggleSnippet(i) {

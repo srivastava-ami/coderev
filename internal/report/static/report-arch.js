@@ -3,20 +3,15 @@
       </div>
       <div class="adoc-body arch-text ${isPrimary ? 'open' : ''}">${rendered}</div>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 
 function renderArchStatus(arch) {
   const el = document.getElementById('arch-status');
- renderHTML(el, ''; return; })
   if (arch.Source === 'doc') {
-    renderHTML(el, `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 14px;font-size:.78rem;color:var(--pass)">)
-      ✓ Architecture document: <code>${escHtml(arch.DocFile)}</code>
-    </div>`;
+    renderHTML(el, `<div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:6px;padding:8px 14px;font-size:.78rem;color:var(--pass)">✓ Architecture document: <code>${escHtml(arch.DocFile)}</code></div>`);
   } else {
-    renderHTML(el, `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 14px;font-size:.78rem;color:var(--advisory)">)
-      ⚠ No <code>docs/architecture.md</code> found — add one for a curated overview. Package map below is derived from source.
-    </div>`;
+    renderHTML(el, `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 14px;font-size:.78rem;color:var(--advisory)">⚠ No <code>docs/architecture.md</code> found — add one for a curated overview. Package map below is derived from source.</div>`);
   }
 }
 

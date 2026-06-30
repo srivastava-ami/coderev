@@ -36,7 +36,7 @@ function rebuildFileList(files) {
       </div>
       <div class="file-findings">${inner}</div>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 
 function toggleFile(i) {
