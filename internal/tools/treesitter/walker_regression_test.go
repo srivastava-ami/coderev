@@ -269,16 +269,11 @@ if (process.env.NODE_ENV !== 'production') {
 // ── Go Convention Rules (20 new rules for production Go) ──────────────────────
 
 // TestGoGoroutineLeakDetected flags bare "go " statement.
+// TestGoGoroutineLeakDetected flags goroutine spawned without tracking.
+// SKIPPED: checkGoGoroutineLeak disabled (commit 7734530) due to false positives.
+// Naive pattern matching cannot distinguish tracked goroutines from untracked ones.
 func TestGoGoroutineLeakDetected(t *testing.T) {
-	src := `
-func Worker(tasks chan Task) {
-	go processTask(tasks)
-}
-`
-	findings := findingsForPath(t, src, "worker.go", analysis.LangGo)
-	if !hasRule(findings, "go_conventions.goroutine_leak") {
-		t.Error("must flag goroutine spawned without tracking")
-	}
+	t.Skip("goroutine leak checks disabled — require scope tracking")
 }
 
 // TestGoDeadlockChannelReceive detects bare channel receive without timeout.
@@ -295,16 +290,10 @@ func WaitForSignal(ch chan struct{}) {
 }
 
 // TestGoDeferPanicDetected flags defer containing panic.
+// SKIPPED: checkGoDeferPanic disabled (commit 7734530) due to false positives.
+// Regex-based detection cannot distinguish actual panics from string literals.
 func TestGoDeferPanicDetected(t *testing.T) {
-	src := `
-func Cleanup() {
-	defer panic("cleanup failed")
-}
-`
-	findings := findingsForPath(t, src, "cleanup.go", analysis.LangGo)
-	if !hasRule(findings, "go_conventions.defer_panic") {
-		t.Error("must flag defer with panic")
-	}
+	t.Skip("defer panic checks disabled — require AST-based detection")
 }
 
 // TestGoUncheckedErrorDetected flags explicit error ignore.
@@ -337,38 +326,18 @@ type Reader interface {
 }
 
 // TestGoUnclosedBodyDetected flags response body access without close.
+// SKIPPED: checkGoUnclosedBody disabled (commit 7734530) due to false positives.
+// Line-by-line matching cannot distinguish code from string literals or recognize
+// defers on preceding lines. Requires flow-aware analysis.
 func TestGoUnclosedBodyDetected(t *testing.T) {
-	src := `
-func FetchData(url string) ([]byte, error) {
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	body, err := io.ReadAll(resp.Body)
-	return body, err
-}
-`
-	findings := findingsForPath(t, src, "fetch.go", analysis.LangGo)
-	if !hasRule(findings, "go_conventions.unclosed_body") {
-		t.Error("must flag resp.Body access without close")
-	}
+	t.Skip("unclosed body checks disabled — require flow-aware detection")
 }
 
 // TestGoFileDescriptorLeakDetected flags os.Open without close.
+// SKIPPED: checkGoFileDescriptorLeak disabled (commit 7734530) due to false positives
+// from line-by-line string matching. Proper resource leak detection requires flow analysis.
 func TestGoFileDescriptorLeakDetected(t *testing.T) {
-	src := `
-func ReadFile(path string) ([]byte, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	return io.ReadAll(f)
-}
-`
-	findings := findingsForPath(t, src, "file.go", analysis.LangGo)
-	if !hasRule(findings, "go_conventions.file_descriptor_leak") {
-		t.Error("must flag os.Open without visible close")
-	}
+	t.Skip("resource leak checks disabled — require flow-aware refactor")
 }
 
 // TestGoNilSliceIterationDetected flags bare range without nil check.
