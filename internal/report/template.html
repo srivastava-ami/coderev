@@ -363,6 +363,7 @@ tr:hover td{background:var(--surface2)}
 </footer>
 
 <script>
+let archTabShown = false;
 const R = {{.ReportJSON}};
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
@@ -1352,7 +1353,10 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
-  // Architecture tab is disabled — graph init suppressed
+  if (name === 'architecture' && !archTabShown && R.GraphJSON) {
+    archTabShown = true;
+    setTimeout(() => GV.init(), 50);
+  }
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
