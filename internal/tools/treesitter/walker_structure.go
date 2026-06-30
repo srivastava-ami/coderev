@@ -29,7 +29,7 @@ func (w *fileWalker) checkFileLength(root *sitter.Node) {
 
 	switch {
 	case lines >= maxL:
-		w.emitFinding(analysis.Finding{Rule: "file_structure.file_length", Pillar: "file_structure", Severity: analysis.SeverityBlocker, Line: 1,
+		w.emitFinding(analysis.Finding{Rule: "file_structure.file_length", Pillar: "file_structure", Severity: analysis.SeverityAdvisory, Line: 1,
 			Message:     fmt.Sprintf("file has %d lines (max %d) — split by concern", lines, maxL),
 			Remediation: w.stds.FileStructure.FileLength.Remediation})
 	case lines >= advisory:

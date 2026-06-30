@@ -140,7 +140,7 @@ func (a *Adapter) analyseFile(fi analysis.FileInfo) ([]analysis.Finding, error) 
 	}
 	defer tree.Close()
 
-	walker := newFileWalker(def, fi, a.stds, a.matcher)
+	walker := newFileWalker(walkerParams{def: def, fi: fi, stds: a.stds, matcher: a.matcher})
 	return walker.walk(tree.RootNode()), nil
 }
 

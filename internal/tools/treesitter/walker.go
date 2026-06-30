@@ -28,16 +28,23 @@ type fileWalker struct {
 	lastErrorStructLine int  // Rust: tracks last Error struct definition line
 }
 
-func newFileWalker(def *LangDef, fi analysis.FileInfo, stds analysis.Standards, matcher *PatternMatcher) *fileWalker {
-	lines := strings.Split(string(fi.Content), "\n")
+type walkerParams struct {
+	def     *LangDef
+	fi      analysis.FileInfo
+	stds    analysis.Standards
+	matcher *PatternMatcher
+}
+
+func newFileWalker(p walkerParams) *fileWalker {
+	lines := strings.Split(string(p.fi.Content), "\n")
 	return &fileWalker{
-		def:     def,
-		src:     fi.Content,
-		file:    fi.Path,
-		lang:    fi.Language,
-		stds:    stds,
-		matcher: matcher,
-		isMain:  fi.Language == analysis.LangGo && isGoMainPackage(fi.Content),
+		def:     p.def,
+		src:     p.fi.Content,
+		file:    p.fi.Path,
+		lang:    p.fi.Language,
+		stds:    p.stds,
+		matcher: p.matcher,
+		isMain:  p.fi.Language == analysis.LangGo && isGoMainPackage(p.fi.Content),
 		scanner: &lineScanner{Lines: lines},
 	}
 }

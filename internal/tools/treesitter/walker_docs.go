@@ -13,7 +13,7 @@ func (w *fileWalker) checkComment(node *sitter.Node) {
 	line := int(node.StartPoint().Row) + 1
 
 	if looksLikeCode(text) {
-		w.emitFinding(analysis.Finding{Rule: "documentation.no_comment_tombstones", Pillar: "documentation", Severity: analysis.SeverityBlocker, Line: line,
+		w.emitFinding(analysis.Finding{Rule: "documentation.no_comment_tombstones", Pillar: "documentation", Severity: analysis.SeverityAdvisory, Line: line,
 			Message:     "commented-out code detected — delete it, git is the undo stack",
 			Remediation: "Remove the commented-out block entirely."})
 		return

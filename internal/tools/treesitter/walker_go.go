@@ -482,14 +482,20 @@ func (w *fileWalker) checkGoPointerReceiverConsistency(line string, lineNum int)
 }
 
 // checkGoUnclosedBody detects HTTP responses without body close.
-// Pattern: resp.Body or .Body accessed without defer Close() visibility.
+// Pattern: actual code accessing resp.Body without Close() on same line (skip strings/comments).
 func (w *fileWalker) checkGoUnclosedBody(line string, lineNum int) {
 	trimmed, skip := w.goGuard(line)
 	if skip || isTestFile(w.file) {
 		return
 	}
-	// Flag: accessing Body without visible Close on same line
-	if strings.Contains(trimmed, "resp.Body") && !strings.Contains(trimmed, "Close()") && !strings.Contains(trimmed, "Closer") {
+	// Skip comments and pure string assignments
+	if strings.HasPrefix(trimmed, "//") {
+		return
+	}
+	// Only flag if resp.Body is accessed in actual code: after = or ( or , (not in strings)
+	// This avoids flagging resp.Body inside string literals like remediation messages
+	hasBodyAccess := strings.Contains(trimmed, " resp.Body") || strings.Contains(trimmed, "(resp.Body") || strings.Contains(trimmed, ",resp.Body")
+	if hasBodyAccess && !strings.Contains(trimmed, "Close()") && !strings.Contains(trimmed, "Closer") {
 		w.emitFinding(analysis.Finding{
 			Rule:        "go_conventions.unclosed_body",
 			Pillar:      "resources",
@@ -502,14 +508,19 @@ func (w *fileWalker) checkGoUnclosedBody(line string, lineNum int) {
 }
 
 // checkGoFileDescriptorLeak detects file opens without close visibility.
-// Pattern: os.Open, os.Create without defer visible on same line.
+// Pattern: actual code with os.Open/os.Create (not in strings/comments) without defer on same line.
 func (w *fileWalker) checkGoFileDescriptorLeak(line string, lineNum int) {
 	trimmed, skip := w.goGuard(line)
 	if skip || isTestFile(w.file) {
 		return
 	}
-	// Flag file open calls without defer or Close on same line
-	if (strings.Contains(trimmed, "os.Open(") || strings.Contains(trimmed, "os.Create(")) {
+	// Skip comments
+	if strings.HasPrefix(trimmed, "//") {
+		return
+	}
+	// Flag file open calls without defer - only if it looks like actual code (contains := or =)
+	isAssignment := strings.Contains(trimmed, ":=") || strings.Contains(trimmed, " = ")
+	if isAssignment && (strings.Contains(trimmed, "os.Open(") || strings.Contains(trimmed, "os.Create(")) {
 		if !strings.Contains(trimmed, "defer") && !strings.Contains(trimmed, "ioutil.ReadAll") {
 			w.emitFinding(analysis.Finding{
 				Rule:        "go_conventions.file_descriptor_leak",

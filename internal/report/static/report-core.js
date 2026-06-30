@@ -136,7 +136,7 @@ function renderPillars() {
     return;
   }
 
-  renderHTML(grid, pillars.map(p => {)
+  renderHTML(grid, pillars.map(p => {
     const pct = Math.round(p.Score * 100);
     const color = p.Status === 'FAIL' ? '#ef4444' : p.Status === 'WARN' ? '#f97316' : '#22c55e';
     const count = p.Findings ? p.Findings.length : 0;
@@ -172,7 +172,7 @@ function rebuildViolationsTable(findings) {
     return;
   }
 
-  renderHTML(body, filtered.map((f, i) => {)
+  renderHTML(body, filtered.map((f, i) => {
     const shortFile = f.File ? f.File.split('/').slice(-3).join('/') : '—';
     const hasSnippet = f.Snippet && f.Snippet.trim().length > 0;
     const snip = hasSnippet ? `<button class="snippet-toggle" onclick="toggleSnippet(${i})">show code</button><pre class="snippet" id="snip-${i}">${escHtml(f.Snippet)}</pre>` : '';

@@ -74,57 +74,41 @@ func (pm *PatternMatcher) LoadRules(rulesFS fs.FS, basePath string) error {
 	if err != nil {
 		return fmt.Errorf("reading rules directory %s: %w", basePath, err)
 	}
-
 	for _, entry := range entries {
-		if entry.IsDir() {
-			// Recursively load from subdirectories (core/, phase1/, phase2/)
-			subPath := basePath + "/" + entry.Name()
-			if err := pm.LoadRules(rulesFS, subPath); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if !strings.HasSuffix(entry.Name(), ".toml") {
-			continue // Skip non-TOML files
-		}
-
-		filePath := basePath + "/" + entry.Name()
-		data, err := fs.ReadFile(rulesFS, filePath)
-		if err != nil {
-			return fmt.Errorf("reading TOML file %s: %w", filePath, err)
-		}
-
-		// Parse TOML into generic map, then extract rules.
-		var doc map[string]map[string]interface{}
-		if _, err := toml.Decode(string(data), &doc); err != nil {
-			return fmt.Errorf("parsing TOML file %s: %w", filePath, err)
-		}
-
-		// Extract rules section
-		rulesSection, ok := doc["rules"]
-		if !ok {
-			continue // File has no rules section
-		}
-
-		for ruleID := range rulesSection {
-			// For Phase A1, accept that full TOML unmarshaling to RuleDefinition
-			// requires reflection. We validate that rule_id is present and non-empty.
-			// Phase A2 will enhance this with full pattern matching.
-
-			rule := &Rule{
-				ID: ruleID,
-			}
-
-			// Validate rule_id is set
-			if rule.ID == "" {
-				return fmt.Errorf("rule in file %s has empty rule_id", filePath)
-			}
-
-			pm.rules[rule.ID] = rule
+		if err := pm.loadEntry(rulesFS, basePath, entry); err != nil {
+			return err
 		}
 	}
+	return nil
+}
 
+func (pm *PatternMatcher) loadEntry(rulesFS fs.FS, basePath string, entry fs.DirEntry) error {
+	if entry.IsDir() {
+		return pm.LoadRules(rulesFS, basePath+"/"+entry.Name())
+	}
+	if !strings.HasSuffix(entry.Name(), ".toml") {
+		return nil
+	}
+	filePath := basePath + "/" + entry.Name()
+	data, err := fs.ReadFile(rulesFS, filePath)
+	if err != nil {
+		return fmt.Errorf("reading TOML file %s: %w", filePath, err)
+	}
+	var doc map[string]map[string]interface{}
+	if _, err := toml.Decode(string(data), &doc); err != nil {
+		return fmt.Errorf("parsing TOML file %s: %w", filePath, err)
+	}
+	rulesSection, ok := doc["rules"]
+	if !ok {
+		return nil
+	}
+	for ruleID := range rulesSection {
+		rule := &Rule{ID: ruleID}
+		if rule.ID == "" {
+			return fmt.Errorf("rule in file %s has empty rule_id", filePath)
+		}
+		pm.rules[rule.ID] = rule
+	}
 	return nil
 }
 
@@ -176,20 +160,27 @@ func (pm *PatternMatcher) Match(src, file string, lang analysis.Language) ([]Pat
 	var findings []PatternFinding
 	for ruleID, rule := range pm.rules {
 		if rule.IsLanguageSupported(lang) {
-			findings = append(findings, pm.matchRule(ruleID, rule, lines, file)...)
+			findings = append(findings, pm.matchRule(ruleMatchParams{ruleID: ruleID, rule: rule, lines: lines, file: file})...)
 		}
 	}
 	return findings, nil
 }
 
-func (pm *PatternMatcher) matchRule(ruleID string, rule *Rule, lines []string, file string) []PatternFinding {
+type ruleMatchParams struct {
+	ruleID string
+	rule   *Rule
+	lines  []string
+	file   string
+}
+
+func (pm *PatternMatcher) matchRule(r ruleMatchParams) []PatternFinding {
 	var out []PatternFinding
-	for _, pattern := range rule.Patterns {
-		for lineNum, line := range lines {
-			if pm.matchPatternType(&pattern, line, lines, lineNum) {
+		for _, pattern := range r.rule.Patterns {
+		for lineNum, line := range r.lines {
+			if pm.matchPatternType(matchCtx{pattern: &pattern, line: line, lines: r.lines, lineNum: lineNum}) {
 				out = append(out, PatternFinding{
-					Rule: ruleID, Pillar: rule.Pillar, Severity: rule.Severity,
-					Line: lineNum + 1, File: file, Message: pattern.Message, Remediation: rule.Remediation,
+					Rule: r.ruleID, Pillar: r.rule.Pillar, Severity: r.rule.Severity,
+					Line: lineNum + 1, File: r.file, Message: pattern.Message, Remediation: r.rule.Remediation,
 				})
 			}
 		}
@@ -219,9 +210,9 @@ var patternMatchers = map[string]patternMatcherFunc{
 	"semantic":           func(pm *PatternMatcher, c matchCtx) bool { return pm.matchSemantic(c.pattern, c.lines, c.lineNum) },
 }
 
-func (pm *PatternMatcher) matchPatternType(pattern *Pattern, line string, lines []string, lineNum int) bool {
-	if fn, ok := patternMatchers[pattern.Type]; ok {
-		return fn(pm, matchCtx{pattern: pattern, line: line, lines: lines, lineNum: lineNum})
+func (pm *PatternMatcher) matchPatternType(arg matchCtx) bool {
+	if fn, ok := patternMatchers[arg.pattern.Type]; ok {
+		return fn(pm, arg)
 	}
 	return false
 }
@@ -424,49 +415,40 @@ func (pm *PatternMatcher) matchMultiLine(pattern *Pattern, lines []string, lineN
 	if pattern.Lines == 0 || len(pattern.PatternSequence) == 0 {
 		return false
 	}
-
-	// Check if current line matches first pattern
 	if lineNum >= len(lines) {
 		return false
 	}
-
-	currentLine := lines[lineNum]
 	re0, err := regexp.Compile(pattern.PatternSequence[0])
 	if err != nil {
-		return false // Invalid regex
-	}
-
-	if !re0.MatchString(currentLine) {
 		return false
 	}
-
-	// If only one pattern, we're done
+	if !re0.MatchString(lines[lineNum]) {
+		return false
+	}
 	if len(pattern.PatternSequence) == 1 {
 		return true
 	}
+	return pm.matchSequenceLookahead(pattern, lines, lineNum)
+}
 
-	// Now look ahead for remaining patterns
+func (pm *PatternMatcher) matchSequenceLookahead(pattern *Pattern, lines []string, lineNum int) bool {
 	patIdx := 1
 	maxLines := pattern.Lines
 	if lineNum+maxLines >= len(lines) {
 		maxLines = len(lines) - lineNum - 1
 	}
-
 	for i := 1; i <= maxLines && patIdx < len(pattern.PatternSequence); i++ {
 		if lineNum+i >= len(lines) {
 			break
 		}
-		nextLine := lines[lineNum+i]
 		re, err := regexp.Compile(pattern.PatternSequence[patIdx])
 		if err != nil {
-			continue // Skip invalid patterns
+			continue
 		}
-		if re.MatchString(nextLine) {
+		if re.MatchString(lines[lineNum+i]) {
 			patIdx++
 		}
 	}
-
-	// All patterns matched in sequence
 	return patIdx == len(pattern.PatternSequence)
 }
 

@@ -21,38 +21,40 @@ func (w *fileWalker) checkDatabaseNPlusOne(lines []string) {
 	if isTestFile(w.file) {
 		return
 	}
-	// Check for loop-level database queries: a loop with a query inside
 	for i, line := range lines {
-		if !strings.Contains(line, "for ") {
+		if !isForLoopLine(line) {
 			continue
 		}
-		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "//") {
-			continue
-		}
-		// Look ahead for a query in the next 5 lines
-		found := false
-		for j := i + 1; j < len(lines) && j < i+5; j++ {
-			nextLine := strings.TrimSpace(lines[j])
-			if strings.HasPrefix(nextLine, "//") {
-				continue
-			}
-			if w.hasQueryPattern(nextLine) {
-				found = true
-				break
-			}
-		}
-		if found {
+		if w.lookaheadHasQuery(lines, i) {
 			w.emitFinding(analysis.Finding{
-				Rule:        "performance.database_query_n_plus_one",
-				Pillar:      "performance",
-				Severity:    analysis.SeverityMajor,
-				Line:        i + 1,
-				Message:     "Database query inside loop — N+1 query pattern (one query per iteration)",
+				Rule: "performance.database_query_n_plus_one", Pillar: "performance",
+				Severity: analysis.SeverityMajor, Line: i + 1,
+				Message: "Database query inside loop — N+1 query pattern (one query per iteration)",
 				Remediation: "Batch queries or use JOINs to fetch all records at once, reducing database round trips",
 			})
 		}
 	}
+}
+
+func isForLoopLine(line string) bool {
+	if !strings.Contains(line, "for ") {
+		return false
+	}
+	trimmed := strings.TrimSpace(line)
+	return !strings.HasPrefix(trimmed, "//")
+}
+
+func (w *fileWalker) lookaheadHasQuery(lines []string, start int) bool {
+	for j := start + 1; j < len(lines) && j < start+5; j++ {
+		nextLine := strings.TrimSpace(lines[j])
+		if strings.HasPrefix(nextLine, "//") {
+			continue
+		}
+		if w.hasQueryPattern(nextLine) {
+			return true
+		}
+	}
+	return false
 }
 
 func (w *fileWalker) hasQueryPattern(line string) bool {
