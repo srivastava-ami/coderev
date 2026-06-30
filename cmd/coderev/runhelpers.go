@@ -164,26 +164,35 @@ func postAnnotate(r report.Report, target string) error {
 	return nil
 }
 
-func postReviewToPR(target string, tc analysis.ToolConfig, repoSlug string, prNumber int) {
-	body, err := os.ReadFile(filepath.Join(target, ".coderev", "review.md"))
+type prReviewReq struct {
+	target   string
+	tc       analysis.ToolConfig
+	repoSlug string
+	prNumber int
+}
+
+func postReviewToPR(req prReviewReq) {
+	body, err := os.ReadFile(filepath.Join(req.target, ".coderev", "review.md"))
 	if err != nil {
 		return
 	}
+	repoSlug := req.repoSlug
 	if repoSlug == "" {
-		repoSlug, err = ghpr.RepoSlug(target)
+		repoSlug, err = ghpr.RepoSlug(req.target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: detecting repo: %v\n", err)
 			return
 		}
 	}
+	prNumber := req.prNumber
 	if prNumber == 0 {
-		prNumber, err = ghpr.OpenPR(target)
+		prNumber, err = ghpr.OpenPR(req.target)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: detecting PR: %v\n", err)
 			return
 		}
 	}
-	if err := ghpr.PostInlineComment(repoSlug, prNumber, target, string(body)); err != nil {
+	if err := ghpr.PostInlineComment(repoSlug, prNumber, req.target, string(body)); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: posting AI review inline to PR: %v\n", err)
 		return
 	}
