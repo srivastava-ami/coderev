@@ -294,8 +294,7 @@ func (w *fileWalker) checkGoContextPropagation(line string, lineNum int) {
 	}
 }
 
-// checkGoChannelSafety detects unsafe channel patterns: close on receiving end, send without buffer.
-// Pattern: close( on a parameter, or chan var := make(chan T, 0).
+// checkGoChannelSafety detects unsafe channel patterns: close on receiving end or unbuffered channels.
 func (w *fileWalker) checkGoChannelSafety(line string, lineNum int) {
 	trimmed, skip := w.goGuard(line)
 	if skip {
@@ -524,8 +523,7 @@ func (w *fileWalker) checkGoFileDescriptorLeak(line string, lineNum int) {
 	}
 }
 
-// checkGoPoolExhaustion detects unbounded resource creation without limits.
-// Pattern: for {...} { conn := pool.Get() ... } or goroutine creation in loop without limit.
+// checkGoPoolExhaustion detects unbounded resource creation without limits in loops.
 func (w *fileWalker) checkGoPoolExhaustion(line string, lineNum int) {
 	trimmed, skip := w.goGuard(line)
 	if skip {
