@@ -19,8 +19,20 @@ func (w *fileWalker) checkPatterns() {
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
+		// Python Phase 1 chunk 2 (Exception Handling, Import Organization, Memory/Resources)
+		w.checkPythonConventionBareExcept, w.checkPythonConventionExceptionSwallowing,
+		w.checkPythonConventionExceptionChaining, w.checkPythonConventionFinallySideEffects,
+		w.checkPythonConventionCircularImport, w.checkPythonConventionImportOrder,
+		w.checkPythonConventionUnusedImport,
+		w.checkPythonConventionResourceLeak, w.checkPythonConventionUnboundedGrowth,
 		w.checkRustUnwrap, w.checkRustPanic, w.checkRustExpect, w.checkRustUnsafe,
 		w.checkRustTransmute, w.checkRustCloneOnCopy, w.checkRustTodo, w.checkRustDbgMacro,
+		// Node.js convention checks (13 rules)
+		w.checkStreamNotPiped, w.checkBackpressureIgnored, w.checkStreamErrorUnhandled,
+		w.checkStreamLeak, w.checkEventListenerLeak, w.checkOnceVsOn,
+		w.checkErrorEventUnhandled, w.checkPromiseSwallowing, w.checkAsyncIteratorIncomplete,
+		w.checkConcurrentOperationsUnbounded, w.checkMemoryLeakTimers,
+		w.checkUnboundedBuffer, w.checkCpuBlocking,
 	}
 	for i, line := range lines {
 		for _, check := range checks {
@@ -32,6 +44,7 @@ func (w *fileWalker) checkPatterns() {
 	w.checkGoIOCopyNoLimit(lines)
 	w.checkSecretFallbackInEnv(lines)
 	w.checkInjectionPatterns(lines)
+	w.checkTerraformConventions(lines)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {
