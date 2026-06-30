@@ -1,0 +1,104 @@
+# Phase 2: Maintainability Rules
+# 4 maintainability patterns: function complexity, coupling, cohesion, secret hardcoding
+
+[rules.maintainability_function_parameter_count]
+rule = "maintainability.function_parameter_count"
+severity = "advisory"
+pillar = "maintainability"
+cwe = "CWE-701"
+description = "Functions with > 5 parameters are hard to understand, test, and maintain. Use parameter objects."
+remediation = "Refactor: create a parameter object (Config, Options) or use builder pattern. Group related params."
+reference_url = "https://refactoring.com/catalog/introducParameterObject.html"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+standards = ["CWE-701"]
+
+[[rules.maintainability_function_parameter_count.patterns]]
+type = "function_def"
+params_count_gt = 5
+confidence = "high"
+message = "Function has {count} parameters (> 5) — difficult to use and test; consider parameter object or builder"
+
+[[rules.maintainability_function_parameter_count.patterns]]
+type = "string_match"
+pattern = "(function|def|func)\\s+\\w+\\s*\\([^)]{100,}"
+confidence = "medium"
+message = "Long parameter list (100+ characters) — use parameter object: function doSomething(config: Config)"
+
+[rules.maintainability_coupling_high]
+rule = "maintainability.coupling_high"
+severity = "advisory"
+pillar = "maintainability"
+cwe = "CWE-1126"
+description = "High coupling (many dependencies) makes code brittle and hard to test. Use interfaces and DI."
+remediation = "Use dependency injection: pass dependencies as constructor args or interface parameters. Depend on abstractions."
+reference_url = "https://en.wikipedia.org/wiki/Coupling_(computer_programming)"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+standards = ["CWE-1126"]
+
+[[rules.maintainability_coupling_high.patterns]]
+type = "negative"
+function_calls = ["import", "require", "from"]
+missing = "dependency_injection|interface|abstract|facade"
+confidence = "low"
+message = "Module imports many dependencies (high coupling) — consider dependency injection or facade pattern"
+
+[[rules.maintainability_coupling_high.patterns]]
+type = "string_match"
+pattern = "import.*Impl|require.*impl|from.*implementation"
+confidence = "high"
+message = "Importing implementation directly instead of interface — increases coupling; import interface instead"
+
+[rules.maintainability_cohesion_low]
+rule = "maintainability.cohesion_low"
+severity = "advisory"
+pillar = "maintainability"
+cwe = "CWE-1126"
+description = "Low cohesion (class does many unrelated things) is hard to understand and modify. Split by responsibility."
+remediation = "Apply Single Responsibility Principle: split class into focused classes. One class = one reason to change."
+reference_url = "https://en.wikipedia.org/wiki/Cohesion_(computer_science)"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+standards = ["CWE-1126"]
+
+[[rules.maintainability_cohesion_low.patterns]]
+type = "string_match"
+pattern = "(class|interface)\\s+\\w+\\s*\\{.*method.*[Ii]nit.*method.*[Pp]arse.*method.*[Ss]end"
+confidence = "medium"
+message = "Class has unrelated methods ([Init], [Parse], [Send]) — low cohesion; split into single-responsibility classes"
+
+[[rules.maintainability_cohesion_low.patterns]]
+type = "negative"
+function_calls = ["this\\.", "self\\.", "self:", "@"]
+missing = "constructor|__init__|init|setUp"
+confidence = "low"
+message = "Shared mutable state without clear initialization — low cohesion; unclear data flow"
+
+[rules.maintainability_secret_hardcoding]
+rule = "maintainability.secret_hardcoding"
+severity = "blocker"
+pillar = "maintainability"
+cwe = "CWE-798"
+description = "Hardcoded secrets in code are exposed in version control, logs, and binary distribution."
+remediation = "Move to environment variables: const secret = process.env.API_KEY. Use secrets manager (Vault, AWS Secrets, etc.) for production."
+reference_url = "https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+standards = ["CWE-798"]
+
+[[rules.maintainability_secret_hardcoding.patterns]]
+type = "string_match"
+pattern = "(password|secret|token|api_key|apiKey|private_key|privateKey|access_token|refreshToken|jwt_secret|db_password)\\s*=\\s*[\"']"
+exclude = ["test", "mock", "stub", "example", "demo"]
+confidence = "high"
+message = "Hardcoded secret detected ({name} = \"...\") — move to environment variable or secrets manager"
+
+[[rules.maintainability_secret_hardcoding.patterns]]
+type = "variable_assignment"
+assigns_to = ["password", "secret", "token", "api_key", "privateKey", "accessToken", "dbPassword"]
+excludes_env = true
+confidence = "high"
+message = "Variable '{name}' assigned literal value (not from env) — must use environment variable or secrets vault"
+
+[[rules.maintainability_secret_hardcoding.patterns]]
+type = "string_match"
+pattern = "(Basic |Bearer |apiKey:|password:)\\s*[\"'][^\"']*[\"']"
+confidence = "high"
+message = "Credential literal in code — use environment variables; never commit secrets"

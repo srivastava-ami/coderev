@@ -1,0 +1,122 @@
+# Phase 2: OWASP Top 10 Security Rules
+# 5 cross-language security rules covering critical OWASP A01–A05 vulnerabilities
+
+[rules.security_owasp_a01_injection]
+rule = "security.owasp_a01_injection"
+severity = "blocker"
+pillar = "security"
+cwe = "CWE-89"
+owasp = "A01:2021"
+description = "Injection flaws when user input is concatenated into queries/commands without validation. Includes SQL injection, command injection, and other code-execution vulnerabilities."
+remediation = "Use parameterized queries (prepared statements) for SQL. Input validation and sanitization for command execution. Never concatenate user input directly into executable strings."
+standards = ["OWASP:A01:2021", "CWE-89", "CWE-77"]
+reference_url = "https://owasp.org/www-community/attacks/SQL_Injection"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.security_owasp_a01_injection.patterns]]
+type = "string_match"
+pattern = "SELECT.*\\+.*WHERE|INSERT.*\\+|UPDATE.*\\+"
+confidence = "high"
+message = "SQL injection via string concatenation — use parameterized queries"
+
+[[rules.security_owasp_a01_injection.patterns]]
+type = "method_call"
+method = "eval|exec|execute"
+confidence = "high"
+message = "Dynamic code execution — sanitize and validate inputs"
+
+[rules.security_owasp_a02_auth]
+rule = "security.owasp_a02_auth"
+severity = "blocker"
+pillar = "security"
+cwe = "CWE-287"
+owasp = "A02:2021"
+description = "Missing or weak authentication validation. Endpoints or sensitive functions without explicit authentication/authorization checks can be accessed by unauthorized users."
+remediation = "Add explicit authentication/authorization checks. Use framework auth middleware, guard clauses, or decorator patterns. Verify token/session validity before handling sensitive data."
+standards = ["OWASP:A02:2021", "CWE-287"]
+reference_url = "https://owasp.org/www-community/attacks/Authentication_Cheat_Sheet"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.security_owasp_a02_auth.patterns]]
+type = "negative"
+function_calls = ["authenticate", "login", "authorize", "checkPermission"]
+missing = "if.*auth|authorize|isAuthenticated"
+confidence = "high"
+message = "Authentication/authorization check missing — request may bypass auth"
+
+[rules.security_owasp_a03_xxe]
+rule = "security.owasp_a03_xxe"
+severity = "blocker"
+pillar = "security"
+cwe = "CWE-611"
+owasp = "A03:2021"
+description = "XXE (XML External Entity) vulnerabilities from unsafe XML parsing. When external entities or DTD processing is enabled, attackers can read sensitive files or cause denial-of-service."
+remediation = "Disable external entities: xml.parse({resolveExternalEntities: false}), disable DTD processing, or use DOM parsers configured to reject external entities. Configure the XML parser to reject external URIs."
+standards = ["OWASP:A03:2021", "CWE-611"]
+reference_url = "https://owasp.org/www-community/attacks/XML_External_Entity"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.security_owasp_a03_xxe.patterns]]
+type = "method_call"
+method = "parse|parseXML|loadXML|XMLParser|xml.Parse"
+args_contains = ["external", "entity", "dtd"]
+confidence = "high"
+message = "XXE vulnerability — XML parsing with DTD/external entities enabled"
+
+[[rules.security_owasp_a03_xxe.patterns]]
+type = "negative"
+function_calls = ["XMLParser", "xml.Parse", "loadXML"]
+missing = "XXE_DISABLED|setFeature.*false|resolveExternalEntities.*false"
+confidence = "high"
+message = "XML parsing without XXE prevention configured"
+
+[rules.security_owasp_a05_broken_access]
+rule = "security.owasp_a05_broken_access"
+severity = "blocker"
+pillar = "security"
+cwe = "CWE-639"
+owasp = "A05:2021"
+description = "Broken access control allowing unauthorized resource access. Missing authorization checks before accessing user data, files, or admin functions can lead to privilege escalation."
+remediation = "Check user permissions before allowing access. Implement role-based access control (RBAC) or attribute-based access control (ABAC). Use middleware or guard clauses. Avoid hardcoding admin checks."
+standards = ["OWASP:A05:2021", "CWE-639"]
+reference_url = "https://owasp.org/www-community/attacks/Broken_Access_Control"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.security_owasp_a05_broken_access.patterns]]
+type = "negative"
+function_calls = ["getResource", "getUser", "getData", "fetch.*by.*id"]
+missing = "checkAccess|authorize|permission|role.*check|isOwner"
+confidence = "high"
+message = "Resource access without authorization check — may allow privilege escalation"
+
+[[rules.security_owasp_a05_broken_access.patterns]]
+type = "string_match"
+pattern = "if.*admin.*==.*true|role.*==.*\"admin\"|isAdmin.*=.*true"
+confidence = "high"
+message = "Hardcoded admin check — use role-based access control (RBAC)"
+
+[rules.compliance_pci_dss_encryption]
+rule = "compliance.pci_dss_encryption"
+severity = "blocker"
+pillar = "security"
+cwe = "CWE-295"
+framework = "PCI-DSS"
+description = "Missing encryption or certificate validation for data in transit. PCI-DSS Requirement 4.1 mandates that all cardholder data must be encrypted in transit using TLS 1.2 or higher."
+remediation = "Use HTTPS with valid certificates. Enable certificate validation in TLS clients. Enforce HSTS headers. Avoid mixed content. Use TLS 1.2 or higher."
+standards = ["PCI-DSS:3.2.1", "CWE-295"]
+reference_url = "https://www.pcisecuritystandards.org/documents/PCI_DSS_v3-2-1.pdf"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.compliance_pci_dss_encryption.patterns]]
+type = "string_match"
+pattern = "http://"
+exclude = ["localhost", "127.0.0.1", "test", "mock", "example.com"]
+confidence = "high"
+message = "Unencrypted HTTP URL detected — PCI-DSS requires HTTPS/TLS"
+
+[[rules.compliance_pci_dss_encryption.patterns]]
+type = "negative"
+function_calls = ["https.request", "https.get", "fetch.*https"]
+missing = "certificate|ca:|rejectUnauthorized.*false|verify"
+confidence = "high"
+message = "HTTPS request without certificate validation — may allow MITM attacks"

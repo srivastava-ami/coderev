@@ -1,0 +1,92 @@
+# Phase 2: HIPAA, SOC2, and Data Classification Compliance Rules
+# 3 cross-language compliance rules covering healthcare, access control, and data sensitivity
+
+[rules.compliance_hipaa_audit_logging]
+rule = "compliance.hipaa_audit_logging"
+severity = "blocker"
+pillar = "compliance"
+framework = "HIPAA"
+cwe = "CWE-778"
+description = "HIPAA requires audit logging of all PHI (Protected Health Information) access and modifications. Sensitive health data operations must be logged with timestamp, user ID, action, and result for audit trail compliance."
+remediation = "Add audit logging to all PHI operations: log access timestamp, user/system ID, action type, resource identifier, and access result. Use structured logging (JSON format). Ensure logs are tamper-proof and retained for 6+ years."
+standards = ["HIPAA:164.312(b)", "CWE-778"]
+reference_url = "https://www.hhs.gov/hipaa/for-professionals/security/laws-regulations/"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.compliance_hipaa_audit_logging.patterns]]
+type = "negative"
+function_calls = ["readPatientData", "updateHealthRecord", "getPharmacy", "deleteMedicalRecord", "accessPHI"]
+missing = "audit|log.*event|recordAudit|logAccess|audit.*log"
+confidence = "high"
+message = "Sensitive health data access without audit logging — HIPAA requires logging all PHI access with timestamp, user ID, and action"
+
+[[rules.compliance_hipaa_audit_logging.patterns]]
+type = "negative"
+function_calls = ["app.post", "app.put", "app.delete", "router.post", "router.delete"]
+missing = "logger|audit|log\\(|console\\.log"
+confidence = "high"
+message = "API endpoint without request/response logging — HIPAA audit trail required for all data modifications"
+
+[rules.compliance_soc2_access_control]
+rule = "compliance.soc2_access_control"
+severity = "blocker"
+pillar = "compliance"
+framework = "SOC2"
+cwe = "CWE-276"
+description = "SOC2 Type II requires logical access controls: role-based access control (RBAC), least privilege principle, and logging of access denials. Resources must be protected from unauthorized access through granular permission checks."
+remediation = "Implement RBAC: (1) define roles in config/database; (2) check user role before resource access; (3) log all access denials with user, resource, action, and timestamp; (4) audit role assignments; (5) enforce least privilege — deny by default."
+standards = ["SOC2:CC6", "CWE-276"]
+reference_url = "https://www.aicpa.org/soc"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.compliance_soc2_access_control.patterns]]
+type = "negative"
+function_calls = ["getResource", "updateData", "deleteRecord", "accessConfig"]
+missing = "checkRole|hasPermission|authorize|rbac|role.*==|permission.*includes"
+confidence = "high"
+message = "Resource access without RBAC check — SOC2 requires role-based access control before sensitive operations"
+
+[[rules.compliance_soc2_access_control.patterns]]
+type = "string_match"
+pattern = "role.*==.*\"admin\"|permission.*==.*\"root\"|isAdmin.*true"
+confidence = "high"
+message = "Hardcoded role/permission logic detected — should be data-driven from config or database, not hardcoded strings"
+
+[[rules.compliance_soc2_access_control.patterns]]
+type = "negative"
+function_calls = ["authenticate", "authorize", "checkAccess"]
+missing = "logDenied|auditDeny|logFailure|logUnauthorized"
+confidence = "high"
+message = "Failed access attempt not logged — SOC2 requires audit logging of all access denials for access control verification"
+
+[rules.compliance_data_classification]
+rule = "compliance.data_classification"
+severity = "major"
+pillar = "compliance"
+framework = "ISO27001"
+cwe = "CWE-200"
+description = "Data must be classified (Public, Internal, Confidential, Restricted) according to sensitivity. ISO 27001 and GDPR require that sensitive data handling is intentional and documented, with appropriate storage and access controls."
+remediation = "Add classification comment above sensitive data: // CLASSIFIED: <PII|CONFIDENTIAL|RESTRICTED>. Store PII encrypted at rest. Audit all access. Document data flow and retention policy."
+standards = ["ISO27001:A.8.2.1", "GDPR:Article32", "CWE-200"]
+reference_url = "https://www.iso.org/standard/54534.html"
+languages = ["go", "python", "rust", "javascript", "typescript", "nodejs", "terraform"]
+
+[[rules.compliance_data_classification.patterns]]
+type = "string_match"
+pattern = "(password|secret|token|api_key|credit_card|ssn|email|phone_number).*="
+exclude = ["test", "mock", "stub", "example"]
+confidence = "high"
+message = "Sensitive data variable assignment without classification comment — add: // CLASSIFIED: <PII|CONFIDENTIAL> above the assignment"
+
+[[rules.compliance_data_classification.patterns]]
+type = "negative"
+function_calls = ["saveToDatabase", "sendToExternal", "cacheData", "logData", "exportData"]
+missing = "CLASSIFIED|classification|dataCategory|sensitivity|pii"
+confidence = "medium"
+message = "Data operation without classification context — data sensitivity level unclear; add classification check or comment"
+
+[[rules.compliance_data_classification.patterns]]
+type = "string_match"
+pattern = "(email|phone|ssn|passport|credit_card|license).*storage|database|cache"
+confidence = "high"
+message = "PII stored without encryption mention — use encrypted storage for personal data; verify encryption at rest is configured"
