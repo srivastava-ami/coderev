@@ -15,60 +15,77 @@ batch_size = 1000
 [graph]
 output_dir = ".coderev/graph"
 
+# ── NATIVE TOOLS (built-in, always available; zero external dependencies) ────
+# These adapters are written in pure Go and ship with the binary.
+# They always work — no installation required. Use these for your quality gate.
+
 [adapters.treesitter]
 enabled = true
+description = "Built-in: AST parsing via tree-sitter library"
 rules = [
   "complexity.*", "file_structure.*", "type_safety.*", "hardcoding.*",
   "documentation.*", "observability.logging", "stability.error_handling",
   "security.secret_fallback_literal",
 ]
 
-# ── Native (pure-Go) adapters — zero-dependency defaults ──────────────────────
 [adapters.depcve]
 enabled      = true
+description  = "Built-in: Offline CVE matching via cached OSV snapshot"
 snapshot_url = ""
 rules        = ["security.dependencies"]
 
 [adapters.secrets]
-enabled = true
-rules = ["security.secrets"]
+enabled     = true
+description = "Built-in: Pattern + entropy-based secret scanning"
+rules       = ["security.secrets"]
 
 [adapters.imports]
-enabled = true
-rules = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+enabled     = true
+description = "Built-in: Circular dependency detection (Tarjan SCC)"
+rules       = ["file_structure.circular_deps", "nx_conventions.boundaries"]
 
-# ── External tools — optional enrichment (off by default) ─────────────────────
+# ── EXTERNAL TOOLS (optional subprocess wrappers; graceful skip if binary missing) ──
+# These adapters invoke external binaries. They are OFF by default.
+# If a binary is not found, the adapter is skipped; core analysis continues.
+# Enable only if you want deeper coverage or different tools for specific languages.
+
 [adapters.semgrep]
 enabled      = false
 binary       = "semgrep"
+description  = "External: Wider AST pattern rules. OPTIONAL — enrichment only. Requires: `semgrep` binary"
 rules        = ["security.injection.*", "security.auth.*", "security.cryptography"]
 download_url = "https://github.com/semgrep/semgrep/releases/download/v%s/semgrep-v%s-ubuntu-16.04.tgz"
 
 [adapters.gitleaks]
 enabled      = false
 binary       = "gitleaks"
+description  = "External: Git history secret scan. OPTIONAL — native/secrets replaces it. Requires: `gitleaks` binary"
 rules        = ["security.secrets"]
 download_url = "https://github.com/gitleaks/gitleaks/releases/download/v%s/gitleaks_%s_%s_%s.tar.gz"
 
 [adapters.madge]
-enabled = false
-binary  = "madge"
-rules   = ["file_structure.circular_deps", "nx_conventions.boundaries"]
+enabled     = false
+binary      = "madge"
+description = "External: Node.js dependency graph. OPTIONAL — native/imports replaces it for Go/TS. Requires: `madge` binary (npm)"
+rules       = ["file_structure.circular_deps", "nx_conventions.boundaries"]
 
 [adapters.npmaudit]
-enabled = true
-binary  = "npm"
-rules   = ["security.dependencies"]
+enabled     = true
+binary      = "npm"
+description = "External: npm package audit. DEPRECATED — native/depcve replaces it. Requires: `npm` CLI"
+rules       = ["security.dependencies"]
 
 [adapters.graphanalyze]
-enabled      = false
-fan_in_max   = 20
-fan_out_max  = 20
-rules        = ["architecture.coupling", "architecture.hotspot"]
+enabled     = false
+description = "External: Architecture coupling & hotspot analysis. OPTIONAL. No binary required (embedded)"
+fan_in_max  = 20
+fan_out_max = 20
+rules       = ["architecture.coupling", "architecture.hotspot"]
 
 [adapters.coverage]
-enabled   = true
-threshold = 80.0
+enabled     = true
+description = "Optional: Code coverage threshold checking. No binary required (embedded)"
+threshold   = 80.0
 
 # ── GitHub API ──────────────────────────────────────────────────────────────────
 # Base URL for the GitHub REST API. Can be overridden for GHES or testing.

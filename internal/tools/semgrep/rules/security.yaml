@@ -1,0 +1,10 @@
+rules:
+  - id: security.secret_fallback_literal
+    message: >-
+      Hardcoded fallback literal for a value destructured from process.env.
+      Secrets and configuration must come from the environment, not a literal
+      default — a baked-in default can leak secrets or mask missing config.
+    languages: [javascript, typescript]
+    severity: ERROR
+    patterns:
+      - pattern: const { ..., $KEY = "...", ... } = process.env
