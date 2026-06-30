@@ -5,8 +5,8 @@ import (
 
 	sitter "github.com/smacker/go-tree-sitter"
 
-	"github.com/srivastava-ami/coderev/internal/adapters/imports"
-	"github.com/srivastava-ami/coderev/internal/adapters/treesitter"
+	"github.com/srivastava-ami/coderev/internal/tools/imports"
+	"github.com/srivastava-ami/coderev/internal/tools/treesitter"
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 

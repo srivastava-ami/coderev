@@ -241,7 +241,7 @@ func nxsLayer(importPath string) string {
 		return "orchestration"
 	case matchesAny(importPath, "internal/config", "internal/quality"):
 		return "governance"
-	case matchesAny(importPath, "internal/adapters", "internal/baseline",
+	case matchesAny(importPath, "internal/tools", "internal/baseline",
 		"internal/toolmgr", "internal/plugin", "internal/github", "internal/llm"):
 		return "persistence"
 	case matchesAny(importPath, "internal/report", "internal/output"):
