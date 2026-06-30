@@ -168,120 +168,114 @@ func (pm *PatternMatcher) compilePattern(pattern string) error {
 }
 
 // Match evaluates all patterns against the source code and returns findings.
-// It processes line-by-line and applies each of the 5 simple pattern matchers.
 func (pm *PatternMatcher) Match(src, file string, lang analysis.Language) ([]PatternFinding, error) {
 	if pm == nil || len(pm.rules) == 0 {
-		return nil, nil // No rules loaded; no findings.
+		return nil, nil
 	}
-
 	lines := strings.Split(src, "\n")
 	var findings []PatternFinding
-
 	for ruleID, rule := range pm.rules {
-		if !rule.IsLanguageSupported(lang) {
-			continue
-		}
-
-		for _, pattern := range rule.Patterns {
-			for lineNum, line := range lines {
-				if pm.matchPatternType(&pattern, line, lines, lineNum) {
-					findings = append(findings, PatternFinding{
-						Rule:        ruleID,
-						Pillar:      rule.Pillar,
-						Severity:    rule.Severity,
-						Line:        lineNum + 1,
-						File:        file,
-						Message:     pattern.Message,
-						Remediation: rule.Remediation,
-					})
-				}
-			}
+		if rule.IsLanguageSupported(lang) {
+			findings = append(findings, pm.matchRule(ruleID, rule, lines, file)...)
 		}
 	}
-
 	return findings, nil
 }
 
-// matchPatternType dispatches to the appropriate matcher based on pattern type.
-func (pm *PatternMatcher) matchPatternType(pattern *Pattern, line string, lines []string, lineNum int) bool {
-	switch pattern.Type {
-	case "string_match":
-		return pm.matchStringMatch(pattern, line)
-	case "method_call":
-		return pm.matchMethodCall(pattern, line)
-	case "import":
-		return pm.matchImport(pattern, line)
-	case "variable_assignment":
-		return pm.matchVariableAssignment(pattern, line)
-	case "function_def":
-		return pm.matchFunctionDef(pattern, line)
-	case "loop_contains":
-		return pm.matchLoopContains(pattern, lines, lineNum)
-	case "multi_line":
-		return pm.matchMultiLine(pattern, lines, lineNum)
-	case "negative":
-		return pm.matchNegative(pattern, lines, lineNum)
-	case "metric":
-		return pm.matchMetric(pattern, lines, lineNum)
-	case "semantic":
-		return pm.matchSemantic(pattern, lines, lineNum)
-	default:
-		return false // Unknown pattern type
+func (pm *PatternMatcher) matchRule(ruleID string, rule *Rule, lines []string, file string) []PatternFinding {
+	var out []PatternFinding
+	for _, pattern := range rule.Patterns {
+		for lineNum, line := range lines {
+			if pm.matchPatternType(&pattern, line, lines, lineNum) {
+				out = append(out, PatternFinding{
+					Rule: ruleID, Pillar: rule.Pillar, Severity: rule.Severity,
+					Line: lineNum + 1, File: file, Message: pattern.Message, Remediation: rule.Remediation,
+				})
+			}
+		}
 	}
+	return out
+}
+
+type matchCtx struct {
+	pattern *Pattern
+	line    string
+	lines   []string
+	lineNum int
+}
+
+type patternMatcherFunc func(*PatternMatcher, matchCtx) bool
+
+var patternMatchers = map[string]patternMatcherFunc{
+	"string_match":       func(pm *PatternMatcher, c matchCtx) bool { return pm.matchStringMatch(c.pattern, c.line) },
+	"method_call":        func(pm *PatternMatcher, c matchCtx) bool { return pm.matchMethodCall(c.pattern, c.line) },
+	"import":             func(pm *PatternMatcher, c matchCtx) bool { return pm.matchImport(c.pattern, c.line) },
+	"variable_assignment": func(pm *PatternMatcher, c matchCtx) bool { return pm.matchVariableAssignment(c.pattern, c.line) },
+	"function_def":       func(pm *PatternMatcher, c matchCtx) bool { return pm.matchFunctionDef(c.pattern, c.line) },
+	"loop_contains":      func(pm *PatternMatcher, c matchCtx) bool { return pm.matchLoopContains(c.pattern, c.lines, c.lineNum) },
+	"multi_line":         func(pm *PatternMatcher, c matchCtx) bool { return pm.matchMultiLine(c.pattern, c.lines, c.lineNum) },
+	"negative":           func(pm *PatternMatcher, c matchCtx) bool { return pm.matchNegative(c.pattern, c.lines, c.lineNum) },
+	"metric":             func(pm *PatternMatcher, c matchCtx) bool { return pm.matchMetric(c.pattern, c.lines, c.lineNum) },
+	"semantic":           func(pm *PatternMatcher, c matchCtx) bool { return pm.matchSemantic(c.pattern, c.lines, c.lineNum) },
+}
+
+func (pm *PatternMatcher) matchPatternType(pattern *Pattern, line string, lines []string, lineNum int) bool {
+	if fn, ok := patternMatchers[pattern.Type]; ok {
+		return fn(pm, matchCtx{pattern: pattern, line: line, lines: lines, lineNum: lineNum})
+	}
+	return false
 }
 
 // matchStringMatch checks for regex or literal substring matches, respecting exclusions.
 func (pm *PatternMatcher) matchStringMatch(pattern *Pattern, line string) bool {
-	// Check exclusions first
-	for _, exc := range pattern.Exclude {
+	if pm.hasExclusion(line, pattern.Exclude) {
+		return false
+	}
+	re := pm.getOrCompile(pattern.Pattern)
+	if re != nil {
+		return re.MatchString(line)
+	}
+	return strings.Contains(line, pattern.Pattern)
+}
+
+func (pm *PatternMatcher) hasExclusion(line string, excludes []string) bool {
+	for _, exc := range excludes {
 		if strings.Contains(line, exc) {
-			return false
+			return true
 		}
 	}
+	return false
+}
 
-	// Try regex first
-	compiled, exists := pm.cache[pattern.Pattern]
-	if !exists {
-		// Compile and cache
-		if re, err := regexp.Compile(pattern.Pattern); err == nil {
-			pm.cache[pattern.Pattern] = re
-			compiled = re
-		} else {
-			// Fallback to literal match
-			return strings.Contains(line, pattern.Pattern)
-		}
+func (pm *PatternMatcher) getOrCompile(pattern string) *regexp.Regexp {
+	compiled, exists := pm.cache[pattern]
+	if exists {
+		return compiled
 	}
-
-	return compiled.MatchString(line)
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		return nil
+	}
+	pm.cache[pattern] = re
+	return re
 }
 
 // matchMethodCall detects method invocations (naive regex-based, not AST-aware).
 // Looks for method( patterns and checks exclusions.
 func (pm *PatternMatcher) matchMethodCall(pattern *Pattern, line string) bool {
-	// Build regex from method name if pattern not specified
-	methodPattern := pattern.Pattern
-	if methodPattern == "" {
-		methodPattern = "\\b" + regexp.QuoteMeta(pattern.Message) + "\\s*\\("
+	re := pm.methodCallRegex(pattern)
+	if re == nil || !re.MatchString(line) {
+		return false
 	}
+	return !pm.hasExclusion(line, pattern.Exclude)
+}
 
-	// Check for the method call pattern
-	methodRegex, err := regexp.Compile(methodPattern)
-	if err != nil {
-		return false // Invalid regex, no match
+func (pm *PatternMatcher) methodCallRegex(pattern *Pattern) *regexp.Regexp {
+	p := pattern.Pattern
+	if p == "" {
+		p = "\\b" + regexp.QuoteMeta(pattern.Message) + "\\s*\\("
 	}
-
-	if !methodRegex.MatchString(line) {
-		return false // Method not called
-	}
-
-	// Check exclusions: if line contains excluded method, don't match
-	for _, excluded := range pattern.Exclude {
-		if strings.Contains(line, excluded) {
-			return false
-		}
-	}
-
-	return true // Method call found
+	return pm.getOrCompile(p)
 }
 
 // matchImport detects dangerous imports (Python from X import, Go import "X", JS import X from).
@@ -381,53 +375,46 @@ func (pm *PatternMatcher) matchFunctionDef(pattern *Pattern, line string) bool {
 	return paramCount > threshold
 }
 
+func isLoopOpen(inside, trimmed, line string) bool {
+	switch inside {
+	case "for":
+		return strings.HasPrefix(trimmed, "for") && strings.Contains(line, "{")
+	case "while":
+		return strings.HasPrefix(trimmed, "while") && strings.Contains(line, "{")
+	case "foreach":
+		return strings.Contains(trimmed, "foreach") && strings.Contains(line, "{")
+	}
+	return false
+}
+
 // matchLoopContains detects keywords inside loops (memory allocation in hot paths).
 // Looks for loop opening, then checks next 10+ lines for contained keywords.
 func (pm *PatternMatcher) matchLoopContains(pattern *Pattern, lines []string, lineNum int) bool {
-	if pattern.Inside == "" || len(pattern.Contains) == 0 {
+	if pattern.Inside == "" || len(pattern.Contains) == 0 || lineNum >= len(lines) {
 		return false
 	}
-
-	line := lines[lineNum]
-	inside := strings.ToLower(pattern.Inside)
-
-	// Check if this line opens the loop type
-	trimmed := strings.TrimSpace(line)
-	loopOpensHere := false
-	switch inside {
-	case "for":
-		loopOpensHere = strings.HasPrefix(trimmed, "for") && strings.Contains(line, "{")
-	case "while":
-		loopOpensHere = strings.HasPrefix(trimmed, "while") && strings.Contains(line, "{")
-	case "foreach":
-		loopOpensHere = strings.Contains(trimmed, "foreach") && strings.Contains(line, "{")
-	default:
+	if !isLoopOpen(strings.ToLower(pattern.Inside), strings.TrimSpace(lines[lineNum]), lines[lineNum]) {
 		return false
 	}
+	return pm.lookaheadHasKeyword(pattern.Contains, lines, lineNum)
+}
 
-	if !loopOpensHere {
-		return false
+func (pm *PatternMatcher) lookaheadHasKeyword(keywords []string, lines []string, lineNum int) bool {
+	max := 10
+	if lineNum+max >= len(lines) {
+		max = len(lines) - lineNum - 1
 	}
-
-	// Look ahead up to 10 lines for contained keywords
-	lookahead := 10
-	if lineNum+lookahead >= len(lines) {
-		lookahead = len(lines) - lineNum - 1
-	}
-
-	for i := 1; i <= lookahead; i++ {
-		nextLine := lines[lineNum+i]
-		for _, keyword := range pattern.Contains {
-			if strings.Contains(nextLine, keyword) {
+	for i := 1; i <= max; i++ {
+		next := lines[lineNum+i]
+		for _, kw := range keywords {
+			if strings.Contains(next, kw) {
 				return true
 			}
 		}
-		// Stop if we hit closing brace (simple heuristic)
-		if strings.Contains(nextLine, "}") && !strings.Contains(nextLine, "{") {
+		if strings.Contains(next, "}") && !strings.Contains(next, "{") {
 			break
 		}
 	}
-
 	return false
 }
 
@@ -483,48 +470,36 @@ func (pm *PatternMatcher) matchMultiLine(pattern *Pattern, lines []string, lineN
 	return patIdx == len(pattern.PatternSequence)
 }
 
+func lineContainsAny(line string, candidates []string) bool {
+	for _, c := range candidates {
+		if strings.Contains(line, c) {
+			return true
+		}
+	}
+	return false
+}
+
+func linesContain(lines []string, start, maxLines int, target string) bool {
+	if start+maxLines >= len(lines) {
+		maxLines = len(lines) - start - 1
+	}
+	for i := 0; i <= maxLines; i++ {
+		if strings.Contains(lines[start+i], target) {
+			return true
+		}
+	}
+	return false
+}
+
 // matchNegative detects missing patterns (e.g., missing timeout on db.Query).
-// Finds function_calls, checks if missing pattern appears in next 5 lines.
 func (pm *PatternMatcher) matchNegative(pattern *Pattern, lines []string, lineNum int) bool {
-	if len(pattern.FunctionCalls) == 0 || pattern.Missing == "" {
+	if len(pattern.FunctionCalls) == 0 || pattern.Missing == "" || lineNum >= len(lines) {
 		return false
 	}
-
-	if lineNum >= len(lines) {
+	if !lineContainsAny(lines[lineNum], pattern.FunctionCalls) {
 		return false
 	}
-
-	line := lines[lineNum]
-
-	// Check if any function_call is present on this line
-	callFound := false
-	for _, call := range pattern.FunctionCalls {
-		if strings.Contains(line, call) {
-			callFound = true
-			break
-		}
-	}
-
-	if !callFound {
-		return false
-	}
-
-	// Look for missing pattern in current line + next 5 lines
-	missingFound := false
-	lookahead := 5
-	if lineNum+lookahead >= len(lines) {
-		lookahead = len(lines) - lineNum - 1
-	}
-
-	for i := 0; i <= lookahead; i++ {
-		if lineNum+i < len(lines) && strings.Contains(lines[lineNum+i], pattern.Missing) {
-			missingFound = true
-			break
-		}
-	}
-
-	// Return true if missing pattern was NOT found
-	return !missingFound
+	return !linesContain(lines, lineNum, 5, pattern.Missing)
 }
 
 // matchMetric detects quantitative violations (cyclomatic complexity, etc.).
@@ -533,112 +508,124 @@ func (pm *PatternMatcher) matchMetric(pattern *Pattern, lines []string, lineNum 
 	if pattern.Metric == "" || pattern.ThresholdGt == 0 {
 		return false
 	}
-
-	// For now, implement cyclomatic complexity heuristic
 	if pattern.Metric == "cyclomatic_complexity" {
 		return pm.countCyclomaticComplexity(lines, lineNum) > pattern.ThresholdGt
 	}
-
-	// Other metrics: stub for now
 	return false
 }
 
+type complexityStep struct {
+	prefix []string
+	substr []string
+}
+
+var complexitySteps = []complexityStep{
+	{prefix: []string{"if ", "if("}},
+	{prefix: []string{"case "}},
+	{prefix: []string{"catch ", "catch("}},
+	{prefix: []string{"for ", "for("}},
+	{prefix: []string{"while ", "while("}},
+	{substr: []string{" else if ", "}else if"}},
+}
+
 // countCyclomaticComplexity counts if/else/switch/case branches in a function block.
-// Counts from lineNum onwards, looking for a function definition and counting complexity within it.
 func (pm *PatternMatcher) countCyclomaticComplexity(lines []string, lineNum int) int {
 	if lineNum >= len(lines) {
 		return 1
 	}
+	return pm.scanFunctionComplexity(lines, lineNum, 1)
+}
 
-	complexity := 1 // Base complexity
+func (pm *PatternMatcher) scanFunctionComplexity(lines []string, start int, baseComplexity int) int {
 	braceDepth := 0
 	inFunction := false
-	startedCounting := false
+	counting := false
 
-	for i := lineNum; i < len(lines); i++ {
+	for i := start; i < len(lines); i++ {
 		line := lines[i]
-
-		// Detect function opening on or after lineNum
 		if !inFunction {
-			if strings.Contains(line, "function") || strings.Contains(line, "=>") || strings.Contains(line, "def ") {
-				inFunction = true
-			} else {
+			inFunction = pm.isFunctionDef(line)
+			if !inFunction {
 				continue
 			}
 		}
-
-		// Track braces
-		for _, ch := range line {
-			if ch == '{' {
-				braceDepth++
-				startedCounting = true
-			} else if ch == '}' {
-				braceDepth--
-				if startedCounting && braceDepth == 0 {
-					return complexity // End of function
-				}
-			}
-		}
-
-		if !startedCounting {
+		braceDepth, counting = pm.updateBraceDepth(line, braceDepth, counting)
+		if !counting {
 			continue
 		}
+		if braceDepth == 0 {
+			return baseComplexity
+		}
+		baseComplexity += pm.countComplexityOnLine(line)
+	}
+	return baseComplexity
+}
 
-		// Count complexity nodes (only within the function body)
-		trimmed := strings.TrimSpace(line)
+func (pm *PatternMatcher) isFunctionDef(line string) bool {
+	return strings.Contains(line, "function") || strings.Contains(line, "=>") || strings.Contains(line, "def ")
+}
 
-		// if statement
-		if strings.HasPrefix(trimmed, "if ") || strings.HasPrefix(trimmed, "if(") {
-			complexity++
-		}
-		// else if
-		if strings.Contains(line, " else if ") || strings.Contains(line, "}else if") {
-			complexity++
-		}
-		// switch cases
-		if strings.HasPrefix(trimmed, "case ") {
-			complexity++
-		}
-		// catch blocks
-		if strings.HasPrefix(trimmed, "catch ") || strings.Contains(line, "catch(") {
-			complexity++
-		}
-		// for and while loops
-		if strings.HasPrefix(trimmed, "for ") || strings.HasPrefix(trimmed, "for(") {
-			complexity++
-		}
-		if strings.HasPrefix(trimmed, "while ") || strings.HasPrefix(trimmed, "while(") {
-			complexity++
+func (pm *PatternMatcher) updateBraceDepth(line string, depth int, counting bool) (int, bool) {
+	for _, ch := range line {
+		if ch == '{' {
+			depth++
+			counting = true
+		} else if ch == '}' {
+			depth--
 		}
 	}
+	return depth, counting
+}
 
-	return complexity
+func (pm *PatternMatcher) countComplexityOnLine(line string) int {
+	trimmed := strings.TrimSpace(line)
+	n := 0
+	for _, s := range complexitySteps {
+		if matchesAnyPrefix(trimmed, s.prefix) || containsAny(line, s.substr) {
+			n++
+		}
+	}
+	return n
+}
+
+func matchesAnyPrefix(s string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(s, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAny(s string, substrs []string) bool {
+	for _, sub := range substrs {
+		if strings.Contains(s, sub) {
+			return true
+		}
+	}
+	return false
+}
+
+type semanticCtx struct {
+	lines   []string
+	lineNum int
+}
+
+var semanticDetectors = map[string]func(*PatternMatcher, semanticCtx) bool{
+	"go_nil_pointer_dereference":  func(pm *PatternMatcher, c semanticCtx) bool { return pm.detectGoNilDereference(c.lines, c.lineNum) },
+	"rust_unchecked_cast":         func(pm *PatternMatcher, c semanticCtx) bool { return pm.detectRustUncheckedCast(c.lines[c.lineNum]) },
+	"python_resource_leak":        func(pm *PatternMatcher, c semanticCtx) bool { return pm.detectPythonResourceLeak(c.lines, c.lineNum) },
 }
 
 // matchSemantic detects language-specific heuristics (nil dereference, unchecked cast, resource leak).
 func (pm *PatternMatcher) matchSemantic(pattern *Pattern, lines []string, lineNum int) bool {
-	if pattern.Semantic == "" || pattern.Language == "" {
+	if pattern.Semantic == "" || pattern.Language == "" || lineNum >= len(lines) {
 		return false
 	}
-
-	line := lines[lineNum]
-	lang := strings.ToLower(pattern.Language)
-
-	switch strings.ToLower(pattern.Semantic) {
-	case "nil_pointer_dereference":
-		if lang == "go" {
-			return pm.detectGoNilDereference(lines, lineNum)
-		}
-	case "unchecked_cast":
-		if lang == "rust" {
-			return pm.detectRustUncheckedCast(line)
-		}
-	case "resource_leak":
-		if lang == "python" {
-			return pm.detectPythonResourceLeak(lines, lineNum)
-		}
+	key := strings.ToLower(pattern.Language) + "_" + strings.ToLower(pattern.Semantic)
+	if fn, ok := semanticDetectors[key]; ok {
+		return fn(pm, semanticCtx{lines: lines, lineNum: lineNum})
 	}
-
 	return false
 }
 

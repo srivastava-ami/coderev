@@ -8,22 +8,19 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 )
 
-func (w *fileWalker) checkPatterns() {
-	lines := strings.Split(string(w.src), "\n")
-	checks := []func(string, int){
+var linePatternChecks = func(w *fileWalker) []func(string, int) {
+	return []func(string, int){
 		w.checkConsolLog, w.checkAnyType, w.checkEmptyCatch, w.checkHardcodedURL,
 		w.checkEval, w.checkInnerHTML, w.checkWeakCrypto, w.checkPrototypePollution,
 		w.checkThrowLiteral, w.checkNonNullAssertion, w.checkForceCast, w.checkDeepImport,
 		w.checkGoFmtPrint, w.checkGoPanicInLib, w.checkGoSQLStringConcat,
 		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
-		// Go conventions (Phase 1 - 8 rules, context_propagation disabled due to false positives)
 		w.checkGoGoroutineLeak, w.checkGoDeadlockPattern,
 		w.checkGoDeferPanic, w.checkGoUncheckedError, w.checkGoInterfaceBloat,
 		w.checkGoUnclosedBody, w.checkGoFileDescriptorLeak, w.checkGoNilSliceIteration,
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
-		// Python Phase 1 conventions (18 rules: Type Safety, Async, Exception Handling, Imports, Resources)
 		w.checkPythonConventionTypeHintsMissing, w.checkPythonConventionNoneCoercion,
 		w.checkPythonConventionDynamicAttribute, w.checkPythonConventionTypeInconsistency,
 		w.checkPythonConventionDuckTypingUnsafe, w.checkPythonConventionUnclosedAsyncResource,
@@ -35,52 +32,54 @@ func (w *fileWalker) checkPatterns() {
 		w.checkPythonConventionResourceLeak, w.checkPythonConventionUnboundedGrowth,
 		w.checkRustUnwrap, w.checkRustPanic, w.checkRustExpect, w.checkRustUnsafe,
 		w.checkRustTransmute, w.checkRustCloneOnCopy, w.checkRustTodo, w.checkRustDbgMacro,
-		// Rust Phase 1 conventions (9 rules)
 		w.checkRustUnsafeBlockJustif, w.checkRustPanicInLibrary, w.checkRustUnwrapInLibrary,
 		w.checkRustMutableStatic, w.checkRustErrorPropagation, w.checkRustCloneHeavy,
 		w.checkRustExpensiveOpLoop, w.checkRustIterCollectChain, w.checkRustAsyncCancelSafety,
-		// JavaScript Phase 1 conventions (9 rules: Type Safety, Promises, Async)
 		w.checkAnyTypeUsage, w.checkTypeCoercion, w.checkOptionalChainingOveruse,
 		w.checkNullCoalescingCorrect, w.checkTypeAssertionUnsafe, w.checkUnhandledPromise,
 		w.checkAsyncAwaitChaining, w.checkPromiseRaceHazard, w.checkCallbackHell,
-		// Node.js Phase 1 conventions (13 rules: Streams, Event Emitters, Async Patterns, Performance)
 		w.checkStreamNotPiped, w.checkBackpressureIgnored, w.checkStreamErrorUnhandled,
 		w.checkStreamLeak, w.checkEventListenerLeak, w.checkOnceVsOn,
 		w.checkErrorEventUnhandled, w.checkPromiseSwallowing, w.checkAsyncIteratorIncomplete,
 		w.checkConcurrentOperationsUnbounded, w.checkMemoryLeakTimers,
 		w.checkUnboundedBuffer, w.checkCpuBlocking,
 	}
+}
+
+func (w *fileWalker) checkPatterns() {
+	lines := strings.Split(string(w.src), "\n")
 	for i, line := range lines {
-		for _, check := range checks {
+		for _, check := range linePatternChecks(w) {
 			check(line, i+1)
 		}
 	}
+	w.checkMultiLinePatterns(lines)
+	w.applyTOMLMatcher(lines)
+}
+
+func (w *fileWalker) checkMultiLinePatterns(lines []string) {
 	w.checkAwaitInLoop(lines)
 	w.checkGoDeferInLoop(lines)
 	w.checkGoIOCopyNoLimit(lines)
 	w.checkSecretFallbackInEnv(lines)
 	w.checkInjectionPatterns(lines)
 	w.checkTerraformConventions(lines)
-	w.checkCallbackHellNJS(lines)  // Node.js Phase 1: callback_hell (14th rule, multi-line)
+	w.checkCallbackHellNJS(lines)
+}
 
-	// Phase A: TOML-first rule engine integration
-	// Load TOML rules and apply pattern matching
-	if w.matcher != nil {
-		findings, err := w.matcher.Match(string(w.src), w.file, w.lang)
-		if err != nil {
-			// Log but don't fail on pattern matching errors
-			return
-		}
-		for _, pf := range findings {
-			w.emitFinding(analysis.Finding{
-				Rule:        pf.Rule,
-				Pillar:      pf.Pillar,
-				Severity:    analysis.Severity(pf.Severity),
-				Line:        pf.Line,
-				Message:     pf.Message,
-				Remediation: pf.Remediation,
-			})
-		}
+func (w *fileWalker) applyTOMLMatcher(lines []string) {
+	if w.matcher == nil {
+		return
+	}
+	findings, err := w.matcher.Match(string(w.src), w.file, w.lang)
+	if err != nil {
+		return
+	}
+	for _, pf := range findings {
+		w.emitFinding(analysis.Finding{
+			Rule: pf.Rule, Pillar: pf.Pillar, Severity: analysis.Severity(pf.Severity),
+			Line: pf.Line, Message: pf.Message, Remediation: pf.Remediation,
+		})
 	}
 }
 

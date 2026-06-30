@@ -60,122 +60,147 @@ func (w *fileWalker) checkTFHardcodedValues(lines []string) {
 	}
 }
 
-// checkTFProviderVersionPinning detects unpinned provider versions.
-// Pattern: provider "X" without version constraint, or "~> latest"
-func (w *fileWalker) checkTFProviderVersionPinning(lines []string) {
-	var inProviderBlock bool
-	var providerName string
-	var providerStart int
-	var providerHasVersion bool
+type tfBlockState struct {
+	inBlock   bool
+	name      string
+	startLine int
+	hasKey    bool
+}
 
+func (s *tfBlockState) reset(name string, start int) {
+	s.inBlock = true
+	s.name = name
+	s.startLine = start
+	s.hasKey = false
+}
+
+// checkTFProviderVersionPinning detects unpinned provider versions.
+func (w *fileWalker) checkTFProviderVersionPinning(lines []string) {
+	var st tfBlockState
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		if strings.Contains(trimmed, "provider") && strings.Contains(trimmed, "{") {
-			inProviderBlock = true
-			providerName = extractProviderName(trimmed)
-			providerStart = i + 1
-			providerHasVersion = false
+		if matched, name := matchProviderOpen(trimmed); matched {
+			st.reset(name, i+1)
 			continue
 		}
-		if inProviderBlock {
-			if strings.Contains(trimmed, "}") {
-				inProviderBlock = false
-				if !providerHasVersion && providerName != "" {
-					w.emitFinding(analysis.Finding{
-						Rule:        "terraform_conventions.provider_version_pinning",
-						Pillar:      "terraform_conventions",
-						Severity:    analysis.SeverityMajor,
-						Line:        providerStart,
-						Message:     fmt.Sprintf("Provider %q has no version constraint — use required_version for reproducibility", providerName),
-						Remediation: fmt.Sprintf("Set required_version in provider block: required_version = \"~> X.Y.Z\""),
-					})
-				}
+		if !st.inBlock {
+			continue
+		}
+		if strings.Contains(trimmed, "}") {
+			st.inBlock = false
+			if !st.hasKey && st.name != "" {
+				w.emitProviderVersionFinding(st.name, st.startLine)
 			}
-			if strings.Contains(trimmed, "required_version") || strings.Contains(trimmed, "version") {
-				providerHasVersion = true
-			}
+			continue
+		}
+		if strings.Contains(trimmed, "required_version") || strings.Contains(trimmed, "version") {
+			st.hasKey = true
 		}
 	}
 }
 
+func matchProviderOpen(trimmed string) (bool, string) {
+	if strings.Contains(trimmed, "provider") && strings.Contains(trimmed, "{") {
+		return true, extractProviderName(trimmed)
+	}
+	return false, ""
+}
+
+func (w *fileWalker) emitProviderVersionFinding(name string, line int) {
+	w.emitFinding(analysis.Finding{
+		Rule:        "terraform_conventions.provider_version_pinning",
+		Pillar:      "terraform_conventions",
+		Severity:    analysis.SeverityMajor,
+		Line:        line,
+		Message:     fmt.Sprintf("Provider %q has no version constraint — use required_version for reproducibility", name),
+		Remediation: fmt.Sprintf("Set required_version in provider block: required_version = \"~> X.Y.Z\""),
+	})
+}
+
+var tfSecretKeywords = []string{"password", "secret", "api_key", "token", "private_key"}
+
+type tfVarState struct {
+	inBlock bool
+	name    string
+	hasDef  bool
+}
+
+func (s *tfVarState) open(trimmed string) {
+	s.inBlock = true
+	s.hasDef = false
+	parts := strings.Split(trimmed, "\"")
+	if len(parts) >= 2 {
+		s.name = parts[1]
+	}
+}
+
+func (s *tfVarState) close() { s.inBlock = false }
+
 // checkTFVariableDefaultsSensitive detects sensitive data in variable defaults.
-// Pattern: variable with name or default containing secret-like strings (password, key, secret, token)
 func (w *fileWalker) checkTFVariableDefaultsSensitive(lines []string) {
-	secretKeywords := []string{"password", "secret", "api_key", "token", "private_key"}
-
-	var inVariableBlock bool
-	var variableBlockName string
-	var hasDefault bool
-
+	var st tfVarState
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
-		// Detect variable block opening
 		if strings.HasPrefix(trimmed, "variable") && strings.Contains(trimmed, "{") {
-			inVariableBlock = true
-			hasDefault = false
-			// Extract variable name for context
-			parts := strings.Split(trimmed, "\"")
-			if len(parts) >= 2 {
-				variableBlockName = parts[1]
-			}
+			st.open(trimmed)
 			continue
 		}
-
-		// Check if we're in a variable block
-		if inVariableBlock {
-			if strings.Contains(trimmed, "}") {
-				inVariableBlock = false
-				continue
-			}
-
-			// Track if we see a default value
-			if strings.Contains(trimmed, "default") && strings.Contains(trimmed, "=") {
-				hasDefault = true
-			}
-
-			// Check for sensitive keywords in variable name or in default value
-			for _, keyword := range secretKeywords {
-				// Check if variable name contains sensitive keyword
-				if strings.Contains(strings.ToLower(variableBlockName), keyword) {
-					// If it's a sensitive-named variable with a default, flag it
-					if hasDefault || (strings.Contains(trimmed, "default") && strings.Contains(line, "=")) {
-						w.emitFinding(analysis.Finding{
-							Rule:        "terraform_conventions.variable_defaults_sensitive",
-							Pillar:      "terraform_conventions",
-							Severity:    analysis.SeverityBlocker,
-							Line:        i + 1,
-							Message:     fmt.Sprintf("Variable %q: sensitive data (password, key, secret, token) should not have a default value", variableBlockName),
-							Remediation: "Remove default value; require the variable to be passed at runtime via terraform.tfvars or -var flags",
-						})
-						return
-					}
-				}
-
-				// Check if default line contains sensitive value
-				if strings.Contains(trimmed, "default") {
-					lowerLine := strings.ToLower(line)
-					if strings.Contains(lowerLine, keyword) && strings.Contains(line, "=") {
-						w.emitFinding(analysis.Finding{
-							Rule:        "terraform_conventions.variable_defaults_sensitive",
-							Pillar:      "terraform_conventions",
-							Severity:    analysis.SeverityBlocker,
-							Line:        i + 1,
-							Message:     fmt.Sprintf("Variable %q: sensitive data (password, key, secret, token) should not have a default value", variableBlockName),
-							Remediation: "Remove default value; require the variable to be passed at runtime via terraform.tfvars or -var flags",
-						})
-						return
-					}
-				}
-			}
+		if !st.inBlock {
+			continue
+		}
+		if strings.Contains(trimmed, "}") {
+			st.close()
+			continue
+		}
+		if strings.Contains(trimmed, "default") && strings.Contains(trimmed, "=") {
+			st.hasDef = true
+		}
+		if w.emitIfSecretInVar(line, trimmed, st, i) {
+			return
 		}
 	}
+}
+
+func (w *fileWalker) emitIfSecretInVar(line, trimmed string, st tfVarState, idx int) bool {
+	if hasSecretKeyword(strings.ToLower(st.name)) && (st.hasDef || hasDefaultAssignment(trimmed)) {
+		w.emitSecretDefaultFinding(st.name, idx)
+		return true
+	}
+	if strings.Contains(trimmed, "default") && hasSecretKeyword(strings.ToLower(line)) && strings.Contains(line, "=") {
+		w.emitSecretDefaultFinding(st.name, idx)
+		return true
+	}
+	return false
+}
+
+func hasSecretKeyword(s string) bool {
+	for _, kw := range tfSecretKeywords {
+		if strings.Contains(s, kw) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDefaultAssignment(trimmed string) bool {
+	return strings.Contains(trimmed, "default") && strings.Contains(trimmed, "=")
+}
+
+func (w *fileWalker) emitSecretDefaultFinding(name string, line int) {
+	w.emitFinding(analysis.Finding{
+		Rule:        "terraform_conventions.variable_defaults_sensitive",
+		Pillar:      "terraform_conventions",
+		Severity:    analysis.SeverityBlocker,
+		Line:        line + 1,
+		Message:     fmt.Sprintf("Variable %q: sensitive data (password, key, secret, token) should not have a default value", name),
+		Remediation: "Remove default value; require the variable to be passed at runtime via terraform.tfvars or -var flags",
+	})
 }
 
 // checkTFStateFileExposure detects Terraform state files in .gitignore absence.
@@ -247,82 +272,78 @@ func (w *fileWalker) checkTFCountVsForEach(lines []string) {
 }
 
 // checkTFModuleCoupling detects modules with hard dependencies on other modules.
-// Pattern: module source referencing another module by relative path, or cross-module variable dependencies
 func (w *fileWalker) checkTFModuleCoupling(lines []string) {
-	var inModuleBlock bool
-
+	var inBlock bool
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-
-		// Detect module block opening
 		if strings.HasPrefix(trimmed, "module") && strings.Contains(trimmed, "{") {
-			inModuleBlock = true
+			inBlock = true
 			continue
 		}
-
-		// Check if we're in a module block
-		if inModuleBlock {
-			if strings.Contains(trimmed, "}") {
-				inModuleBlock = false
-				continue
-			}
-			// Look for source with relative paths or module references
-			if strings.Contains(trimmed, "source") {
-				if strings.Contains(line, "../") || strings.Contains(line, "module.") {
-					w.emitFinding(analysis.Finding{
-						Rule:        "terraform_conventions.module_coupling",
-						Pillar:      "terraform_conventions",
-						Severity:    analysis.SeverityAdvisory,
-						Line:        i + 1,
-						Message:     "Module has hard dependency on another module path or output — consider loose coupling via variables",
-						Remediation: "Use input variables to decouple modules; avoid relative paths (use registry or remote sources)",
-					})
-				}
-			}
+		if !inBlock {
+			continue
+		}
+		if strings.Contains(trimmed, "}") {
+			inBlock = false
+			continue
+		}
+		if strings.Contains(trimmed, "source") && (strings.Contains(line, "../") || strings.Contains(line, "module.")) {
+			w.emitFinding(analysis.Finding{
+				Rule:        "terraform_conventions.module_coupling",
+				Pillar:      "terraform_conventions",
+				Severity:    analysis.SeverityAdvisory,
+				Line:        i + 1,
+				Message:     "Module has hard dependency on another module path or output — consider loose coupling via variables",
+				Remediation: "Use input variables to decouple modules; avoid relative paths (use registry or remote sources)",
+			})
 		}
 	}
 }
 
-// checkTFDataSourceSafety detects unsafe data source queries.
-// Pattern: data source without filter constraints, or data "aws_ami" without most_recent or specific filters
-func (w *fileWalker) checkTFDataSourceSafety(lines []string) {
-	dataSourcePattern := regexp.MustCompile(`^\s*data\s+"([^"]+)"\s+"([^"]+)"\s*{`)
-	var inDataBlock bool
-	var dataBlockStart int
-	var dataType string
-	var hasFilters bool
+type tfDataSourceState struct {
+	inBlock   bool
+	dataType  string
+	startLine int
+	hasFilter bool
+}
 
+// checkTFDataSourceSafety detects unsafe data source queries.
+func (w *fileWalker) checkTFDataSourceSafety(lines []string) {
+	var reDataSource = regexp.MustCompile(`^\s*data\s+"([^"]+)"\s+"([^"]+)"\s*{`)
+	var st tfDataSourceState
 	for i, line := range lines {
-		match := dataSourcePattern.FindStringSubmatch(line)
-		if match != nil {
-			inDataBlock = true
-			dataBlockStart = i + 1
-			dataType = match[1]
-			hasFilters = false
+		if m := reDataSource.FindStringSubmatch(line); m != nil {
+			st = tfDataSourceState{inBlock: true, dataType: m[1], startLine: i + 1}
 			continue
 		}
-		if inDataBlock {
-			if strings.TrimSpace(line) == "}" {
-				inDataBlock = false
-				if !hasFilters && isUnsafeDataSource(dataType) {
-					w.emitFinding(analysis.Finding{
-						Rule:        "terraform_conventions.data_source_safety",
-						Pillar:      "terraform_conventions",
-						Severity:    analysis.SeverityMajor,
-						Line:        dataBlockStart,
-						Message:     fmt.Sprintf("Data source %q lacks safety filters — may return unexpected results", dataType),
-						Remediation: "Add filter block: filter { name = \"state\"; values = [\"available\"] } to constrain results",
-					})
-				}
+		if !st.inBlock {
+			continue
+		}
+		if strings.TrimSpace(line) == "}" {
+			st.inBlock = false
+			if !st.hasFilter && isUnsafeDataSource(st.dataType) {
+				w.emitDataSourceFinding(st.dataType, st.startLine)
 			}
-			if strings.Contains(line, "filter") {
-				hasFilters = true
-			}
+			continue
+		}
+		if strings.Contains(line, "filter") {
+			st.hasFilter = true
 		}
 	}
+}
+
+func (w *fileWalker) emitDataSourceFinding(dataType string, line int) {
+	w.emitFinding(analysis.Finding{
+		Rule:        "terraform_conventions.data_source_safety",
+		Pillar:      "terraform_conventions",
+		Severity:    analysis.SeverityMajor,
+		Line:        line,
+		Message:     fmt.Sprintf("Data source %q lacks safety filters — may return unexpected results", dataType),
+		Remediation: "Add filter block: filter { name = \"state\"; values = [\"available\"] } to constrain results",
+	})
 }
 
 // checkTFPublicResourceExposure detects publicly accessible resources without auth.
