@@ -170,18 +170,25 @@ func (g GenericRuleCategory) GetString(key string) string {
 
 // GetStringSlice retrieves a []string field.
 func (g GenericRuleCategory) GetStringSlice(key string) []string {
-	if v, ok := g[key]; ok {
-		if slice, ok := v.([]interface{}); ok {
-			var result []string
-			for _, item := range slice {
-				if s, ok := item.(string); ok {
-					result = append(result, s)
-				}
-			}
-			return result
+	v, ok := g[key]
+	if !ok {
+		return nil
+	}
+	slice, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	return extractStrings(slice)
+}
+
+func extractStrings(slice []interface{}) []string {
+	var out []string
+	for _, item := range slice {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
 		}
 	}
-	return nil
+	return out
 }
 
 // GetInt retrieves an int field.
