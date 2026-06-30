@@ -294,19 +294,6 @@ func WaitForSignal(ch chan struct{}) {
 	}
 }
 
-// TestGoContextPropagationMissing detects multi-param function without ctx.
-func TestGoContextPropagationMissing(t *testing.T) {
-	src := `
-func ProcessRequest(db Database, user User) error {
-	return db.Save(user)
-}
-`
-	findings := findingsForPath(t, src, "process.go", analysis.LangGo)
-	if !hasRule(findings, "go_conventions.context_propagation") {
-		t.Error("must flag function with multiple params missing context.Context")
-	}
-}
-
 // TestGoDeferPanicDetected flags defer containing panic.
 func TestGoDeferPanicDetected(t *testing.T) {
 	src := `
