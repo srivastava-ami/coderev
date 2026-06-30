@@ -1,5 +1,3 @@
-let archTabShown = false;
-const R = {{.ReportJSON}};
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -1096,6 +1094,3 @@ function markdownToHtml(md) {
   }
   if (inCode) html += '</code></pre>\n';
   closeTable(); closeList(); closeBq();
-  return html;
-}
-</script>
