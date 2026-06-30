@@ -209,24 +209,6 @@ tr:hover td{background:var(--surface2)}
 /* Tooltip */
 #gtip{position:absolute;pointer-events:none;font-size:10.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);z-index:50;white-space:nowrap;opacity:0;transition:opacity .12s;max-width:320px;overflow:hidden;text-overflow:ellipsis}
 #gtip.show{opacity:.95}
-/* Layer band */
-.lay-band{pointer-events:none}
-.lay-band rect{stroke-dasharray:none}
-.lay-band .lbl{font-size:9px;font-weight:700;fill:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
-/* Edge flow highlight */
-.lnk.flow{stroke:var(--warn);opacity:.9;stroke-width:2.5}
-.lnk.flow-light{stroke:var(--warn);opacity:.5;stroke-width:1.5}
-.lnk.flow-dim{opacity:.1}
-/* Entrypoint star */
-.ep-star{fill:var(--pass);opacity:.9}
-.ep-glow{animation:epulse 2s ease-in-out infinite;transform-origin:center}
-@keyframes epulse{0%,100%{opacity:.4}50%{opacity:.85}}
-/* Function expanded */
-.fn-band{fill:none;stroke:var(--border);stroke-width:1;stroke-dasharray:3 3;pointer-events:none}
-
-/* Tooltip */
-#gtip{position:absolute;pointer-events:none;font-size:10.5px;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:5px 9px;color:var(--text);z-index:50;white-space:nowrap;opacity:0;transition:opacity .12s;max-width:320px;overflow:hidden;text-overflow:ellipsis}
-#gtip.show{opacity:.95}
 /* Layer bands */
 .lay-band{pointer-events:none}
 .lay-band .lbl{font-size:10px;font-weight:700;fill:var(--muted);letter-spacing:2px;text-transform:uppercase}
@@ -266,7 +248,7 @@ tr:hover td{background:var(--surface2)}
 
 <nav>
   <button class="tab active" onclick="showTab('summary',this)">Summary</button>
-  <button class="tab" onclick="showTab('architecture',this)">Architecture</button>
+  <button class="tab" onclick="showTab('architecture',this)" style="display:none">Architecture</button>
   <button class="tab" onclick="showTab('docs',this)" id="tab-docs" style="display:none">Docs</button>
   <button class="tab" onclick="showTab('violations',this)">Violations</button>
   <button class="tab" onclick="showTab('files',this)">Files</button>
@@ -395,8 +377,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderExceptions();
   renderAIReview();
 });
-
-let archTabShown = false;
 
 // ── Header ───────────────────────────────────────────────────────────────────
 function renderHeader() {
@@ -1218,9 +1198,45 @@ const GV = {
     GV.draw();
   },
   setupUI(){
-    // Interactions
     const gsvg=document.getElementById('gsvg');
     if(!gsvg) return;
+    const tip=document.getElementById('gtip');
+    // Edge hover tooltips
+    gsvg.addEventListener('pointerover',ev=>{
+      const p=ev.target.closest('path.lnk');
+      if(p){
+        const lk=GV.links.find(l=>{const a=GV.map[l.s],b=GV.map[l.t];return a&&b&&Math.abs(a.x-(parseFloat(p.getAttribute('d')?.match(/M\s*([\d.-]+)/)?.[1]||0)))<50;});
+        if(lk){ const s=GV.map[l.s],t=GV.map[l.t]; if(s&&t&&tip){ tip.textContent=`${s.label||s.id} → ${t.label||t.id} : ${lk.relation||lk.kind}`; tip.className='show'; } }
+      }
+    });
+    gsvg.addEventListener('pointerout',ev=>{ if(ev.target.closest('path.lnk')&&tip) tip.className=''; });
+    // Node hover tooltips
+    gsvg.addEventListener('pointerover',ev=>{
+      const g=ev.target.closest('.gn');
+      if(!g) return;
+      const n=GV.map[g.dataset.id]; if(!n||!tip) return;
+      if(n.type==='file'){
+        const role=GV.isEntrypoint(n)?'entrypoint':GV.nodeRole(n);
+        const fns=GV.getPkgInfo(n.source_file||'')?.funcs||[];
+        tip.textContent=`${n.label}  ·  ${role}  ·  ${n.layer}  ·  ${fns.length} funcs`;
+      } else if(n.type==='fn'){
+        tip.textContent=`${n.label}()  ·  ${n.parentId}`;
+      } else if(n.type==='layer'){
+        tip.textContent=`${n.label} layer`;
+      } else {
+        tip.textContent=n.label;
+      }
+      tip.className='show';
+    });
+    gsvg.addEventListener('pointerout',ev=>{ if(ev.target.closest('.gn')&&tip) tip.className=''; });
+    // Position tooltip on pointer move
+    gsvg.addEventListener('pointermove',ev=>{
+      if(tip&&tip.className==='show'){
+        const r=gsvg.getBoundingClientRect();
+        tip.style.left=(ev.clientX-r.left+12)+'px';
+        tip.style.top=(ev.clientY-r.top-8)+'px';
+      }
+    });
     let drag=null;
     gsvg.addEventListener('pointerdown',ev=>{
       const g=ev.target.closest('.gn');
@@ -1336,12 +1352,7 @@ function showTab(name, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
   document.getElementById('panel-' + name).classList.add('active');
   btn.classList.add('active');
-  // Lazy-init the interactive graph on first Architecture tab show
-  if (name === 'architecture' && !archTabShown && R.GraphJSON) {
-    archTabShown = true;
-    // Defer so the panel becomes visible first (display:block → dimensions computed)
-    setTimeout(() => GV.init(), 50);
-  }
+  // Architecture tab is disabled — graph init suppressed
 }
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
