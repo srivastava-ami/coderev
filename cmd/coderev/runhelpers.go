@@ -10,7 +10,6 @@ import (
 	"github.com/srivastava-ami/coderev/internal/architecture"
 	"github.com/srivastava-ami/coderev/internal/baseline"
 	"github.com/srivastava-ami/coderev/internal/config"
-	"github.com/srivastava-ami/coderev/internal/github"
 	"github.com/srivastava-ami/coderev/internal/output"
 	"github.com/srivastava-ami/coderev/internal/output/ghpr"
 	"github.com/srivastava-ami/coderev/internal/plugin"
@@ -184,16 +183,10 @@ func postReviewToPR(target string, tc analysis.ToolConfig, repoSlug string, prNu
 			return
 		}
 	}
-	client, err := github.New(tc.Github.BaseURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: %v\n", err)
+	if err := ghpr.PostInlineComment(repoSlug, prNumber, target, string(body)); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: posting AI review inline to PR: %v\n", err)
 		return
 	}
-	if err := client.UpsertCommentContext(context.Background(), github.PRTarget{Repo: repoSlug, PR: prNumber}, string(body)); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: posting AI review to PR: %v\n", err)
-		return
-	}
-	fmt.Fprintf(os.Stderr, "  review-posted: AI review upserted to PR #%d\n", prNumber)
 }
 
 // generateAllReports writes all three formats (md, html, sarif) into .coderev/.

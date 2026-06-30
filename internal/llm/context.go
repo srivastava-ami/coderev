@@ -31,18 +31,23 @@ type ReviewContext struct {
 	Neighbors []GraphNeighbor
 }
 
-const reviewSystemInstruction = `You are a gap detector for a deterministic code analysis tool.
-The <findings> below were produced by static analysis rules and are authoritative — 90% of
-the review is already done. Your sole job: given only the code context shown in this prompt,
-identify patterns or issues the rules did not catch. Do not repeat or rephrase any finding
-already listed. Do not reason about code not shown here. Do not suggest cosmetic or style
-changes. Do not suggest fixes — describe each gap so the author can reason about it.
+const reviewSystemInstruction = `You are a code reviewer. The <findings> below were produced by
+static analysis rules. Your job: given the code context shown in this prompt, identify patterns
+or issues the rules did not catch. Do not repeat or rephrase any finding already listed. Do not
+reason about code not shown here. Do not suggest cosmetic or style changes.
 If you see nothing the rules missed, say so explicitly rather than inventing concerns.
 `
 
 const reviewOutputInstruction = `
-Write the review grouped by file. For each gap state: file:line, the concern, and why
-it matters. If the rules already cover everything visible, say "No gaps found." — do not
+Write the review grouped by file. For each concern state: file:line, what the issue is, why
+it matters, and how to fix it. Include file:line citations for every claim. Format as:
+
+## path/to/file.go
+- **line 42** — <short description>
+  **Why:** <explanation of impact>
+  **Fix:** <concrete remediation suggestion>
+
+If the rules already cover everything visible, say "No gaps found." — do not
 pad the response.
 `
 
