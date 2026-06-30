@@ -10,6 +10,7 @@ import (
 	"github.com/srivastava-ami/coderev/internal/analysis"
 	"github.com/srivastava-ami/coderev/internal/config"
 	"github.com/srivastava-ami/coderev/internal/llm"
+	"github.com/srivastava-ami/coderev/internal/report"
 	"github.com/srivastava-ami/coderev/internal/toolmgr"
 )
 
@@ -159,24 +160,47 @@ func stdRun(s runSetup, result analysis.RunResult) error {
 	if err := postAnnotate(r, s.target); err != nil {
 		return err
 	}
-	rc := buildReviewContext(s.target, result.Findings, graphDir)
-	if err := writePromptFile(s.target, rc); err != nil {
+	return processReview(reviewReq{s: s, result: result, graphDir: graphDir, r: r})
+}
+
+type reviewReq struct {
+	s       runSetup
+	result  analysis.RunResult
+	graphDir string
+	r       report.Report
+}
+
+func processReview(req reviewReq) error {
+	rc := buildReviewContext(req.s.target, req.result.Findings, req.graphDir)
+	if err := writePromptFile(req.s.target, rc); err != nil {
 		fmt.Fprintf(os.Stderr, "warning: writing prompt file: %v\n", err)
 	}
-	if flagFullReview {
-		if err := runFullGraphReview(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: llm.ReviewContext{Findings: result.Findings}}, graphDir); err != nil {
-			return err
-		}
-	} else if flagReview {
-		if err := maybeSendToLLM(context.Background(), llmReviewReq{target: s.target, tc: s.tc, rc: rc}); err != nil {
-			return err
-		}
+	if err := dispatchReview(dispatchReq{target: req.s.target, tc: req.s.tc, findings: req.result.Findings, rc: rc, graphDir: req.graphDir}); err != nil {
+		return err
 	}
-	if err := refreshHTMLWithReview(r, s.target); err != nil {
+	if err := refreshHTMLWithReview(req.r, req.s.target); err != nil {
 		return err
 	}
 	if (flagReview || flagFullReview) && flagAnnotatePR {
-		postReviewToPR(s.target, s.tc, flagRepo, flagPR)
+		postReviewToPR(prReviewReq{target: req.s.target, tc: req.s.tc, repoSlug: flagRepo, prNumber: flagPR})
+	}
+	return nil
+}
+
+type dispatchReq struct {
+	target   string
+	tc       analysis.ToolConfig
+	findings []analysis.Finding
+	rc       llm.ReviewContext
+	graphDir string
+}
+
+func dispatchReview(req dispatchReq) error {
+	if flagFullReview {
+		return runFullGraphReview(context.Background(), llmReviewReq{target: req.target, tc: req.tc, rc: llm.ReviewContext{Findings: req.findings}}, req.graphDir)
+	}
+	if flagReview {
+		return maybeSendToLLM(context.Background(), llmReviewReq{target: req.target, tc: req.tc, rc: req.rc})
 	}
 	return nil
 }
