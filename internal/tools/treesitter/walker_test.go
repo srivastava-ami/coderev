@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/srivastava-ami/coderev/internal/analysis"
@@ -25,6 +26,10 @@ func defaultStds() analysis.Standards {
 
 func findingsForSrc(t *testing.T, src string, lang analysis.Language) []analysis.Finding {
 	t.Helper()
+	// Special handling for Terraform (no tree-sitter grammar)
+	if lang == analysis.LangTerraform {
+		return findingsForTerraform(t, src)
+	}
 	adapter := New(defaultStds())
 	fi := analysis.FileInfo{Path: "test.ts", Language: lang, Content: []byte(src)}
 	findings, err := adapter.analyseFile(fi)
@@ -32,6 +37,25 @@ func findingsForSrc(t *testing.T, src string, lang analysis.Language) []analysis
 		t.Fatalf("analyseFile: %v", err)
 	}
 	return findings
+}
+
+func findingsForTerraform(t *testing.T, src string) []analysis.Finding {
+	t.Helper()
+	stds := defaultStds()
+	stds.TerraformConventions = analysis.TerraformConventionsStd{Severity: "blocker"}
+
+	// Create a minimal walker for Terraform pattern checks (no tree-sitter AST parsing)
+	w := &fileWalker{
+		src:   []byte(src),
+		file:  "test.tf",
+		lang:  analysis.LangTerraform,
+		stds:  stds,
+		findings: []analysis.Finding{},
+	}
+	// Run Terraform-specific checks directly
+	lines := strings.Split(src, "\n")
+	w.checkTerraformConventions(lines)
+	return w.findings
 }
 
 func hasRule(findings []analysis.Finding, rule string) bool {

@@ -16,18 +16,34 @@ func (w *fileWalker) checkPatterns() {
 		w.checkThrowLiteral, w.checkNonNullAssertion, w.checkForceCast, w.checkDeepImport,
 		w.checkGoFmtPrint, w.checkGoPanicInLib, w.checkGoSQLStringConcat,
 		w.checkGoContextTODO, w.checkGoFmtErrorfNoFormat, w.checkFloatingPromise,
+		// Go conventions (Phase 1 - 8 rules, context_propagation disabled due to false positives)
+		w.checkGoGoroutineLeak, w.checkGoDeadlockPattern,
+		w.checkGoDeferPanic, w.checkGoUncheckedError, w.checkGoInterfaceBloat,
+		w.checkGoUnclosedBody, w.checkGoFileDescriptorLeak, w.checkGoNilSliceIteration,
 		w.checkPythonPrint, w.checkPythonBareExcept, w.checkPythonEvalExec,
 		w.checkPythonSQLStringConcat, w.checkPythonSubprocess, w.checkPythonMutableDefault,
 		w.checkPythonWildcardImport,
-		// Python Phase 1 chunk 2 (Exception Handling, Import Organization, Memory/Resources)
-		w.checkPythonConventionBareExcept, w.checkPythonConventionExceptionSwallowing,
-		w.checkPythonConventionExceptionChaining, w.checkPythonConventionFinallySideEffects,
-		w.checkPythonConventionCircularImport, w.checkPythonConventionImportOrder,
-		w.checkPythonConventionUnusedImport,
+		// Python Phase 1 conventions (18 rules: Type Safety, Async, Exception Handling, Imports, Resources)
+		w.checkPythonConventionTypeHintsMissing, w.checkPythonConventionNoneCoercion,
+		w.checkPythonConventionDynamicAttribute, w.checkPythonConventionTypeInconsistency,
+		w.checkPythonConventionDuckTypingUnsafe, w.checkPythonConventionUnclosedAsyncResource,
+		w.checkPythonConventionAsyncDeadlock, w.checkPythonConventionTaskLeak,
+		w.checkPythonConventionEventLoopMismatch, w.checkPythonConventionBareExcept,
+		w.checkPythonConventionExceptionSwallowing, w.checkPythonConventionExceptionChaining,
+		w.checkPythonConventionFinallySideEffects, w.checkPythonConventionCircularImport,
+		w.checkPythonConventionImportOrder, w.checkPythonConventionUnusedImport,
 		w.checkPythonConventionResourceLeak, w.checkPythonConventionUnboundedGrowth,
 		w.checkRustUnwrap, w.checkRustPanic, w.checkRustExpect, w.checkRustUnsafe,
 		w.checkRustTransmute, w.checkRustCloneOnCopy, w.checkRustTodo, w.checkRustDbgMacro,
-		// Node.js convention checks (13 rules)
+		// Rust Phase 1 conventions (9 rules)
+		w.checkRustUnsafeBlockJustif, w.checkRustPanicInLibrary, w.checkRustUnwrapInLibrary,
+		w.checkRustMutableStatic, w.checkRustErrorPropagation, w.checkRustCloneHeavy,
+		w.checkRustExpensiveOpLoop, w.checkRustIterCollectChain, w.checkRustAsyncCancelSafety,
+		// JavaScript Phase 1 conventions (9 rules: Type Safety, Promises, Async)
+		w.checkAnyTypeUsage, w.checkTypeCoercion, w.checkOptionalChainingOveruse,
+		w.checkNullCoalescingCorrect, w.checkTypeAssertionUnsafe, w.checkUnhandledPromise,
+		w.checkAsyncAwaitChaining, w.checkPromiseRaceHazard, w.checkCallbackHell,
+		// Node.js Phase 1 conventions (13 rules: Streams, Event Emitters, Async Patterns, Performance)
 		w.checkStreamNotPiped, w.checkBackpressureIgnored, w.checkStreamErrorUnhandled,
 		w.checkStreamLeak, w.checkEventListenerLeak, w.checkOnceVsOn,
 		w.checkErrorEventUnhandled, w.checkPromiseSwallowing, w.checkAsyncIteratorIncomplete,
@@ -45,6 +61,7 @@ func (w *fileWalker) checkPatterns() {
 	w.checkSecretFallbackInEnv(lines)
 	w.checkInjectionPatterns(lines)
 	w.checkTerraformConventions(lines)
+	w.checkCallbackHellNJS(lines)  // Node.js Phase 1: callback_hell (14th rule, multi-line)
 }
 
 func (w *fileWalker) checkNonNullAssertion(line string, lineNum int) {

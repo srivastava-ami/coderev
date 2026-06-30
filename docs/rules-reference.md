@@ -1,6 +1,8 @@
 # Rules Reference
 
-All 55 built-in rules, grouped by pillar, with TOML configuration and severity defaults.
+All 150 built-in rules (55 core + 95 Phase 1 enterprise), grouped by pillar, with TOML configuration and severity defaults.
+
+**New in v0.17 (Phase 1 Complete):** 95 enterprise-grade convention rules across Go, Python, Rust, JavaScript/TypeScript, Node.js, and Terraform.
 
 ---
 
@@ -280,6 +282,10 @@ checks   = ["no_await_in_loop"]
 
 ## 11. Go Conventions
 
+**Phase 1 (v0.17):** 20 enterprise-grade rules covering concurrency, error handling, resource management, interfaces, and nil safety.
+
+### Core Rules (v0.16)
+
 | Rule ID | What it detects | Default severity |
 |---|---|---|
 | `go.fmt_print` | `fmt.Println()`, `fmt.Printf()` in non-test files | advisory |
@@ -288,22 +294,67 @@ checks   = ["no_await_in_loop"]
 | `go.context_todo` | `context.TODO()` in non-test files | advisory |
 | `go.defer_in_loop` | `defer` inside a `for` loop | major |
 
+### Phase 1 Enterprise Rules (v0.17)
+
+#### Concurrency Safety (6 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `go_conventions.goroutine_leak` | Goroutines spawned without tracking/cancellation | blocker |
+| `go_conventions.race_condition` | Unprotected shared memory access | major |
+| `go_conventions.deadlock_pattern` | Channel operations without timeout in select | major |
+| `go_conventions.channel_safety` | Closing channel on receiving end or send after close | blocker |
+| `go_conventions.select_timeout` | select without timeout for external calls | major |
+
+#### Error Handling (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `go_conventions.unchecked_error` | Ignored error returns with blank assignment | major |
+| `go_conventions.error_wrapping` | Missing context in wrapped errors (fmt.Errorf) | major |
+| `go_conventions.defer_panic` | panic() in defer blocks | blocker |
+| `go_conventions.defer_unlock_order` | Incorrect defer lock/unlock ordering | major |
+
+#### Interface Design (3 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `go_conventions.interface_bloat` | Interfaces with >5 methods | major |
+| `go_conventions.interface_segregation` | Clients depending on unused interface methods | major |
+| `go_conventions.pointer_receiver_consistency` | Inconsistent receiver types (pointer vs value) | advisory |
+
+#### Resource Management (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `go_conventions.unclosed_body` | http.Response.Body not closed | blocker |
+| `go_conventions.file_descriptor_leak` | Unclosed files/connections | blocker |
+| `go_conventions.pool_exhaustion` | Unbounded resource acquisition | major |
+| `go_conventions.memory_leak_patterns` | Unbounded maps/slices, circular references | major |
+
+#### Nil Safety (3 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `go_conventions.nil_pointer_dereference` | Unguarded nil dereferences | major |
+| `go_conventions.nil_slice_iteration` | Range over potentially nil slices | major |
+| `go_conventions.nil_method_call` | Method calls on uninitialized structs | major |
+
 ```toml
 [go_conventions]
-severity = "advisory"
+severity = "major"
 
-[go_conventions.error_handling]
-rule   = "go.error_handling"
-checks = ["no_panic_in_lib", "check_return_err"]
+[go_conventions.concurrency]
+rule   = "go_conventions.goroutine_leak"
+checks = ["untracked_goroutine"]
 
-[go_conventions.context_propagation]
-rule   = "go.context_propagation"
-checks = ["no_context_todo"]
+[go_conventions.resource_management]
+rule   = "go_conventions.unclosed_body"
+checks = ["response_body_close"]
 ```
 
 ---
 
 ## 12. Python Conventions
+
+**Phase 1 (v0.17):** 18 enterprise-grade rules covering type safety, async/concurrency, exception handling, imports, and resources.
+
+### Core Rules (v0.16)
 
 | Rule ID | What it detects | Default severity |
 |---|---|---|
@@ -315,14 +366,66 @@ checks = ["no_context_todo"]
 | `python.no_mutable_default` | `def foo(x=[])` or `def foo(x={})` | blocker |
 | `python.no_wildcard_import` | `from module import *` | major |
 
+### Phase 1 Enterprise Rules (v0.17)
+
+#### Type Safety (5 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `python_conventions.type_hints_missing` | Functions without type annotations | major |
+| `python_conventions.none_coercion` | Implicit None comparisons (if x: vs if x is not None:) | major |
+| `python_conventions.dynamic_attribute` | getattr/setattr on user input | blocker |
+| `python_conventions.type_inconsistency` | Functions returning different types | major |
+| `python_conventions.duck_typing_unsafe` | Attribute access without isinstance checks | major |
+
+#### Async/Concurrency (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `python_conventions.unclosed_async_resource` | Async context managers not awaited (aiohttp, asyncpg) | blocker |
+| `python_conventions.async_deadlock` | Blocking calls in async functions (time.sleep, requests.get) | major |
+| `python_conventions.task_leak` | asyncio.create_task() not tracked/awaited | major |
+| `python_conventions.event_loop_mismatch` | Manual event loop creation in wrong thread | major |
+
+#### Exception Handling (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `python_conventions.bare_except` | `except:` without specific exception type | blocker |
+| `python_conventions.exception_swallowing` | Empty except blocks (just pass) | major |
+| `python_conventions.exception_chaining` | Exceptions without context (raise ... from) | major |
+| `python_conventions.finally_side_effects` | Side effects/IO in finally blocks | major |
+
+#### Import Organization (3 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `python_conventions.circular_import` | Circular dependency between modules | major |
+| `python_conventions.import_order` | Incorrect order (stdlib → third-party → local) | major |
+| `python_conventions.unused_import` | Unused or aliased with underscore | major |
+
+#### Memory/Resources (2 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `python_conventions.resource_leak` | Unclosed files/connections (missing with statement) | blocker |
+| `python_conventions.unbounded_growth` | Unbounded lists/dicts/caches (.append without checks) | major |
+
 ```toml
 [python_conventions]
-severity = "advisory"
+severity = "major"
+
+[python_conventions.type_safety]
+rule = "python_conventions.type_hints_missing"
+checks = ["missing_annotations"]
+
+[python_conventions.async_patterns]
+rule = "python_conventions.unclosed_async_resource"
+checks = ["aiohttp_session", "asyncpg_connection"]
 ```
 
 ---
 
 ## 13. Rust Conventions
+
+**Phase 1 (v0.17):** 15 enterprise-grade rules covering memory safety, error handling, patterns, and borrowing.
+
+### Core Rules (v0.16)
 
 | Rule ID | What it detects | Default severity |
 |---|---|---|
@@ -335,14 +438,142 @@ severity = "advisory"
 | `rust.no_todo` | `todo!()`, `unimplemented!()` | major |
 | `rust.no_dbg_macro` | `dbg!()` macro | advisory |
 
+### Phase 1 Enterprise Rules (v0.17)
+
+#### Memory Safety (5 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `rust_conventions.unsafe_block_justification` | unsafe blocks without // SAFETY comment | blocker |
+| `rust_conventions.panic_in_library` | panic!() in library code (use Result) | blocker |
+| `rust_conventions.unwrap_in_library` | .unwrap()/.expect() in library code | blocker |
+| `rust_conventions.unbounded_lifetime` | Generic lifetimes without bounds | major |
+| `rust_conventions.mutable_static` | static mut without synchronization (Mutex/atomic) | blocker |
+
+#### Error Handling (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `rust_conventions.error_propagation` | Lossy error conversions (.ok()) | major |
+| `rust_conventions.result_discard` | Discarded Results without explicit ignore | major |
+| `rust_conventions.panic_hook_missing` | Missing panic handler in main.rs | major |
+| `rust_conventions.custom_error_impl` | Incomplete Error trait implementation | major |
+
+#### Patterns (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `rust_conventions.clone_heavy` | Excessive cloning instead of references | major |
+| `rust_conventions.expensive_operation_loop` | Allocations in hot loops (Vec::new) | major |
+| `rust_conventions.iter_collect_chain` | Unnecessary collect() in iterator chains | major |
+| `rust_conventions.async_cancel_safety` | Drop inconsistencies in async code | major |
+
+#### Borrowing (2 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `rust_conventions.borrowed_reference_lifetime` | References outliving referent | major |
+| `rust_conventions.mutable_borrow_scope` | Mutable borrows with unnecessary scope | advisory |
+
 ```toml
 [rust_conventions]
-severity = "advisory"
+severity = "major"
+
+[rust_conventions.memory_safety]
+rule = "rust_conventions.unsafe_block_justification"
+checks = ["missing_safety_comment"]
 ```
 
 ---
 
-## 14. NX Conventions
+## 14. JavaScript/TypeScript Conventions
+
+**Phase 1 (v0.17):** 16 enterprise-grade rules covering type safety, promises/async, module systems, and data flow security.
+
+| Rule ID | Category | What it detects | Default severity |
+|---|---|---|---|
+| `js_conventions.any_type_usage` | Type Safety | `: any`, `as any`, `@ts-ignore` | blocker |
+| `js_conventions.type_coercion` | Type Safety | Implicit type coercion (`==`, `!=`) | major |
+| `js_conventions.optional_chaining_overuse` | Type Safety | Optional chaining on literals (`?.`) | major |
+| `js_conventions.null_coalescing_correct` | Type Safety | Null coalescing with error-prone values (`??`) | major |
+| `js_conventions.type_assertion_unsafe` | Type Safety | Unsafe type assertions (`as any`, `as unknown as`) | major |
+| `js_conventions.unhandled_promise` | Promises/Async | `.then()` without `.catch()` | blocker |
+| `js_conventions.floating_promise` | Promises/Async | Promises not awaited or returned | major |
+| `js_conventions.async_await_chain` | Promises/Async | Mixing await with `.then()` | major |
+| `js_conventions.promise_race_hazard` | Promises/Async | Incomplete Promise.race handling | major |
+| `js_conventions.callback_hell` | Promises/Async | Deeply nested callbacks (3+ levels) | major |
+| `js_conventions.circular_dependency` | Modules | Module circular imports | major |
+| `js_conventions.import_order` | Modules | Mixing import styles (CJS/ESM) | major |
+| `js_conventions.wildcard_import` | Modules | `import *` unless namespaced | major |
+| `js_conventions.dom_xss` | Data Flow | innerHTML/textContent from untrusted sources | blocker |
+| `js_conventions.eval_usage` | Data Flow | eval() or Function() with dynamic code | blocker |
+| `js_conventions.prototype_pollution` | Data Flow | Object.assign with untrusted objects | blocker |
+
+---
+
+## 15. Node.js Conventions
+
+**Phase 1 (v0.17):** 14 enterprise-grade rules covering streams, event emitters, async patterns, and performance.
+
+#### Streams (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `nodejs_conventions.stream_not_piped` | Streams created but not piped | major |
+| `nodejs_conventions.backpressure_ignored` | Ignoring stream.write() return value | blocker |
+| `nodejs_conventions.stream_error_unhandled` | Stream error handlers missing | major |
+| `nodejs_conventions.stream_leak` | Streams not destroyed on error | blocker |
+
+#### Event Emitters (3 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `nodejs_conventions.event_listener_leak` | Listeners not removed (memory leak) | blocker |
+| `nodejs_conventions.once_vs_on` | Using `.on()` for single-event listeners | major |
+| `nodejs_conventions.error_event_unhandled` | Unhandled 'error' event (crashes process) | blocker |
+
+#### Async Patterns (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `nodejs_conventions.callback_hell` | Deeply nested callbacks (3+ levels) | major |
+| `nodejs_conventions.promise_swallowing` | Promises without error handling | major |
+| `nodejs_conventions.async_iterator_incomplete` | Incomplete async iterator implementation | major |
+| `nodejs_conventions.concurrent_operations_unbounded` | Unbounded concurrent operations (Promise.all) | major |
+
+#### Performance (3 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `nodejs_conventions.memory_leak_timers` | setInterval without clearInterval | blocker |
+| `nodejs_conventions.unbounded_buffer` | Unbounded internal buffering (.push) | major |
+| `nodejs_conventions.cpu_blocking` | Sync operations blocking event loop (readFileSync) | major |
+
+---
+
+## 16. Terraform Conventions
+
+**Phase 1 (v0.17):** 12 enterprise-grade rules covering best practices, resource design, and compliance.
+
+#### Best Practices (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `terraform_conventions.hardcoded_values` | Hardcoded resource names, regions, AZs | blocker |
+| `terraform_conventions.provider_version_pinning` | Unpinned provider versions (no required_version) | blocker |
+| `terraform_conventions.variable_defaults_sensitive` | Sensitive data in variable defaults | blocker |
+| `terraform_conventions.state_file_exposure` | State files in git (missing .gitignore) | blocker |
+
+#### Resource Design (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `terraform_conventions.resource_naming` | Inconsistent resource naming (mixed cases) | major |
+| `terraform_conventions.count_vs_for_each` | Using count for dynamic resources | major |
+| `terraform_conventions.module_coupling` | Modules with hard dependencies | major |
+| `terraform_conventions.data_source_safety` | Unsafe data source queries (no filters) | blocker |
+
+#### Compliance (4 rules)
+| Rule ID | What it detects | Default severity |
+|---|---|---|
+| `terraform_conventions.public_resource_exposure` | Publicly accessible resources without auth | blocker |
+| `terraform_conventions.encryption_disabled` | Storage without encryption enabled | blocker |
+| `terraform_conventions.logging_disabled` | Resources without logging enabled | major |
+| `terraform_conventions.backup_missing` | No backup strategy defined (RDS, databases) | major |
+
+---
+
+## 17. NX Conventions
 
 | Rule ID | What it detects | Default severity | Adapter |
 |---|---|---|---|
@@ -421,10 +652,12 @@ A plugin needs a manifest (`coderev-plugin.toml`) and a binary that outputs find
 
 | Adapter | Rules it handles | Requires install? |
 |---|---|---|
-| **treesitter** | All complexity, file_structure, type_safety, hardcoding, observability, stability, documentation, security (4), go (5), python (7), rust (8), nx_conventions.no_deep_import — **48 rules** | Built-in |
+| **treesitter** | All complexity, file_structure, type_safety, hardcoding, observability, stability, documentation, security (4), go (5+20), python (7+18), rust (8+15), js (0+16), nodejs (0+14), terraform (0+12), nx_conventions.no_deep_import — **150 rules** | Built-in |
 | **semgrep** | `security.injection.*`, `security.auth.*`, `security.cryptography` | `brew install semgrep` |
 | **gitleaks** | `security.secrets` | `brew install gitleaks` |
 | **madge** | `file_structure.circular_deps`, `nx_conventions.boundaries` | `npm i -g madge` |
 | **npmaudit** | `security.dependencies` | Ships with Node |
 | **coverage** | `testing.coverage` | Generate lcov.info first |
 | **custom/script** | Any rule ID you assign | Your binary on `$PATH` |
+
+**Note:** All 95 Phase 1 enterprise rules are handled by the native **treesitter** adapter (pure Go, zero external dependencies).

@@ -214,13 +214,219 @@ type PerformanceAsyncStd struct {
 // ── Python Conventions ─────────────────────────────────────────────────────────
 
 type PythonConventionsStd struct {
-	Severity string `toml:"severity"`
+	Severity          string               `toml:"severity"`
+	TypeSafety        PythonTypeSafetyStd  `toml:"type_safety"`
+	AsyncPatterns     PythonAsyncStd       `toml:"async_patterns"`
+	ExceptionHandling PythonExceptionStd   `toml:"exception_handling"`
+	Imports           PythonImportsStd     `toml:"imports"`
+	MemoryResources   PythonMemoryStd      `toml:"memory_resources"`
+}
+
+type PythonTypeSafetyStd struct {
+	TypeHintsMissing    RuleEntryStd `toml:"type_hints_missing"`
+	NoneCoercion        RuleEntryStd `toml:"none_coercion"`
+	DynamicAttribute    RuleEntryStd `toml:"dynamic_attribute"`
+	TypeInconsistency   RuleEntryStd `toml:"type_inconsistency"`
+	DuckTypingUnsafe    RuleEntryStd `toml:"duck_typing_unsafe"`
+}
+
+type PythonAsyncStd struct {
+	UnclosedAsyncResource RuleEntryStd `toml:"unclosed_async_resource"`
+	AsyncDeadlock         RuleEntryStd `toml:"async_deadlock"`
+	TaskLeak              RuleEntryStd `toml:"task_leak"`
+	EventLoopMismatch     RuleEntryStd `toml:"event_loop_mismatch"`
+}
+
+type PythonExceptionStd struct {
+	BareExcept           RuleEntryStd `toml:"bare_except"`
+	ExceptionSwallowing  RuleEntryStd `toml:"exception_swallowing"`
+	ExceptionChaining    RuleEntryStd `toml:"exception_chaining"`
+	FinallySideEffects   RuleEntryStd `toml:"finally_side_effects"`
+}
+
+type PythonImportsStd struct {
+	CircularImport RuleEntryStd `toml:"circular_import"`
+	ImportOrder    RuleEntryStd `toml:"import_order"`
+	UnusedImport   RuleEntryStd `toml:"unused_import"`
+}
+
+type PythonMemoryStd struct {
+	ResourceLeak    RuleEntryStd `toml:"resource_leak"`
+	UnboundedGrowth RuleEntryStd `toml:"unbounded_growth"`
+}
+
+type RuleEntryStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+// ── JavaScript/TypeScript Conventions ──────────────────────────────────────
+
+type JavaScriptConventionsStd struct {
+	Severity       string                  `toml:"severity"`
+	TypeSafety    JSTypeSafetyStd         `toml:"type_safety"`
+	PromisesAsync JSPromisesAsyncStd      `toml:"promises_async"`
+	Modules       JSModulesStd            `toml:"modules"`
+	DataFlow      JSDataFlowStd           `toml:"data_flow"`
+}
+
+// TypeSafety category: 5 rules
+type JSTypeSafetyStd struct {
+	AnyTypeUsage        JSRuleStd `toml:"any_type_usage"`
+	TypeCoercion        JSRuleStd `toml:"type_coercion"`
+	OptionalChainingUse JSRuleStd `toml:"optional_chaining_overuse"`
+	NullCoalescingUse   JSRuleStd `toml:"null_coalescing_correct"`
+	TypeAssertionUnsafe JSRuleStd `toml:"type_assertion_unsafe"`
+}
+
+// PromisesAsync category: 5 rules
+type JSPromisesAsyncStd struct {
+	UnhandledPromise   JSRuleStd `toml:"unhandled_promise"`
+	FloatingPromise    JSRuleStd `toml:"floating_promise"`
+	AsyncAwaitChaining JSRuleStd `toml:"async_await_chain"`
+	PromiseRaceHazard  JSRuleStd `toml:"promise_race_hazard"`
+	CallbackHell       JSRuleStd `toml:"callback_hell"`
+}
+
+// Modules category: 3 rules
+type JSModulesStd struct {
+	CircularDependency JSRuleStd `toml:"circular_dependency"`
+	ImportOrder        JSRuleStd `toml:"import_order"`
+	WildcardImport     JSRuleStd `toml:"wildcard_import"`
+}
+
+// DataFlow category: 3 rules (security-focused)
+type JSDataFlowStd struct {
+	DomXSS             JSRuleStd `toml:"dom_xss"`
+	EvalUsage          JSRuleStd `toml:"eval_usage"`
+	PrototypePollution JSRuleStd `toml:"prototype_pollution"`
+}
+
+type JSRuleStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+	Description string `toml:"description"`
 }
 
 // ── Rust Conventions ───────────────────────────────────────────────────────────
 
 type RustConventionsStd struct {
 	Severity string `toml:"severity"`
+	// Memory Safety (5 rules)
+	UnsafeBlockJustif    RustUnsafeBlockJustifStd    `toml:"unsafe_block_justification"`
+	PanicInLibrary       RustPanicInLibraryStd       `toml:"panic_in_library"`
+	UnwrapInLibrary      RustUnwrapInLibraryStd      `toml:"unwrap_in_library"`
+	UnboundedLifetime    RustUnboundedLifetimeStd    `toml:"unbounded_lifetime"`
+	MutableStatic        RustMutableStaticStd        `toml:"mutable_static"`
+	// Error Handling (4 rules)
+	ErrorPropagation     RustErrorPropagationStd     `toml:"error_propagation"`
+	ResultDiscard        RustResultDiscardStd        `toml:"result_discard"`
+	PanicHookMissing     RustPanicHookMissingStd     `toml:"panic_hook_missing"`
+	CustomErrorImpl       RustCustomErrorImplStd      `toml:"custom_error_impl"`
+	// Patterns (4 rules)
+	CloneHeavy           RustCloneHeavyStd           `toml:"clone_heavy"`
+	ExpensiveOpLoop      RustExpensiveOpLoopStd      `toml:"expensive_operation_loop"`
+	IterCollectChain     RustIterCollectChainStd     `toml:"iter_collect_chain"`
+	AsyncCancelSafety    RustAsyncCancelSafetyStd    `toml:"async_cancel_safety"`
+	// Borrowing (2 rules)
+	BorrowedRefLifetime  RustBorrowedRefLifetimeStd  `toml:"borrowed_reference_lifetime"`
+	MutableBorrowScope   RustMutableBorrowScopeStd   `toml:"mutable_borrow_scope"`
+}
+
+type RustUnsafeBlockJustifStd struct {
+	Rule              string `toml:"rule"`
+	Severity          string `toml:"severity"`
+	RequireComment    bool   `toml:"require_comment"`
+	CommentKeywords   []string `toml:"comment_keywords"`
+	Remediation       string `toml:"remediation"`
+}
+
+type RustMutableStaticStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustBorrowedRefLifetimeStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustMutableBorrowScopeStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustUnboundedLifetimeStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustPanicInLibraryStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustUnwrapInLibraryStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustErrorPropagationStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustResultDiscardStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustCloneHeavyStd struct {
+	Rule            string `toml:"rule"`
+	Severity        string `toml:"severity"`
+	CloneThreshold  int    `toml:"clone_threshold"`
+	Remediation     string `toml:"remediation"`
+}
+
+type RustExpensiveOpLoopStd struct {
+	Rule        string   `toml:"rule"`
+	Severity    string   `toml:"severity"`
+	ExpensiveOps []string `toml:"expensive_ops"`
+	Remediation string   `toml:"remediation"`
+}
+
+type RustIterCollectChainStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustAsyncCancelSafetyStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustPanicHookMissingStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
+}
+
+type RustCustomErrorImplStd struct {
+	Rule        string `toml:"rule"`
+	Severity    string `toml:"severity"`
+	Remediation string `toml:"remediation"`
 }
 
 // ── NX Conventions ────────────────────────────────────────────────────────────
@@ -240,4 +446,40 @@ type BoundariesStd struct {
 type TagsStd struct {
 	Rule            string   `toml:"rule"`
 	RequiredTagAxes []string `toml:"required_axes"`
+}
+
+// ── Node.js Conventions ───────────────────────────────────────────────────────
+
+type NodeJsConventionsStd struct {
+	Severity      string                 `toml:"severity"`
+	Streams       NodeJsStreamsStd       `toml:"streams"`
+	EventEmitters NodeJsEventEmittersStd `toml:"event_emitters"`
+	AsyncPatterns NodeJsAsyncPatternsStd `toml:"async_patterns"`
+	Performance   NodeJsPerformanceStd   `toml:"performance"`
+}
+
+type NodeJsStreamsStd struct {
+	StreamNotPiped       RuleEntryStd `toml:"stream_not_piped"`
+	BackpressureIgnored  RuleEntryStd `toml:"backpressure_ignored"`
+	StreamErrorUnhandled RuleEntryStd `toml:"stream_error_unhandled"`
+	StreamLeak           RuleEntryStd `toml:"stream_leak"`
+}
+
+type NodeJsEventEmittersStd struct {
+	EventListenerLeak    RuleEntryStd `toml:"event_listener_leak"`
+	OnceVsOn             RuleEntryStd `toml:"once_vs_on"`
+	ErrorEventUnhandled  RuleEntryStd `toml:"error_event_unhandled"`
+}
+
+type NodeJsAsyncPatternsStd struct {
+	CallbackHell              RuleEntryStd `toml:"callback_hell"`
+	PromiseSwallowing         RuleEntryStd `toml:"promise_swallowing"`
+	AsyncIteratorIncomplete   RuleEntryStd `toml:"async_iterator_incomplete"`
+	ConcurrentOperationsMax   RuleEntryStd `toml:"concurrent_operations_unbounded"`
+}
+
+type NodeJsPerformanceStd struct {
+	MemoryLeakTimers RuleEntryStd `toml:"memory_leak_timers"`
+	UnboundedBuffer  RuleEntryStd `toml:"unbounded_buffer"`
+	CpuBlocking      RuleEntryStd `toml:"cpu_blocking"`
 }

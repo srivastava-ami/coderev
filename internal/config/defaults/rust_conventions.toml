@@ -1,2 +1,89 @@
 [rust_conventions]
 severity = "advisory"
+
+# ── Memory Safety (5 rules) ───────────────────────────────────────────────────
+
+[rust_conventions.unsafe_block_justification]
+rule              = "rust_conventions.unsafe_block_justification"
+severity          = "blocker"
+require_comment   = true
+comment_keywords  = ["SAFETY:", "SAFETY", "INVARIANT"]
+remediation       = "Add a // SAFETY: comment explaining why the unsafe block is necessary and what invariants it preserves."
+
+[rust_conventions.panic_in_library]
+rule        = "rust_conventions.panic_in_library"
+severity    = "blocker"
+remediation = "Return a Result<T, E> instead of calling panic!(). Let the caller decide how to handle the error."
+
+[rust_conventions.unwrap_in_library]
+rule        = "rust_conventions.unwrap_in_library"
+severity    = "major"
+remediation = "Replace .unwrap() with pattern matching (match), .ok(), .map_err(), or the ? operator for proper error propagation."
+
+[rust_conventions.unbounded_lifetime]
+rule        = "rust_conventions.unbounded_lifetime"
+severity    = "major"
+remediation = "Add explicit lifetime bounds (e.g., <'a: 'b>) or use 'static where appropriate. Unbounded lifetimes hide coupling between types."
+
+[rust_conventions.mutable_static]
+rule        = "rust_conventions.mutable_static"
+severity    = "blocker"
+remediation = "Replace static mut with lazy_static, once_cell, OnceLock, Mutex, or Arc<Mutex<T>>. Mutable statics are inherently unsafe."
+
+# ── Error Handling (4 rules) ──────────────────────────────────────────────────
+
+[rust_conventions.error_propagation]
+rule        = "rust_conventions.error_propagation"
+severity    = "major"
+remediation = "Use .map_err() to wrap/transform errors, or use context libraries like anyhow/eyre to preserve error chains."
+
+[rust_conventions.result_discard]
+rule        = "rust_conventions.result_discard"
+severity    = "major"
+remediation = "Use .ok() to ignore the Ok case, or _ = expr to explicitly acknowledge the Result. Never silently discard Results."
+
+[rust_conventions.panic_hook_missing]
+rule        = "rust_conventions.panic_hook_missing"
+severity    = "advisory"
+remediation = "Call std::panic::set_hook() in main() to log panics before termination. This enables post-mortem debugging in production."
+
+[rust_conventions.custom_error_impl]
+rule        = "rust_conventions.custom_error_impl"
+severity    = "major"
+remediation = "Implement std::fmt::Display, std::fmt::Debug, and std::error::Error traits on your error type. Use thiserror or anyhow for reduced boilerplate."
+
+# ── Patterns (4 rules) ────────────────────────────────────────────────────────
+
+[rust_conventions.clone_heavy]
+rule            = "rust_conventions.clone_heavy"
+severity        = "advisory"
+clone_threshold = 5
+remediation     = "Reduce cloning by using references (&T), borrowing in loops, or taking ownership in function signatures. Over-cloning signals a lifetime or design issue."
+
+[rust_conventions.expensive_operation_loop]
+rule         = "rust_conventions.expensive_operation_loop"
+severity     = "major"
+expensive_ops = ["Vec::new", "String::new", "HashMap::new", "regex::Regex::new", "format!"]
+remediation  = "Move allocations outside loops. Use .iter(), drain(), or pre-allocate with_capacity to avoid O(n²) patterns."
+
+[rust_conventions.iter_collect_chain]
+rule        = "rust_conventions.iter_collect_chain"
+severity    = "advisory"
+remediation = "Replace .collect() in the middle of a chain with .collect::<Vec<_>>() or avoid the intermediate collection entirely by chaining iterators."
+
+[rust_conventions.async_cancel_safety]
+rule        = "rust_conventions.async_cancel_safety"
+severity    = "major"
+remediation = "Ensure drop impl is consistent with partial async operations. Use select!() guards or ensure all branches are cancel-safe. Document cancel-safety invariants."
+
+# ── Borrowing (2 rules) ───────────────────────────────────────────────────────
+
+[rust_conventions.borrowed_reference_lifetime]
+rule        = "rust_conventions.borrowed_reference_lifetime"
+severity    = "blocker"
+remediation = "Ensure borrowed references do not outlive their referent. Use owned types (String, Vec, Box) or explicit lifetime bounds where necessary."
+
+[rust_conventions.mutable_borrow_scope]
+rule        = "rust_conventions.mutable_borrow_scope"
+severity    = "advisory"
+remediation = "Limit mutable borrow scope — release the borrow as soon as the mutation is complete. Split statements or use explicit block scope to allow reborrowing."

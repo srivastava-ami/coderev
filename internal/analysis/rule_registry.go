@@ -138,6 +138,17 @@ var RuleRegistry = map[string]RuleMeta{
 	// Memory & resource management (2 rules)
 	"python_conventions.resource_leak":     {Tags: []string{"cwe:772", "cwe:775"}, Standards: []string{"CWE-772", "CWE-775"}},
 	"python_conventions.unbounded_growth":  {Tags: []string{"cwe:400", "cwe:401"}, Standards: []string{"CWE-400", "CWE-401"}},
+
+	// nodejs_conventions (Phase 1: 7 enterprise-grade rules for production Node.js)
+	// Streams (4 rules)
+	"nodejs_conventions.stream_not_piped":       {Tags: []string{"cwe:400", "cwe:401"}, Standards: []string{"CWE-400", "CWE-401"}},
+	"nodejs_conventions.backpressure_ignored":   {Tags: []string{"cwe:400", "cwe:401"}, Standards: []string{"CWE-400", "CWE-401"}},
+	"nodejs_conventions.stream_error_unhandled": {Tags: []string{"cwe:391", "cwe:248"}, Standards: []string{"CWE-391", "CWE-248"}},
+	"nodejs_conventions.stream_leak":            {Tags: []string{"cwe:772", "cwe:775"}, Standards: []string{"CWE-772", "CWE-775"}},
+	// Event Emitters (3 rules)
+	"nodejs_conventions.event_listener_leak":   {Tags: []string{"cwe:401", "cwe:772"}, Standards: []string{"CWE-401", "CWE-772"}},
+	"nodejs_conventions.once_vs_on":            {Tags: []string{"cwe:1121"}, Standards: []string{"CWE-1121"}},
+	"nodejs_conventions.error_event_unhandled": {Tags: []string{"cwe:248", "cwe:391"}, Standards: []string{"CWE-248", "CWE-391"}},
 }
 
 // ── Generic TOML-Driven Standards Infrastructure ──────────────────────────
@@ -196,69 +207,4 @@ func (g GenericRuleCategory) GetBool(key string) bool {
 		}
 	}
 	return false
-}
-
-// PopulateGenericPillars extracts rule categories from deserialized TOML.
-// It walks top-level fields (excluding meta/exceptions) and treats each as a pillar
-// with nested rule categories. Call after TOML deserialization.
-func PopulateGenericPillars(std *Standards, rawData map[string]interface{}) {
-	if std == nil {
-		return
-	}
-	std.Pillars = make(map[string]map[string]GenericRuleCategory)
-	std.Severity = make(map[string]string)
-
-	for pillarName, pillarData := range rawData {
-		// Skip meta and exceptions
-		if pillarName == "meta" || pillarName == "exceptions" {
-			continue
-		}
-
-		pillarMap, ok := pillarData.(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		std.Pillars[pillarName] = make(map[string]GenericRuleCategory)
-
-		// Extract severity at pillar level
-		if sev, ok := pillarMap["severity"].(string); ok {
-			std.Severity[pillarName] = sev
-		}
-
-		// Iterate over category-level entries
-		for categoryName, categoryData := range pillarMap {
-			if categoryName == "severity" {
-				continue
-			}
-
-			categoryMap, ok := categoryData.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			// Convert to GenericRuleCategory
-			category := GenericRuleCategory(categoryMap)
-			std.Pillars[pillarName][categoryName] = category
-		}
-	}
-}
-
-// RegisterRulesFromStandards populates RuleRegistry with rules discovered in generic Standards.
-// New rules (not already in RuleRegistry) are added with empty metadata. Existing rules
-// in RuleRegistry are preserved, allowing manual CWE/OWASP tagging to take precedence.
-// Call this once after loading standards to enable automatic rule discovery.
-func RegisterRulesFromStandards(std *Standards) {
-	if std == nil || std.Pillars == nil {
-		return
-	}
-	for pillar, categories := range std.Pillars {
-		for category := range categories {
-			ruleID := pillar + "." + category
-			// Only add if not already registered (preserves manual metadata)
-			if _, exists := RuleRegistry[ruleID]; !exists {
-				RuleRegistry[ruleID] = RuleMeta{ID: ruleID}
-			}
-		}
-	}
 }

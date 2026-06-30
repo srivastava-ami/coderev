@@ -35,6 +35,7 @@ const (
 	LangGo          Language = "go"
 	LangPython      Language = "python"
 	LangRust        Language = "rust"
+	LangTerraform   Language = "terraform"
 	LangUnknown     Language = "unknown"
 )
 
@@ -57,4 +58,5 @@ var ExtToLanguage = map[string]Language{
 	".go":  LangGo,
 	".py":  LangPython,
 	".rs":  LangRust,
+	".tf":  LangTerraform,
 }

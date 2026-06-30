@@ -1,0 +1,109 @@
+# JavaScript/TypeScript Convention Rules (16 enterprise-grade rules)
+# For projects using Node.js, browser JavaScript, or TypeScript.
+
+[javascript_conventions]
+severity = "major"
+
+# ── Type Safety (5 rules) ──────────────────────────────────────────────────────
+
+[javascript_conventions.type_safety.any_type_usage]
+rule        = "javascript_conventions.any_type_usage"
+severity    = "advisory"
+description = "Use of bare 'any' type in TypeScript"
+remediation = "Replace 'any' with a specific type or use 'unknown' with type narrowing"
+
+[javascript_conventions.type_safety.type_coercion]
+rule        = "javascript_conventions.type_coercion"
+severity    = "major"
+description = "Loose equality (==) causes implicit type coercion bugs"
+remediation = "Use strict equality (===) instead of (==) for all comparisons"
+
+[javascript_conventions.type_safety.optional_chaining_overuse]
+rule        = "javascript_conventions.optional_chaining_overuse"
+severity    = "advisory"
+description = "Unnecessary optional chaining on known non-null values"
+remediation = "Use direct property access when the value is provably non-null"
+
+[javascript_conventions.type_safety.null_coalescing_correct]
+rule        = "javascript_conventions.null_coalescing_correct"
+severity    = "major"
+description = "Null coalescing (??) with error-prone function calls"
+remediation = "Wrap function calls in try/catch or validate input before calling"
+
+[javascript_conventions.type_safety.type_assertion_unsafe]
+rule        = "javascript_conventions.type_assertion_unsafe"
+severity    = "major"
+description = "Unsafe type assertions (as any, as unknown as) bypass type checking"
+remediation = "Use proper type guards, interfaces, or discriminated unions"
+
+# ── Promises & Async (5 rules) ─────────────────────────────────────────────────
+
+[javascript_conventions.promises_async.unhandled_promise]
+rule        = "javascript_conventions.unhandled_promise"
+severity    = "blocker"
+description = "Promise without error handler (.catch) — unhandled rejections crash the app"
+remediation = "Add .catch(err => {...}) or use try/await with proper error handling"
+
+[javascript_conventions.promises_async.floating_promise]
+rule        = "javascript_conventions.floating_promise"
+severity    = "major"
+description = "Floating promise — function call returns promise but is not awaited"
+remediation = "Either await the promise or explicitly ignore it with 'void'"
+
+[javascript_conventions.promises_async.async_await_chain]
+rule        = "javascript_conventions.async_await_chain"
+severity    = "advisory"
+description = "Mixing await with .then() — inconsistent async style"
+remediation = "Use either async/await or promise chains consistently, not both"
+
+[javascript_conventions.promises_async.promise_race_hazard]
+rule        = "javascript_conventions.promise_race_hazard"
+severity    = "major"
+description = "Promise.race() is error-prone and loses promise cleanup"
+remediation = "Use Promise.any(), Promise.allSettled(), or manage all promises explicitly"
+
+[javascript_conventions.promises_async.callback_hell]
+rule        = "javascript_conventions.callback_hell"
+severity    = "advisory"
+description = "Callback hell — deeply nested .then() calls reduce readability"
+remediation = "Convert to async/await or extract named functions for clarity"
+
+# ── Modules & Structure (3 rules) ──────────────────────────────────────────────
+
+[javascript_conventions.modules.circular_dependency]
+rule        = "javascript_conventions.circular_dependency"
+severity    = "major"
+description = "Circular dependency detected — can cause initialization bugs"
+remediation = "Restructure code to break the cycle; consider extracting shared logic"
+
+[javascript_conventions.modules.import_order]
+rule        = "javascript_conventions.import_order"
+severity    = "advisory"
+description = "Imports not ordered by convention (stdlib, third-party, local)"
+remediation = "Order imports: external packages first, then local/relative paths"
+
+[javascript_conventions.modules.wildcard_import]
+rule        = "javascript_conventions.wildcard_import"
+severity    = "advisory"
+description = "Wildcard imports (*) hide dependencies and complicate tree-shaking"
+remediation = "Use named imports: import { foo, bar } from 'module'"
+
+# ── Data Flow & Security (3 rules) ─────────────────────────────────────────────
+
+[javascript_conventions.data_flow.dom_xss]
+rule        = "javascript_conventions.dom_xss"
+severity    = "blocker"
+description = "DOM manipulation with .innerHTML risks DOM-based XSS attacks"
+remediation = "Use .textContent for text or .appendChild with document.createElement"
+
+[javascript_conventions.data_flow.eval_usage]
+rule        = "javascript_conventions.eval_usage"
+severity    = "blocker"
+description = "eval() and Function() allow arbitrary code execution"
+remediation = "Use JSON.parse() for JSON or a safe expression evaluator like vm2"
+
+[javascript_conventions.data_flow.prototype_pollution]
+rule        = "javascript_conventions.prototype_pollution"
+severity    = "blocker"
+description = "Object.assign with untrusted input — prototype pollution risk"
+remediation = "Use Object.create(null) or implement deep merge with key validation"

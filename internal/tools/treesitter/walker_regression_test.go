@@ -265,3 +265,186 @@ if (process.env.NODE_ENV !== 'production') {
 		}
 	}
 }
+
+// ── Go Convention Rules (20 new rules for production Go) ──────────────────────
+
+// TestGoGoroutineLeakDetected flags bare "go " statement.
+func TestGoGoroutineLeakDetected(t *testing.T) {
+	src := `
+func Worker(tasks chan Task) {
+	go processTask(tasks)
+}
+`
+	findings := findingsForPath(t, src, "worker.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.goroutine_leak") {
+		t.Error("must flag goroutine spawned without tracking")
+	}
+}
+
+// TestGoDeadlockChannelReceive detects bare channel receive without timeout.
+func TestGoDeadlockChannelReceive(t *testing.T) {
+	src := `
+func WaitForSignal(ch chan struct{}) {
+	<-ch
+}
+`
+	findings := findingsForPath(t, src, "signal.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.deadlock_pattern") {
+		t.Error("must flag channel receive without timeout")
+	}
+}
+
+// TestGoContextPropagationMissing detects multi-param function without ctx.
+func TestGoContextPropagationMissing(t *testing.T) {
+	src := `
+func ProcessRequest(db Database, user User) error {
+	return db.Save(user)
+}
+`
+	findings := findingsForPath(t, src, "process.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.context_propagation") {
+		t.Error("must flag function with multiple params missing context.Context")
+	}
+}
+
+// TestGoDeferPanicDetected flags defer containing panic.
+func TestGoDeferPanicDetected(t *testing.T) {
+	src := `
+func Cleanup() {
+	defer panic("cleanup failed")
+}
+`
+	findings := findingsForPath(t, src, "cleanup.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.defer_panic") {
+		t.Error("must flag defer with panic")
+	}
+}
+
+// TestGoUncheckedErrorDetected flags explicit error ignore.
+func TestGoUncheckedErrorDetected(t *testing.T) {
+	src := `
+func WriteFile(filename string, data []byte) {
+	_ = os.WriteFile(filename, data, 0o644)
+}
+`
+	findings := findingsForPath(t, src, "file.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.unchecked_error") {
+		t.Error("must flag explicit error ignore with _ =")
+	}
+}
+
+// TestGoInterfaceBloatDetected flags interface type declaration.
+func TestGoInterfaceBloatDetected(t *testing.T) {
+	src := `
+type Reader interface {
+	Read(p []byte) (n int, err error)
+	ReadByte() (byte, error)
+	ReadRune() (rune, int, error)
+	ReadFull(p []byte) (n int, err error)
+}
+`
+	findings := findingsForPath(t, src, "reader.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.interface_bloat") {
+		t.Error("must flag interface declaration (triggers manual review)")
+	}
+}
+
+// TestGoUnclosedBodyDetected flags response body access without close.
+func TestGoUnclosedBodyDetected(t *testing.T) {
+	src := `
+func FetchData(url string) ([]byte, error) {
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	body, err := io.ReadAll(resp.Body)
+	return body, err
+}
+`
+	findings := findingsForPath(t, src, "fetch.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.unclosed_body") {
+		t.Error("must flag resp.Body access without close")
+	}
+}
+
+// TestGoFileDescriptorLeakDetected flags os.Open without close.
+func TestGoFileDescriptorLeakDetected(t *testing.T) {
+	src := `
+func ReadFile(path string) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	return io.ReadAll(f)
+}
+`
+	findings := findingsForPath(t, src, "file.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.file_descriptor_leak") {
+		t.Error("must flag os.Open without visible close")
+	}
+}
+
+// TestGoNilSliceIterationDetected flags bare range without nil check.
+func TestGoNilSliceIterationDetected(t *testing.T) {
+	src := `
+func ProcessSlice(items []Item) {
+	for _, item := range items {
+		item.Process()
+	}
+}
+`
+	findings := findingsForPath(t, src, "process.go", analysis.LangGo)
+	if !hasRule(findings, "go_conventions.nil_slice_iteration") {
+		t.Error("must flag range iteration (triggers nil check review)")
+	}
+}
+
+// TestGoPanicInLibFires verifies existing panic rule still works.
+func TestGoPanicInLibFires(t *testing.T) {
+	src := `
+func ValidateInput(val int) string {
+	if val < 0 {
+		panic("invalid value")
+	}
+	return fmt.Sprintf("%d", val)
+}
+`
+	findings := findingsForPath(t, src, "validate.go", analysis.LangGo)
+	if !hasRule(findings, "go.panic_in_lib") {
+		t.Error("must flag panic in library code")
+	}
+}
+
+// TestGoContextTODOFires verifies existing context.TODO rule still works.
+func TestGoContextTODOFires(t *testing.T) {
+	src := `
+func QueryDatabase(query string) ([]Row, error) {
+	return db.Query(context.TODO(), query)
+}
+`
+	findings := findingsForPath(t, src, "db.go", analysis.LangGo)
+	if !hasRule(findings, "go.context_todo") {
+		t.Error("must flag context.TODO() placeholder")
+	}
+}
+
+// TestGoDeferInLoopFires verifies existing defer-in-loop rule still works.
+func TestGoDeferInLoopFires(t *testing.T) {
+	src := `
+func ProcessFiles(files []string) error {
+	for _, f := range files {
+		handle, err := os.Open(f)
+		if err != nil {
+			return err
+		}
+		defer handle.Close()
+		process(handle)
+	}
+	return nil
+}
+`
+	findings := findingsForPath(t, src, "files.go", analysis.LangGo)
+	if !hasRule(findings, "go.defer_in_loop") {
+		t.Error("must flag defer inside loop")
+	}
+}
