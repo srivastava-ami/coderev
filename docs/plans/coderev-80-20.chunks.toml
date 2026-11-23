@@ -1,0 +1,592 @@
+# coderev 80/20 — ordered chunks. One function per chunk; tests in the same chunk.
+# Pulled on demand via project_manifest.toml [pull].plan_chunks. Status lives in the manifest.
+# ---------- Phase A: finding model (S6) ----------
+[[chunk]]
+id = "C01"
+stage = "S6"
+model = "haiku"
+func = "finding.Finding + enums + (f Finding) Validate() error"
+file = "internal/pr/finding/model.go"
+test = "TestValidateRejectsBadEnums"
+validate = "go test ./internal/pr/finding -run TestValidate"
+
+[[chunk]]
+id = "C02"
+stage = "S6"
+model = "haiku"
+func = "finding.Fingerprint(path, ruleID, code string) string — whitespace-normalised sha256[:16]"
+file = "internal/pr/finding/fingerprint.go"
+test = "TestFingerprintStableAcrossWhitespace"
+validate = "go test ./internal/pr/finding -run TestFingerprint"
+
+[[chunk]]
+id = "C03"
+stage = "S6"
+model = "haiku"
+func = "finding.FromLegacy(analysis.Finding) Finding — blocker→high/blocking, major→medium/should-fix, advisory→low/nit; source=tool"
+file = "internal/pr/finding/legacy.go"
+test = "TestFromLegacyMapsSeverity"
+validate = "go test ./internal/pr/finding -run TestFromLegacy"
+
+[[chunk]]
+id = "C04"
+stage = "S6"
+model = "haiku"
+func = "finding.ToOCRComment(Finding) ocr.LlmComment — superset check against ocr v1.14.2 JSON field names"
+file = "internal/pr/finding/ocr.go"
+test = "TestToOCRCommentRoundTrip"
+validate = "go test ./internal/pr/finding -run TestToOCR"
+
+# ---------- Phase B: ingest + diff index (S1) ----------
+[[chunk]]
+id = "C05"
+stage = "S1"
+model = "haiku"
+func = "ingest.ParseTarget(arg) Target{Kind url|branch|range, Owner, Repo, PR, Base, Head}"
+file = "internal/pr/ingest/target.go"
+test = "TestParseTargetForms"
+validate = "go test ./internal/pr/ingest -run TestParseTarget"
+
+[[chunk]]
+id = "C06"
+stage = "S1"
+model = "haiku"
+func = "ingest.Resolve(ctx, Target, Runner) (Refs{Base, Head, HeadSHA}, error) — gh/git behind Runner interface"
+file = "internal/pr/ingest/resolve.go"
+test = "TestResolveWithFakeRunner"
+validate = "go test ./internal/pr/ingest -run TestResolve"
+
+[[chunk]]
+id = "C07"
+stage = "S1"
+model = "haiku"
+func = "ingest.Diff(ctx, Refs, Runner) ([]FilePatch, error) — git diff --unified=3 base...head, split per file (old/new path, rename)"
+file = "internal/pr/ingest/diff.go"
+test = "TestDiffSplitsFilesAndRenames"
+validate = "go test ./internal/pr/ingest -run TestDiff"
+
+[[chunk]]
+id = "C08"
+stage = "S1"
+model = "haiku"
+func = "ingest.ParseHunkHeader(line) (oldStart, oldLen, newStart, newLen int, ok bool)"
+file = "internal/pr/ingest/hunk.go"
+test = "TestParseHunkHeaderVariants"
+validate = "go test ./internal/pr/ingest -run TestParseHunkHeader"
+
+[[chunk]]
+id = "C09"
+stage = "S1"
+model = "haiku"
+func = "ingest.BuildIndex([]FilePatch) DiffIndex — new-side lines (added|context) per file+hunk; drops '-' and '\\ No newline'"
+file = "internal/pr/ingest/index.go"
+test = "TestBuildIndexDropsNoNewlineMarker"
+validate = "go test ./internal/pr/ingest -run TestBuildIndex"
+note = "fixes latent bug at internal/output/ghpr/annotate.go:162-166 (\\ No newline line advances the counter)"
+
+[[chunk]]
+id = "C10"
+stage = "S1"
+model = "haiku"
+func = "(DiffIndex) Anchorable(path, start, end int) bool — all lines visible and in the same hunk"
+file = "internal/pr/ingest/index.go"
+test = "TestAnchorableSpansSingleHunk"
+validate = "go test ./internal/pr/ingest -run TestAnchorable"
+
+[[chunk]]
+id = "C11"
+stage = "S1"
+model = "haiku"
+func = "ghpr.parsePatchLines delegates to ingest.BuildIndex (single authority)"
+file = "internal/output/ghpr/annotate.go"
+test = "existing ghpr tests + TestParsePatchLinesNoNewline"
+validate = "go test ./internal/output/ghpr"
+
+# ---------- Phase C: context slice (S2) ----------
+[[chunk]]
+id = "C12"
+stage = "S2"
+model = "haiku"
+func = "prctx.GraphSlice(graphJSON, changed) Slice{Callers, Callees, EntryPoints} — reuses llm.GraphNeighborhood (internal/llm/context.go:95)"
+file = "internal/pr/prctx/graph.go"
+test = "TestGraphSliceFindsEntryPoints"
+validate = "go test ./internal/pr/prctx -run TestGraphSlice"
+
+[[chunk]]
+id = "C13"
+stage = "S2"
+model = "haiku"
+func = "prctx.TFInventory(files) Inventory{Resources, Variables{name,default}, Modules{source,ref}} via tree-sitter hcl"
+file = "internal/pr/prctx/tf.go"
+test = "TestTFInventoryParsesBlocks"
+validate = "go test ./internal/pr/prctx -run TestTFInventory"
+
+[[chunk]]
+id = "C14"
+stage = "S2"
+model = "haiku"
+func = "prctx.TFVarsByEnv(root) map[env]map[var]value — *.tfvars and env/<name>/ layouts"
+file = "internal/pr/prctx/tfvars.go"
+test = "TestTFVarsByEnv"
+validate = "go test ./internal/pr/prctx -run TestTFVarsByEnv"
+
+[[chunk]]
+id = "C15"
+stage = "S2"
+model = "haiku"
+func = "prctx.ModuleArgs(ctx, source, sha, Fetcher) []string — fetch pinned module (git archive, cached in .coderev/modcache) and list declared variables"
+file = "internal/pr/prctx/module.go"
+test = "TestModuleArgsFromFakeFetcher"
+validate = "go test ./internal/pr/prctx -run TestModuleArgs"
+
+[[chunk]]
+id = "C16"
+stage = "S2"
+model = "haiku"
+func = "prctx.Write(path, Context) error — context.json, stable key order"
+file = "internal/pr/prctx/write.go"
+test = "TestWriteContextGolden"
+validate = "go test ./internal/pr/prctx -run TestWriteContext"
+
+# ---------- Phase D: static gates → evidence (S3) ----------
+[[chunk]]
+id = "C17"
+stage = "S3"
+model = "haiku"
+func = "gates.Run(ctx, Cmd) Evidence{tool, command, exit, key_metric, log_path} — output to .tmp/<tool>.log"
+file = "internal/pr/gates/run.go"
+test = "TestRunWritesLogAndExit"
+validate = "go test ./internal/pr/gates -run TestRun"
+
+[[chunk]]
+id = "C18"
+stage = "S3"
+model = "haiku"
+func = "gates.Plan(repo) []Cmd — build/test/lint/typecheck per detected ecosystem (go, npm/tsc/eslint, python)"
+file = "internal/pr/gates/plan.go"
+test = "TestPlanDetectsEcosystems"
+validate = "go test ./internal/pr/gates -run TestPlan"
+
+[[chunk]]
+id = "C19"
+stage = "S3"
+model = "haiku"
+func = "gates.TerraformPlan(dirs) []Cmd — init -backend=false, validate, fmt -check; tflint/checkov/gitleaks when on PATH"
+file = "internal/pr/gates/terraform.go"
+test = "TestTerraformPlanSkipsMissingTools"
+validate = "go test ./internal/pr/gates -run TestTerraformPlan"
+
+[[chunk]]
+id = "C20"
+stage = "S3"
+model = "haiku"
+func = "gates.Metric(tool, log) string — pass/fail counts for go test, jest/vitest, tsc error count, tflint/checkov counts"
+file = "internal/pr/gates/metric.go"
+test = "TestMetricParsers"
+validate = "go test ./internal/pr/gates -run TestMetric"
+
+# ---------- Phase E: rule engine (S4) ----------
+[[chunk]]
+id = "C21"
+stage = "S4"
+model = "haiku"
+func = "rules.Load(fs) ([]Rule, error) — schema {id, globs, matcher{kind,...}, severity, tag, category, message, fix_hint, suggestion_template, doc_url}; rejects unknown kinds"
+file = "internal/pr/rules/load.go"
+test = "TestLoadRejectsInvalidRule"
+validate = "go test ./internal/pr/rules -run TestLoad"
+note = "fixes gap: reference_url in TOML is ignored by today's Rule struct (pattern_matcher.go:19-29)"
+
+[[chunk]]
+id = "C22"
+stage = "S4"
+model = "haiku"
+func = "rules.MatchGlobs(rule, path) bool — doublestar-style globs, implemented without new deps"
+file = "internal/pr/rules/glob.go"
+test = "TestMatchGlobs"
+validate = "go test ./internal/pr/rules -run TestMatchGlobs"
+
+[[chunk]]
+id = "C23"
+stage = "S4"
+model = "haiku"
+func = "rules.MatchRegex(rule, file) []Hit{start,end,code} — multi-line (?s) with line-span capture"
+file = "internal/pr/rules/m_regex.go"
+test = "TestMatchRegexSpans"
+validate = "go test ./internal/pr/rules -run TestMatchRegex"
+
+[[chunk]]
+id = "C24"
+stage = "S4"
+model = "haiku"
+func = "rules.MatchTSQuery(rule, file) []Hit — tree-sitter query with @hit capture (ts/js/go)"
+file = "internal/pr/rules/m_tsquery.go"
+test = "TestMatchTSQueryFailOpenGuard"
+validate = "go test ./internal/pr/rules -run TestMatchTSQuery"
+
+[[chunk]]
+id = "C25"
+stage = "S4"
+model = "haiku"
+func = "rules.MatchHCLPath(rule, file) []Hit — path like resource.*.site_config.ip_restriction[service_tag=\"AzureFrontDoor.Backend\"] with has/lacks/equals predicates"
+file = "internal/pr/rules/m_hclpath.go"
+test = "TestMatchHCLPathLacksHeaders"
+validate = "go test ./internal/pr/rules -run TestMatchHCLPath"
+
+[[chunk]]
+id = "C26"
+stage = "S4"
+model = "haiku"
+func = "rules.Predicates registry: same_change_creates, var_default_unset_in_envs, module_lacks_arg, read_before_check, single_member — each reads context.json"
+file = "internal/pr/rules/m_crossfile.go"
+test = "TestPredicatesAgainstContext"
+validate = "go test ./internal/pr/rules -run TestPredicates"
+
+[[chunk]]
+id = "C27"
+stage = "S4"
+model = "haiku"
+func = "rules.MatchClones(files, minLines) []Hit — token-hash windows restricted to changed files (reuses treesitter dupTokenize, duplication.go:129)"
+file = "internal/pr/rules/m_clone.go"
+test = "TestMatchClonesAcrossTwoFiles"
+validate = "go test ./internal/pr/rules -run TestMatchClones"
+
+[[chunk]]
+id = "C28"
+stage = "S4"
+model = "haiku"
+func = "rules.UntestedBranches(fn, tests) []Hit — enumerate if/?:/||/?? branches in changed guard/coercion fns; hit when no test references the branch literal/condition"
+file = "internal/pr/rules/m_branches.go"
+test = "TestUntestedBranchesTracesAll"
+validate = "go test ./internal/pr/rules -run TestUntestedBranches"
+
+[[chunk]]
+id = "C29"
+stage = "S4"
+model = "haiku"
+func = "rules.RenderSuggestion(tmpl, Hit) (string, bool) — text/template over captures; must reproduce line count of existing_code span"
+file = "internal/pr/rules/suggest.go"
+test = "TestRenderSuggestionKeepsSpan"
+validate = "go test ./internal/pr/rules -run TestRenderSuggestion"
+
+[[chunk]]
+id = "C30"
+stage = "S4"
+model = "haiku"
+func = "rules.Engine.Run(ctx, idx, files, Context) []finding.Finding — status=plausible, source=rule, citations=[doc_url]"
+file = "internal/pr/rules/engine.go"
+test = "TestEngineEmitsFingerprintedFindings"
+validate = "go test ./internal/pr/rules -run TestEngine"
+
+[[chunk]]
+id = "C31"
+stage = "S4"
+model = "haiku"
+func = "seed rules (data): security/fail-open-env-guard, security/trusts-client-ip-header, security/service-tag-without-fdid"
+file = "internal/config/prrules/security.toml"
+test = "TestSeedSecurityRules (fixture snippets, positive + negative each)"
+validate = "go test ./internal/pr/rules -run TestSeedSecurity"
+
+[[chunk]]
+id = "C32"
+stage = "S4"
+model = "haiku"
+func = "seed rules (data): infra/cutover-same-apply, infra/waf-ratelimit-unset-per-env (tag=verify, <200 note), infra/single-origin-health-probe, infra/http-accepted-with-secret, maint/hardcoded-route-list"
+file = "internal/config/prrules/infra.toml"
+test = "TestSeedInfraRules"
+validate = "go test ./internal/pr/rules -run TestSeedInfra"
+
+[[chunk]]
+id = "C33"
+stage = "S4"
+model = "haiku"
+func = "seed rules (data): perf/unbounded-body-read, maint/duplicated-guard-block, test/new-branch-untested, style/trailing-whitespace-blank-runs"
+file = "internal/config/prrules/code.toml"
+test = "TestSeedCodeRules"
+validate = "go test ./internal/pr/rules -run TestSeedCode"
+
+# ---------- Phase F: runtime verification (S5) ----------
+[[chunk]]
+id = "C34"
+stage = "S5"
+model = "haiku"
+func = "runtime.LoadScenarios(path) ([]Scenario, Harness) — {name, method, path, headers, body_fixture, repeat, rotate_header, expect_status|expect_count_of_status, proves=[rule_id]}"
+file = "internal/pr/runtime/scenario.go"
+test = "TestLoadScenarios"
+validate = "go test ./internal/pr/runtime -run TestLoadScenarios"
+
+[[chunk]]
+id = "C35"
+stage = "S5"
+model = "haiku"
+func = "runtime.Execute(ctx, baseURL, Scenario) Result — repeat + rotated header values, status histogram"
+file = "internal/pr/runtime/exec.go"
+test = "TestExecuteAgainstHTTPTest (fixed vs rotated client-ip limiter)"
+validate = "go test ./internal/pr/runtime -run TestExecute"
+
+[[chunk]]
+id = "C36"
+stage = "S5"
+model = "haiku"
+func = "runtime.Harness.Up/Down — up cmds, readiness poll, guaranteed teardown (containers stopped, temp files removed) via defer + signal trap"
+file = "internal/pr/runtime/harness.go"
+test = "TestHarnessDownRunsOnFailure"
+validate = "go test ./internal/pr/runtime -run TestHarness"
+
+[[chunk]]
+id = "C37"
+stage = "S5"
+model = "haiku"
+func = "runtime.Promote(findings, results) (findings, caveats) — matched proves → confirmed + evidence; unreproduced → caveat 'hardening'"
+file = "internal/pr/runtime/promote.go"
+test = "TestPromoteConfirmsAndCaveats"
+validate = "go test ./internal/pr/runtime -run TestPromote"
+
+# ---------- Phase G: anchor + merge (S7) ----------
+[[chunk]]
+id = "C38"
+stage = "S7"
+model = "haiku"
+func = "anchor.Place(findings, idx) (inline, outside []Finding)"
+file = "internal/pr/anchor/place.go"
+test = "TestPlaceSplitsOutsideDiff"
+validate = "go test ./internal/pr/anchor -run TestPlace"
+
+[[chunk]]
+id = "C39"
+stage = "S7"
+model = "haiku"
+func = "anchor.DedupOrder(findings, fileOrder) — fingerprint dedup (keep highest severity, merge evidence); sort severity, diff file order, line"
+file = "internal/pr/anchor/order.go"
+test = "TestDedupOrder"
+validate = "go test ./internal/pr/anchor -run TestDedupOrder"
+
+[[chunk]]
+id = "C40"
+stage = "S7"
+model = "haiku"
+func = "anchor.Event(findings) string — blocking→REQUEST_CHANGES, should-fix→COMMENT, else APPROVE"
+file = "internal/pr/anchor/event.go"
+test = "TestEventTable"
+validate = "go test ./internal/pr/anchor -run TestEvent"
+
+# ---------- Phase H: output adapters (S8) ----------
+[[chunk]]
+id = "C41"
+stage = "S8a"
+model = "haiku"
+func = "ghreview.Payload(refs, inline, body, idx) (Payload, error) — RIGHT side, start_line/start_side for spans, ```suggestion fences; error if any anchor not in idx"
+file = "internal/pr/out/ghreview/payload.go"
+test = "TestPayloadFailsOnBadAnchor"
+validate = "go test ./internal/pr/out/ghreview -run TestPayload"
+
+[[chunk]]
+id = "C42"
+stage = "S8a"
+model = "haiku"
+func = "ghreview.Body(Review) string — writing contract template: verdict + top-3 blocking, tags, How this was checked (commands + runtime table), Outside the diff, Verify, Checked no issue"
+file = "internal/pr/out/ghreview/body.go + templates/body.md.tmpl"
+test = "TestBodyGoldenSections"
+validate = "go test ./internal/pr/out/ghreview -run TestBody"
+
+[[chunk]]
+id = "C43"
+stage = "S8b"
+model = "haiku"
+func = "preview.RenderMD(md, ctxRepo, Renderer) string — gh api markdown mode=gfm behind interface; offline fallback = escaped <pre>"
+file = "internal/pr/out/preview/render.go"
+test = "TestRenderMDUsesFakeRenderer"
+validate = "go test ./internal/pr/out/preview -run TestRenderMD"
+
+[[chunk]]
+id = "C44"
+stage = "S8b"
+model = "haiku"
+func = "preview.ReplaceSuggestions(html, comment, fileLines) string — placeholder <p[^>]*>…</p> → 'Suggested change' -/+ block from anchored lines"
+file = "internal/pr/out/preview/suggest.go"
+test = "TestReplaceSuggestionsHandlesDirAuto"
+validate = "go test ./internal/pr/out/preview -run TestReplaceSuggestions"
+
+[[chunk]]
+id = "C45"
+stage = "S8b"
+model = "haiku"
+func = "preview.Page(Review, idx) []byte — threads under hunks with 3 lines context, summary body on top, no leftover placeholders"
+file = "internal/pr/out/preview/page.go"
+test = "TestPageNoPlaceholdersLeft"
+validate = "go test ./internal/pr/out/preview -run TestPage"
+
+[[chunk]]
+id = "C46"
+stage = "S8c"
+model = "haiku"
+func = "ocrsession.Path(home, repoPath, t, rnd) string — ~/.opencodereview/sessions/<repo-path '/'→'-', leading '/' trimmed>/<YYYYMMDD-HHMMSS-xxxxxx>.jsonl"
+file = "internal/pr/out/ocrsession/path.go"
+test = "TestPathNaming"
+validate = "go test ./internal/pr/out/ocrsession -run TestPath"
+
+[[chunk]]
+id = "C47"
+stage = "S8c"
+model = "haiku"
+func = "ocrsession.Write(w, Session) — session_start, review_item_done per file (LlmComment[]), session_end; uuid/parentUuid chain"
+file = "internal/pr/out/ocrsession/write.go"
+test = "TestWriteRecordChain"
+validate = "go test ./internal/pr/out/ocrsession -run TestWrite"
+note = "first verify field names against ocr v1.14.2 internal/session/persist.go before coding"
+
+[[chunk]]
+id = "C48"
+stage = "S8c"
+model = "haiku"
+func = "ocrsession.Manifest(Session) — v1 run_manifest so ocr lists it as non-legacy"
+file = "internal/pr/out/ocrsession/manifest.go"
+test = "TestManifestV1Fields"
+validate = "go test ./internal/pr/out/ocrsession -run TestManifest"
+
+[[chunk]]
+id = "C49"
+stage = "S8d"
+model = "haiku"
+func = "ci.SARIF(findings) + ci.JSON(findings) for finding v2 (reuses report/sarif.go shapes)"
+file = "internal/pr/out/ci/ci.go"
+test = "TestSARIFHasFingerprints"
+validate = "go test ./internal/pr/out/ci"
+
+# ---------- Phase I: guarded post (S9) ----------
+[[chunk]]
+id = "C50"
+stage = "S9"
+model = "haiku"
+func = "post.Guard(payload, liveHeadSHA, confirm) error — SHA mismatch, attribution grep (Co-Authored-By|Generated with), missing --confirm"
+file = "internal/pr/post/guard.go"
+test = "TestGuardBlocksEachCase"
+validate = "go test ./internal/pr/post -run TestGuard"
+
+[[chunk]]
+id = "C51"
+stage = "S9"
+model = "haiku"
+func = "post.Submit(ctx, client, payload) error — POST /pulls/{n}/reviews, re-list review comments, assert count == len(payload.comments)"
+file = "internal/pr/post/submit.go"
+test = "TestSubmitVerifiesCount (httptest)"
+validate = "go test ./internal/pr/post -run TestSubmit"
+
+# ---------- Phase J: LLM 20% ----------
+[[chunk]]
+id = "C52"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.Budget wrapper over llm.Provider — hard cap, cumulative TokenUsage, refuses call that would exceed"
+file = "internal/pr/llmlayer/budget.go"
+test = "TestBudgetRefusesOverCap"
+validate = "go test ./internal/pr/llmlayer -run TestBudget"
+
+[[chunk]]
+id = "C53"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.StrictJSON[T](ctx, p, prompt, validate) (T, error) — parse, validate, retry once, then drop"
+file = "internal/pr/llmlayer/strict.go"
+test = "TestStrictJSONRetriesOnceThenDrops"
+validate = "go test ./internal/pr/llmlayer -run TestStrictJSON"
+
+[[chunk]]
+id = "C54"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.Triage(findings, hunks, ctx) — confirm|reject+reason only; location/severity floor/rule id immutable"
+file = "internal/pr/llmlayer/triage.go"
+test = "TestTriageCannotMutateLocation"
+validate = "go test ./internal/pr/llmlayer -run TestTriage"
+
+[[chunk]]
+id = "C55"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.Explain(finding, excerpts) — what/why-here/impact/fix; reject output whose claims lack a citation token"
+file = "internal/pr/llmlayer/explain.go"
+test = "TestExplainRequiresCitations"
+validate = "go test ./internal/pr/llmlayer -run TestExplain"
+
+[[chunk]]
+id = "C56"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.Suggest(finding) — suggestion_code for findings without one; accepted only if span-preserving and tree-sitter parses the patched file without new ERROR nodes"
+file = "internal/pr/llmlayer/suggest.go"
+test = "TestSuggestRejectsUnparseable"
+validate = "go test ./internal/pr/llmlayer -run TestSuggest"
+
+[[chunk]]
+id = "C57"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.Novel(hunks, ctx, n=3) — each must quote a diff line that idx.Anchorable accepts; source=llm, status=plausible, tag=verify unless evidence confirms"
+file = "internal/pr/llmlayer/novel.go"
+test = "TestNovelDropsUnanchoredQuotes"
+validate = "go test ./internal/pr/llmlayer -run TestNovel"
+
+[[chunk]]
+id = "C58"
+stage = "LLM"
+model = "haiku"
+func = "llmlayer.OCREngine.Review(ctx, refs, contextMD, budget) []Finding — `ocr review --from --to --format json --max-tokens-budget N --background-file`; map to source=ocr"
+file = "internal/pr/llmlayer/ocr.go"
+test = "TestOCRMapsJSONFixture (recorded ocr json, no network)"
+validate = "go test ./internal/pr/llmlayer -run TestOCR"
+
+[[chunk]]
+id = "C59"
+stage = "LLM"
+model = "haiku"
+func = "split.Report(findings, decisions) — counts by source, deterministic-decision share; error when llm-sourced inline > 20%"
+file = "internal/pr/split/split.go"
+test = "TestSplitFailsOver20Percent"
+validate = "go test ./internal/pr/split"
+
+# ---------- Phase K: wiring + acceptance ----------
+[[chunk]]
+id = "C60"
+stage = "CLI"
+model = "main"
+func = "cmd/coderev newPRCmd() — S1→S9 in order, writes .coderev/pr/<sha>/{context.json,findings.json,payload.json,preview.html,review.sarif}"
+file = "cmd/coderev/pr.go"
+test = "TestPRCmdDryRunOnFixture"
+validate = "go test ./cmd/coderev -run TestPRCmd"
+
+[[chunk]]
+id = "C61"
+stage = "ACC"
+model = "haiku"
+func = "fixture builder: testdata/golden/edge-guard/{base,head}/ → temp git repo with two commits (synthetic TS guard + rate limiter + Front Door/WAF terraform + tests); NO helpshift content"
+file = "internal/pr/testfixture/build.go"
+test = "TestFixtureBuildsTwoCommits"
+validate = "go test ./internal/pr/testfixture"
+
+[[chunk]]
+id = "C62"
+stage = "ACC"
+model = "main"
+func = "golden acceptance: rule engine only, no LLM — anchors in expected.toml, recall ≥ 10/12 inline + 2 outside, zero bad anchors, event REQUEST_CHANGES, no attribution strings, preview has 5 'Suggested change' blocks and 0 placeholders"
+file = "internal/pr/acceptance_test.go + testdata/golden/edge-guard/expected.toml"
+test = "TestGoldenEdgeGuard"
+validate = "go test ./internal/pr -run TestGoldenEdgeGuard"
+
+[[chunk]]
+id = "C63"
+stage = "ACC"
+model = "main"
+func = "ocr round-trip: write session into temp HOME, `ocr session list` shows 12 comments, `ocr session export -o x.html` exits 0 (skips when ocr absent)"
+file = "internal/pr/out/ocrsession/roundtrip_test.go"
+test = "TestOCRRoundTrip"
+validate = "go test ./internal/pr/out/ocrsession -run TestOCRRoundTrip"
+
+[[chunk]]
+id = "C64"
+stage = "DOC"
+model = "haiku"
+func = "docs/pr-pipeline.md + README 'Review a PR' section + rule-authoring guide for internal/config/prrules"
+file = "docs/pr-pipeline.md, README.md"
+test = "n/a (go vet ./... + markdown link check)"
+validate = "go vet ./..."
+
