@@ -76,7 +76,8 @@ th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--mute
 <li><b>coderev</b> is your tool. It takes the same philosophy further: about 80% of decisions are deterministic (rules as data, static gates, runtime proof, anchor validation) and the LLM is bounded to triage, prose and suggestions. ocr is an <i>optional engine</i> that plugs in, and coderev writes ocr-compatible sessions, so <code>ocr viewer</code>, <code>export</code> and <code>compare</code> work on coderev reviews.</li>
 <li>The page should credit ocr by name and link it. It shouldn't reuse ocr's logo or benchmark numbers as coderev's own, or imply coderev is affiliated with Alibaba.</li>
 </ul>
-<p class="muted">Blocked on Q1: which repo hosts nex-ovia.com? Your org has <code>nex-ovia/infraflow-nex-ovia-site</code> and <code>nex-ovia/pages-template</code>.</p>
+<p><b>Q1 answered (repo scan):</b> nex-ovia tools each ship their own product page from <code>nex-ovia/pages-template</code> (<code>site/</code> + GitHub Pages workflow + Cloudflare CNAME), exactly like <code>genome</code> → genome.nex-ovia.com and <code>nx-viz</code>. So the coderev page lives in <b>srivastava-ami/coderev</b> under <code>site/</code>, served at <b>coderev.nex-ovia.com</b>. <code>infraflow-nex-ovia-site</code> is an older Azure Static Web Apps site, not the live hub.</p>
+<p class="muted"><b>Still blocked:</b> the source of the live hub <code>www.nex-ovia.com/tools</code> (needed to add the coderev card) isn't in any GitHub repo this session can see; it's probably a Cloudflare Pages direct upload. Also, the template's installers expect <code>&lt;triple&gt;.tar.gz</code> + <code>.sha256</code>, while coderev releases bare <code>coderev-v&lt;ver&gt;-&lt;os&gt;-&lt;arch&gt;</code> binaries, so chunk W03 adapts them.</p>
 </div>
 
 <h2>Open questions</h2>
